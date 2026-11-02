@@ -10,9 +10,9 @@
 | Job & Search | NestJS | `job` + Elasticsearch | `/jobs` |
 | Application | Spring Boot | `application` | `/applications` |
 | Interview | Spring Boot | `interview` | `/interviews` |
-| Chat | Go + WebSocket | PostgreSQL `public` (owned chat tables) | `/chat` |
-| Notification | Go + SSE | PostgreSQL `public` (owned notification tables) | `/notifications` |
-| Video | Go + LiveKit | PostgreSQL `public` (owned video tables) | `/calls` |
+| Chat | Go + WebSocket | `chat` | `/chat` |
+| Notification | Go + SSE | `notification` | `/notifications` |
+| Video | Go + LiveKit | `video` | `/calls` |
 | Media | NestJS | `media` + Cloudinary | `/files` |
 | Admin | Spring Boot | `admin` | `/admin` |
 | AI | FastAPI | `ai` + pgvector | `/ai` |

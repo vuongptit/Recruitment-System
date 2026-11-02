@@ -32,7 +32,7 @@ func getEnv(key, defaultVal string) string {
 func main() {
 	log.Println("[Video Service] Starting up...")
 
-	dbURL := getEnv("DATABASE_URL", "postgres://video_user:video_secure_pass_123@localhost:5432/video_db?sslmode=disable&search_path=video,public")
+	dbURL := getEnv("DATABASE_URL", "postgres://video_user:video_secure_pass_123@localhost:5432/video_db?sslmode=disable&search_path=video")
 	kafkaBrokersStr := getEnv("KAFKA_BROKERS", "redpanda:9092")
 	jwtPublicKeyPath := getEnv("JWT_PUBLIC_KEY", "/run/secrets/jwt_public_key")
 	jwtJwksURI := getEnv("JWT_JWKS_URI", "")

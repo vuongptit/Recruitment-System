@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS poison_events (
 
 -- Create notification_logs for delivery tracking
 CREATE TABLE IF NOT EXISTS notification_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     notification_id UUID NOT NULL REFERENCES notifications(id) ON DELETE RESTRICT,
     channel VARCHAR(20) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',

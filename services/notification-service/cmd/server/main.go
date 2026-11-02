@@ -34,7 +34,7 @@ func getEnv(key, defaultVal string) string {
 func main() {
 	log.Println("[Notification Service] Starting up...")
 
-	dbURL := getEnv("DATABASE_URL", "postgres://notification_user:notif_secure_pass_123@localhost:5432/notification_db?sslmode=disable&search_path=notification,public")
+	dbURL := getEnv("DATABASE_URL", "postgres://notification_user:notif_secure_pass_123@localhost:5432/notification_db?sslmode=disable&search_path=notification")
 	kafkaBrokersStr := getEnv("KAFKA_BROKERS", "redpanda:9092")
 	jwtPublicKeyPath := getEnv("JWT_PUBLIC_KEY", "/run/secrets/jwt-public.pem")
 	jwtJwksURI := getEnv("JWT_JWKS_URI", "")

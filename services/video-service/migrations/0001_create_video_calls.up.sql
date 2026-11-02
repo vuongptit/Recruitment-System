@@ -1,7 +1,5 @@
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 CREATE TABLE IF NOT EXISTS video_calls (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     room_name VARCHAR(255) NOT NULL UNIQUE,
     host_id UUID NOT NULL,
     title VARCHAR(255) NOT NULL DEFAULT '',

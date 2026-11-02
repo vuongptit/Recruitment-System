@@ -18,22 +18,18 @@ import (
 
 const TargetSchema = "chat"
 
-// EnsureSearchPath guarantees the target schema and public fallback are present in search_path.
+// EnsureSearchPath forces search_path to the service schema only (no public
+// fallback), so every unqualified table lives in and resolves to that schema.
 func EnsureSearchPath(databaseURL, schema string) string {
-	target := schema + ",public"
 	u, err := url.Parse(databaseURL)
 	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") {
-		if strings.Contains(databaseURL, "search_path") {
-			return databaseURL
-		}
-		return strings.TrimSpace(databaseURL) + " search_path=" + target
+		// key=value DSN: lib/pq keeps the last occurrence of a key.
+		return strings.TrimSpace(databaseURL) + " search_path=" + schema
 	}
 
 	q := u.Query()
-	if q.Get("search_path") == "" {
-		q.Set("search_path", target)
-		u.RawQuery = q.Encode()
-	}
+	q.Set("search_path", schema)
+	u.RawQuery = q.Encode()
 	return u.String()
 }
 
@@ -97,4 +93,3 @@ func RunMigrations(db *sql.DB, migrationsFS embed.FS) error {
 	log.Println("[Migration] Chat database migrations applied successfully!")
 	return nil
 }
-
