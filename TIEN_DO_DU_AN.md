@@ -134,40 +134,52 @@ Bốn service Company, Job & Search, Application và AI. **44/44 checkbox của 
 
 ## T05 — Company Service
 
+- **Người phụ trách:** Người 2, mục B1 của tài liệu phân công.
 - **Mục tiêu:** quản lý hồ sơ doanh nghiệp, quy trình xác minh và recruiter thuộc công ty.
-- **Công nghệ:** NestJS, TypeScript, Prisma, PostgreSQL, JWT RS256, Swagger.
+- **Công nghệ hiện tại:** NestJS, TypeScript, Prisma, PostgreSQL, JWT RS256, Swagger.
 - **Luồng hoạt động:** tạo hồ sơ công ty; OWNER xin chữ ký/confirm upload và gắn media đã xác minh; cập nhật; gửi duyệt và Admin xác minh; hiển thị trang công khai; mời, chấp nhận, xóa và chuyển quyền thành viên.
 - **Chức năng chính:** profile CRUD, logo/ảnh/video Media-backed, trạng thái `PENDING/VERIFIED/REJECTED`, ownership, invitation token, public company page và endpoint tra cứu membership cho service khác.
 - **Phụ thuộc:** Auth, File/Media và Admin.
-- **Trạng thái:** nghiệp vụ chính và Company–Media ownership đã merge vào `develop` qua PR #54; migration backup/restore đã verify qua PR #55; append-only domain audit cho duyệt công ty/chuyển OWNER hoàn thành qua PR #56; public search/load hoàn thành qua PR #57. Real Auth–Company invitation identity gate đã PASS; Company–Media contract integration với PostgreSQL thật và HTTP thật hoàn thành qua PR #70; metrics/SLO surface hoàn thành qua PR #81. **Chưa làm:** real Admin approval E2E — bị chặn vì Admin Service mới ở mức scaffold, và live Cloudinary E2E vẫn thuộc P09.
+- **Đã có:** nghiệp vụ chính và Company–Media ownership đã merge vào `develop` qua PR #54; migration backup/restore đã verify qua PR #55; append-only domain audit cho duyệt công ty/chuyển OWNER hoàn thành qua PR #56; public search/load hoàn thành qua PR #57; Company–Media contract integration với PostgreSQL thật và HTTP thật hoàn thành qua PR #70; metrics/SLO surface hoàn thành qua PR #81.
+- **Kiểm thử:** 352 unit tests + 19 PostgreSQL/Media-contract integration PASS; build PASS; API-mock E2E Company PASS sau sửa; real Auth–Company invitation identity gate đã PASS.
+- **Còn thiếu:** real Admin approval E2E — bị chặn vì Admin Service mới ở mức scaffold, và live Cloudinary E2E vẫn thuộc P09; deployed full-system E2E (P17).
 
 ## T06 — Job & Search Service
 
+- **Người phụ trách:** Người 2, mục B2 của tài liệu phân công.
 - **Mục tiêu:** nguồn dữ liệu gốc của tin tuyển dụng và công cụ tìm kiếm việc làm.
-- **Công nghệ:** NestJS, TypeScript, Prisma, PostgreSQL, Elasticsearch, BullMQ, Redis, KafkaJS.
+- **Công nghệ hiện tại:** NestJS, TypeScript, Prisma, PostgreSQL, Elasticsearch, BullMQ, Redis, KafkaJS.
 - **Luồng hoạt động:** recruiter tạo/sửa tin nháp; gửi duyệt; Admin duyệt/từ chối; đóng/hết hạn tin; tìm kiếm và lọc; đồng bộ Elasticsearch; phát `job-events`; lấy gợi ý từ AI.
 - **Chức năng chính:** Job CRUD, state machine `DRAFT → PENDING_APPROVAL → PUBLISHED/REJECTED → CLOSED/EXPIRED`, tìm kiếm full-text và filter, reindex, PostgreSQL fallback, endpoint kiểm tra job còn nhận hồ sơ.
 - **Phụ thuộc:** Auth, Company, Admin, Elasticsearch, Redis, Kafka và AI.
-- **Trạng thái:** CRUD, publishing, search, durable Elasticsearch indexing, availability, thống kê job active, `job-events` v1 qua transactional outbox và Candidate job recommendation đã hoàn thành; PR #48 bổ sung explicit-preference fallback deterministic. PR #49 bổ sung Recruiter-only candidate recommendation với Company/Job capability, version binding và post-resolution revalidation. Controlled 100.000-Job search load gate, deep cursor pagination, Vietnamese mapping v4 và strict canonical access-token/JWKS verification ở mức service test đã PASS; CV Candidate index/filter gate hoàn thành ở mục 2.34 và Candidate-facing `/recommend/jobs` full-target HTTP/load gate hoàn thành ở mục 2.41. Application–Job internal contract gate với Job Service thật hoàn thành qua PR #72; metrics/SLO surface hoàn thành qua PR #80. **Chưa làm:** deployed Auth–Job negative E2E và deployed load/capacity trên hạ tầng thật.
+- **Đã có:** CRUD, publishing, search, durable Elasticsearch indexing, availability, thống kê job active, `job-events` v1 qua transactional outbox và Candidate job recommendation đã hoàn thành; PR #48 bổ sung explicit-preference fallback deterministic; PR #49 bổ sung Recruiter-only candidate recommendation với Company/Job capability, version binding và post-resolution revalidation; Application–Job internal contract gate với Job Service thật hoàn thành qua PR #72; metrics/SLO surface hoàn thành qua PR #80; SessionGate cho job công khai đã sửa (mục 2.60).
+- **Kiểm thử:** 611 unit tests + 7 integration PostgreSQL PASS; build PASS; controlled 100.000-Job search load gate, deep cursor pagination, Vietnamese mapping v4 và strict canonical access-token/JWKS verification ở mức service test đã PASS; CV Candidate index/filter gate hoàn thành ở mục 2.34; Candidate-facing `/recommend/jobs` full-target HTTP/load gate hoàn thành ở mục 2.41; Application–Job internal contract gate với Job Service thật hoàn thành qua PR #72.
+- **Còn thiếu:** 13 ca test Kafka/indexing cần bộ test cô lập riêng (mục 2.59); deployed Auth–Job negative E2E và deployed load/capacity trên hạ tầng thật; real Admin approval E2E (phụ thuộc P10 của Người 1).
 
 ## T07 — Application Service
 
+- **Người phụ trách:** Người 2, mục B3 của tài liệu phân công.
 - **Mục tiêu:** quản lý toàn bộ vòng đời ứng tuyển từ lúc Candidate nộp đơn đến khi tuyển hoặc bị loại.
-- **Công nghệ:** Spring Boot 3, Java 21, Spring Security Resource Server, Spring Data JPA, Flyway, PostgreSQL, Spring Kafka, transactional outbox.
+- **Công nghệ hiện tại:** Spring Boot 3, Java 21, Spring Security Resource Server, Spring Data JPA, Flyway, PostgreSQL, Spring Kafka, transactional outbox.
 - **Luồng hoạt động:** nộp đơn; Bookmark; Candidate theo dõi timeline; HR lọc và quản lý hồ sơ; state machine; đánh giá nội bộ; gửi/phản hồi Offer; thống kê recruiter; tính lại điểm AI theo yêu cầu.
 - **Chức năng chính:** Application, ApplicationHistory, Evaluation, Offer, Bookmark; optimistic locking; phân quyền theo Candidate/công ty; refresh `match_score`; phát `application-events`.
 - **Phụ thuộc:** Auth, Profile, Job, Company, AI, File/Media và Notification qua Kafka.
-- **Trạng thái:** các luồng đến Recruiter Dashboard và AI Match phía Application đã merge. Canonical Profile verification, recruiter CV metadata/download và Flyway V6 usage ledger đã merge qua PR #39; Flyway V7 permanent deletion gate và submission serialization qua PR #42; Profile v2 consumer, Flyway V8 snapshot/filter qua PR #47; canonical `application-events` JSON Schema/fixtures và v1 producer cho Submission/Pipeline/Offer hoàn thành qua PR #50; strict canonical JWT/JWKS consumer gate hoàn thành qua PR #64; controlled concurrency/load gate 10.000 call hoàn thành qua PR #65; Offer `SENT` được đồng bộ nguyên tử sang `CANCELLED` khi Application ở `OFFER` bị reject/withdraw và legacy được backfill bằng Flyway V9 qua PR #67. Offer quá hạn được worker chuyển sang terminal `EXPIRED` với Flyway V10 qua PR #68; contract gate với AI Service thật qua PR #71 đã phát hiện và sửa lỗi h2c upgrade làm hỏng mọi lời gọi `/match`; contract gate với Job Service thật qua PR #72; metrics/SLO surface qua PR #79. **Chưa làm:** deployed E2E và HTTP/multi-replica load trên hạ tầng thật.
+- **Đã có:** các luồng đến Recruiter Dashboard và AI Match phía Application đã merge. Canonical Profile verification, recruiter CV metadata/download và Flyway V6 usage ledger đã merge qua PR #39; Flyway V7 permanent deletion gate và submission serialization qua PR #42; Profile v2 consumer, Flyway V8 snapshot/filter qua PR #47; canonical `application-events` JSON Schema/fixtures và v1 producer cho Submission/Pipeline/Offer hoàn thành qua PR #50; strict canonical JWT/JWKS consumer gate hoàn thành qua PR #64; controlled concurrency/load gate 10.000 call hoàn thành qua PR #65; Offer `SENT` được đồng bộ nguyên tử sang `CANCELLED` khi Application ở `OFFER` bị reject/withdraw và legacy được backfill bằng Flyway V9 qua PR #67; Offer quá hạn được worker chuyển sang terminal `EXPIRED` với Flyway V10 qua PR #68; contract gate với AI Service thật qua PR #71 đã phát hiện và sửa lỗi h2c upgrade làm hỏng mọi lời gọi `/match`; contract gate với Job Service thật qua PR #72; metrics/SLO surface qua PR #79.
+- **Kiểm thử:** 326 unit/WebMvc/security + 99 integration/AI-contract PASS, gồm V11/outbox ordering; JAR build PASS.
+- **Còn thiếu:** Job-contract timeout trong integration tổng thể chưa chốt; canonical Offer-letter Media contract; deployed E2E và HTTP/multi-replica load trên hạ tầng thật.
 
 ## T08 — AI Service
 
+- **Người phụ trách:** Người 2, mục B4 của tài liệu phân công.
 - **Mục tiêu:** tạo embedding CV/Job, chấm điểm tương đồng, gợi ý việc và chatbot hỗ trợ Candidate.
 - **Công nghệ theo tài liệu:** Python, FastAPI, sentence-transformers `all-MiniLM-L6-v2`, pgvector, Redis, Kafka và Anthropic Claude.
 - **Công nghệ hiện tại:** FastAPI, Psycopg 3, Alembic, PostgreSQL/pgvector, confluent-kafka và sentence-transformers CPU với model/revision bất biến; chatbot dùng Anthropic Claude qua `anthropic==0.120.2`, JWT RS256/JWKS qua `PyJWT==2.13.0` và Redis qua `redis==7.4.1`.
 - **Luồng hoạt động:** consume `cv-events`; consume `job-events`; cập nhật/xóa vector; cosine similarity; recommend jobs/CVs; match CV-job; chatbot có lịch sử ngắn hạn.
 - **Chức năng chính:** đã có `/ai/match`, internal `/recommend/jobs`, internal `/recommend/candidates`, consumer idempotent và Candidate-only `POST /chat`; Job Service public surface cho Recruiter chỉ trả projection Candidate tối thiểu. Chatbot có personalized Job recommendation tool bật độc lập bằng feature flag, chỉ gọi fixed Candidate `/recommended?limit=3` khi Claude trả exact intent không tham số.
 - **Phụ thuộc:** schema `cv-events`, `job-events`, Kafka, PostgreSQL pgvector và Redis.
-- **Trạng thái:** đã có vector store/migration, internal auth/readiness, provider `/match`, worker Job embedding, dedicated CV embedding worker dùng private Media download, internal `/recommend/jobs`, consent-scoped `/recommend/candidates`, backend chatbot Candidate và personalized Job recommendation tool v1. Chatbot khóa RS256/JWKS, fixed recruitment-only prompt, Redis history HMAC 10 lượt/24 giờ, renewable exact-token session lease/fencing, distributed sliding limit theo user/toàn cục, timeout/output hữu hạn, lỗi làm sạch và `no-store`; token Candidate chỉ được chuyển tạm thời tới fixed Job endpoint sau exact tool intent và không được lưu vào history. Exact Candidate–CV pair, authoritative Job version và HMAC cursor đã được khóa qua PR #49; CV HNSW cùng controlled 100.000-CV index/filter/exact-allowlist gate và Candidate-facing 100.000-Job full-target HTTP/load gate đã PASS. PR #69 bổ sung distributed limiter Redis cho `/recommend/jobs` và `/recommend/candidates`. Filter-aware ANN đã điều tra và **loại trừ** qua PR #73 vì index chỉ phục vụ khoá khoảng cách đơn thuần; guarded live-FAQ runner qua PR #74; relevance tiếng Việt đo bằng model thật qua PR #75 (precision@1 1.0, bỏ dấu 1.0, tách sạch 0.25); bất biến cross-replica qua PR #76; metrics/SLO surface qua PR #77 — PR #83 chuyển scrape sang `INTERNAL_API_KEY_METRICS` riêng và tùy chọn thay vì dùng lại `INTERNAL_API_KEY` nghiệp vụ; load hai replica qua PR #78 gặp lại race migration làm replica crash-loop khi rolling deploy, nhưng advisory lock mà #78 thêm vào **đã bị revert ở PR #83** vì deadlock với `CREATE INDEX CONCURRENTLY` của revision `20260829_06` — cách xử lý đúng vẫn là một migration job chạy trước rồi mới bật replica API (mục 2.53 và 2.57). **Chưa làm:** live Claude 10-FAQ (thiếu API key), corpus production quy mô thật và deployed load/monitoring trên hạ tầng thật; frontend chatbot widget và limiter tầng gateway thuộc Người 3.
+- **Đã có:** đã có vector store/migration, internal auth/readiness, provider `/match`, worker Job embedding, dedicated CV embedding worker dùng private Media download, internal `/recommend/jobs`, consent-scoped `/recommend/candidates`, backend chatbot Candidate và personalized Job recommendation tool v1. Chatbot khóa RS256/JWKS, fixed recruitment-only prompt, Redis history HMAC 10 lượt/24 giờ, renewable exact-token session lease/fencing, distributed sliding limit theo user/toàn cục, timeout/output hữu hạn, lỗi làm sạch và `no-store`; token Candidate chỉ được chuyển tạm thời tới fixed Job endpoint sau exact tool intent và không được lưu vào history. Exact Candidate–CV pair, authoritative Job version và HMAC cursor đã được khóa qua PR #49; CV HNSW cùng controlled 100.000-CV index/filter/exact-allowlist gate và Candidate-facing 100.000-Job full-target HTTP/load gate đã PASS. PR #69 bổ sung distributed limiter Redis cho `/recommend/jobs` và `/recommend/candidates`. Filter-aware ANN đã điều tra và **loại trừ** qua PR #73 vì index chỉ phục vụ khoá khoảng cách đơn thuần; guarded live-FAQ runner qua PR #74; relevance tiếng Việt đo bằng model thật qua PR #75 (precision@1 1.0, bỏ dấu 1.0, tách sạch 0.25); bất biến cross-replica qua PR #76; metrics/SLO surface qua PR #77 — PR #83 chuyển scrape sang `INTERNAL_API_KEY_METRICS` riêng và tùy chọn thay vì dùng lại `INTERNAL_API_KEY` nghiệp vụ; load hai replica qua PR #78 gặp lại race migration làm replica crash-loop khi rolling deploy, nhưng advisory lock mà #78 thêm vào **đã bị revert ở PR #83** vì deadlock với `CREATE INDEX CONCURRENTLY` của revision `20260829_06` — cách xử lý đúng vẫn là một migration job chạy trước rồi mới bật replica API (mục 2.53 và 2.57).
+- **Kiểm thử:** 672 unit PASS trên Python 3.11; 77 integration PostgreSQL/pgvector/Redis PASS; lint/format PASS. 2 test Kafka cần live broker chưa chạy.
+- **Còn thiếu:** live Claude 10-FAQ (thiếu API key), corpus production quy mô thật; 2 test Kafka tích hợp; deployed load/monitoring trên hạ tầng thật; frontend chatbot widget và limiter tầng gateway thuộc Người 3.
 
 ## T09 — Interview & Video Call Service
 
@@ -1348,7 +1360,11 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 
 # 3. Danh sách task CHƯA làm (Pending)
 
-## P01 — Hoàn tất và bàn giao Application Pipeline
+## P01–P04 — Application Service
+
+> Bốn vertical slice của Application Service: Pipeline (P01), Evaluation (P02), Offer (P03), Recruiter Dashboard & AI Match (P04) đã hoàn thành, verify và merge vào `develop`. Full Application verify đạt **326 unit/WebMvc/security + 99 integration test** (gồm V11/outbox ordering và hai contract gate thật với AI Service #71 và Job Service #72). Controlled concurrency/load gate đạt 10.000 service call với 0 lỗi/deadlock (PR #65).
+
+### P01 — Hoàn tất và bàn giao Application Pipeline
 
 - [x] Tạo Pull Request vào `develop`, review và merge qua PR #14 (`08cb887`).
 - [x] Xác nhận commit `c0f5a0c` đã có trong lịch sử `develop`.
@@ -1357,7 +1373,7 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 - [x] Test hai recruiter đổi trạng thái cùng lúc: đúng một request thành công và request còn lại nhận lỗi concurrent `409`.
 - [x] Chốt quyền MEMBER/OWNER: cả hai role được xem và xử lý hồ sơ của toàn bộ job cùng công ty; recruiter công ty khác nhận `403`.
 
-## P02 — Application Evaluation
+### P02 — Application Evaluation
 
 > Đã hoàn thành, verify và merge vào `develop` theo xác nhận của người dùng.
 
@@ -1368,7 +1384,7 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 - [x] Bảo đảm Candidate không bao giờ nhận Evaluation trong API của mình.
 - [x] Bổ sung unit/integration test và Swagger.
 
-## P03 — Application Offer
+### P03 — Application Offer
 
 > Core Offer đã hoàn thành, terminal-state consistency được bổ sung qua PR #67 và auto-expiry worker qua PR #68; canonical Offer-letter Media vẫn là hạng mục riêng thuộc P09.
 
@@ -1384,7 +1400,7 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 - [x] Flyway V9 backfill legacy terminal Application + `SENT` Offer, tăng Offer version, giữ event v1 không có Offer trio và kiểm constraint/rollback trên PostgreSQL thật.
 - [x] Bổ sung worker xử lý Offer `SENT` quá `expires_at`: scheduled scan bounded batch dùng `FOR UPDATE SKIP LOCKED` chuyển row sang terminal `EXPIRED` với `responded_at = expires_at`, Flyway V10 mở rộng constraint và backfill row quá hạn; Application giữ nguyên `OFFER` và worker không phát `application-events`.
 
-## P04 — Application Recruiter Dashboard và AI Match
+### P04 — Application Recruiter Dashboard và AI Match
 
 > Recruiter Dashboard, AI Match và Application-time skill snapshot/filter đã hoàn thành. Profile provider v2 qua PR #46; Application consumer, Flyway V8 và Recruiter filter qua PR #47. P17 deployed cross-service E2E vẫn pending.
 
@@ -1401,6 +1417,12 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 - [x] Bổ sung controlled transaction/load gate độc lập cho năm race quan trọng: đúng **10.000 service call** ở concurrency 32, 5.000 winner/5.000 conflict `409` dự kiến, 0 unexpected/5xx/deadlock/timeout, p95 114,567 ms, p99 162,895 ms và 585,53 call/s.
 - [x] Test dữ liệu rỗng, range thiếu/sai/quá 366 ngày, quyền công ty, timezone PostgreSQL, `DAY/WEEK/MONTH` và DST.
 - [x] Verify AI Match đạt tổng cộng 162 unit test và 35 integration test PostgreSQL/Kafka; riêng task mới bổ sung 36 unit test và 6 integration test.
+
+### Các hạng mục còn thiếu cần hoàn thiện (Pending)
+
+- [ ] Chốt Job-contract timeout trong integration tổng thể.
+- [ ] Tích hợp canonical Offer-letter Media contract (thuộc P09, phối hợp với Người 1).
+- [ ] Triển khai deployed E2E và HTTP/multi-replica load trên hạ tầng thật (thuộc P17).
 
 ## P05 — Hoàn thiện Job & Search
 
@@ -1425,7 +1447,16 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
   - [x] 10.000 request concurrency 32 đạt 0 lỗi, 164,632 req/s, p95 402,763 ms, p99 503,771 ms; PIT context 0/peak 32/final 0; 429 unit + 20 integration test PASS.
 - [x] Enforce strict canonical access-token/JWKS consumer contract ở mức Job service: exact Bearer/header/claim, static/current/previous RSA key, bounded/cooldown/single-flight JWKS rotation, sanitized 401/503/500 và negative security matrix; gate của task này (PR #63) PASS 533 unit + 20 integration test; full gate hiện tại — sau metrics surface #80 và các sửa lỗi audit #83 — là **553 unit + 20 integration test PASS**. Deployed Auth–Job E2E vẫn thuộc P17.
 
+### Các hạng mục còn thiếu cần hoàn thiện (Pending)
+
+- [ ] Chạy 13 ca test Kafka/indexing trong bộ test cô lập riêng (mục 2.59).
+- [ ] Deployed Auth–Job negative E2E trên môi trường triển khai thật (thuộc P17).
+- [ ] Deployed search/load/capacity trên hạ tầng thật (thuộc P17).
+- [ ] Real Admin approval E2E (bị chặn vì Admin Service P10 của Người 1 mới ở mức scaffold).
+
 ## P06 — Hoàn thiện Company Service
+
+> Nghiệp vụ chính và Company–Media ownership đã merge vào `develop` qua PR #54; migration backup/restore đã verify qua PR #55; append-only domain audit cho duyệt công ty/chuyển OWNER hoàn thành qua PR #56; public search/load hoàn thành qua PR #57. Real Auth–Company invitation identity gate đã PASS; Company–Media contract integration với PostgreSQL thật và HTTP thật hoàn thành qua PR #70; metrics/SLO surface hoàn thành qua PR #81.
 
 - [ ] Chạy integration test với Auth/Admin/File Service thật.
   - [x] Auth–Company invitation acceptance dùng JWT từ real `/auth/login` và durable `/auth/me`: email binding, account lock/delete/role/email change, replay/concurrency và Auth outage đều PASS không mutation sai.
@@ -1435,6 +1466,12 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 - [x] Chạy Prisma migration trên database sạch và kiểm tra backup/restore cùng restore-based rollback; verifier PostgreSQL 16 fail-closed, migration deploy lặp, drift/ledger/data/constraint và corrupt-archive negative đều PASS.
 - [x] Bổ sung append-only Company domain audit cho duyệt công ty và thay đổi OWNER; actor từ canonical JWT, mutation/audit cùng transaction và PostgreSQL migration/audit/backup/restore gate PASS.
 - [x] Kiểm tra phân trang/tìm kiếm trang công ty công khai ở tải lớn: signed keyset + Vietnamese FTS, full 80.000-row traversal và 10.000-request HTTP benchmark trên fixture 100.000 Company đều PASS; PR #57.
+
+### Các hạng mục còn thiếu cần hoàn thiện (Pending)
+
+- [ ] Real Admin approval E2E: bị chặn vì Admin Service mới ở mức scaffold (toàn bộ P10 chưa implement).
+- [ ] Live Cloudinary E2E: vẫn thuộc P09 (phối hợp Người 1).
+- [ ] Triển khai deployed full-system E2E trên hạ tầng thật (thuộc P17).
 
 ## P07 — Auth Service
 
@@ -1632,19 +1669,33 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 >
 > **Hiện trạng FE cập nhật 31/08/2026:** UI Người 2 hiện có 13 route chính. Các task nền tảng đã thêm adapter `demo|gateway`, read flow thật, cập nhật Company với recovery `409`, shared recovery `429/503` và private session boundary. Company onboarding đã nối `POST /companies/`, validate đúng DTO và đổi `404 COMPANY_NOT_FOUND` thành CTA tạo hồ sơ. Máy trạng thái xác minh đã nối resubmit thật, chỉ mở action ở `REJECTED` và reload đúng một lần khi trạng thái đổi ở tab khác. Sửa tên/mã số thuế của công ty `VERIFIED` đã có shared dialog cảnh báo trước mutation và cập nhật badge theo response. Company media đã thay mô phỏng bằng signed upload/confirm/attach thật, có policy guard, countdown và abandoned-intent recovery; thư viện đã có replace-all editor, reorder và quota/duplicate guard. Tìm kiếm Company công khai đã nối cursor HMAC mờ, khóa `q`/`limit` trong chuỗi tải thêm và chỉ dựa vào `hasMore`, không giả lập `total`. Hồ sơ Company công khai đã nối detail API, có logo placeholder, media empty state và chỉ render danh sách media hiện có trong response backend. OWNER đã có form mời thành viên, token chỉ giữ trong React memory và buộc copy thủ công ngay từ response tạo lời mời. Người được mời đã có route dán token riêng và error-state/CTA theo từng mã 404/410/409/403/401. Membership self-lookup hiện điều khiển fail-closed toàn bộ action OWNER; màn thành viên hỗ trợ list, remove và transfer ownership, hạ quyền caller ngay rồi re-fetch vai trò. Recruiter Job lifecycle đã bỏ mutation local, suy action từ status backend và nối submit-for-approval/close thật. Tin bị admin trả về nay hiện `rejectionReason` ngay trên danh sách và có route sửa–gửi duyệt lại; bước lưu và bước gửi tách recovery để không lặp mutation đã thành công. Form tạo/sửa Job dùng chung validator bám DTO, form tạo đã nối `POST /jobs/`; salary negotiable được omit, deadline/kỹ năng/kinh nghiệm/số lượng được normalize và chặn trước request. Tìm việc công khai đã có đủ filter/sort và hai chế độ OFFSET/CURSOR; cursor chain append khử trùng, khóa toàn bộ criteria và OFFSET có CTA chuyển mode khi chạm cửa sổ 10.000. Hai stale cursor code của search/recommendation nay tự restart đúng một lần, giữ list cũ khi tải và báo mềm thay vì đẩy người dùng vào error state. Search và recommendation hiện ghi rõ nguồn dữ liệu bằng nội dung thân thiện; đủ sáu fallback AI có giải thích và CTA riêng, không render raw reason làm UX chính. Recommendation có cursor append/infinite scroll kèm nút fallback chỉ ở nguồn AI; mọi cursor bất thường từ PREFERENCES/LATEST bị loại và không sinh nút xem thêm. Access token chỉ ở memory; request private luôn no-store và đổi account/logout/401 xóa state. Riêng offer hiển thị rõ API chưa có endpoint đọc. Production phải đặt `NEXT_PUBLIC_API_MODE=gateway` và Auth phải gọi `setApiSession`. Chỉ checkbox có implementation + test trực tiếp mới được đánh dấu.
 
-**Bàn giao baseline theo task:**
+#### 1. Nền tảng & Kiến trúc dùng chung (Foundation & Shared Client)
 
+**Tiến độ bàn giao baseline:**
 - [x] Khóa design context bằng `DESIGN.md`, `UX-CONTRACT.md` và runtime token trong `frontend/app/globals.css`, bám palette xanh, Manrope/Inter, tonal layer, card 16px và responsive layout của Stitch.
 - [x] Tạo shared UI state cho page header, badge, metric, loading và empty state; global scrollbar, focus-visible, reduced-motion và semantic table baseline.
-- [x] Dựng Candidate UI cho job search hai mode, job detail/apply, application state và offer response bằng dữ liệu demo có kiểu TypeScript.
-- [x] Dựng Recruiter UI cho company verification/media handshake, job list/filter/state action và form tạo job có validation phía client.
 - [x] Sửa import, syntax API client và điều kiện dữ liệu demo; production build Next.js PASS.
 - [x] Thêm `apiClientCore.ts` + `person2Api.ts`: nối Company/Job Search/Recommendation/Application read flow với Gateway, không fallback demo khi production lỗi.
 - [x] Thêm timeout/abort, debounce search 300 ms, safe error mapping, Retry-After/backoff, memory-only access token và shared error/retry state.
 - [x] Thêm 7 unit test API contract, lệnh `npm test`/`npm run typecheck` và cấu hình `premium-ui.json` tương ứng.
-- [x] Nối cập nhật Company với API thật và thêm shared conflict snapshot/panel: giữ draft, tải server đúng một lần, so sánh phiên bản/trường và chỉ gửi lại khi người dùng chủ động bấm lưu; 10/10 API/conflict unit test, typecheck, build và strict UI audit PASS.
 - [x] Thêm shared transient recovery cho `429/503` và nối vào `/jobs/mine`: phân biệt server `Retry-After` với local backoff 2–30 giây, auto-retry tối đa một lần, khóa duplicate retry; 13/13 unit test PASS.
 - [x] Thêm `ApiSessionBoundary` ở root và `setApiSession({ token?, accountId })`: xóa toàn bộ React page state khi đổi tài khoản/logout/401, giữ state khi refresh token cùng account, hỗ trợ cookie HttpOnly; 16/16 unit test PASS.
+- [x] Hoàn tất shared optimistic `409` cho cả ba consumer: Company, Job edit/submit và Application status/match đều reload authoritative đúng một lần, giữ draft/intent, mở bảng so sánh và chỉ gửi lại sau quyết định chủ động; 99/99 unit test PASS.
+
+**Checklist hợp đồng endpoint nền tảng (7 endpoint/primitive):**
+- [x] API client bóc envelope thống nhất: thành công là `{data, meta}`, lỗi là `{code, message, details}`. Hiển thị theo `code` chứ không hiển thị `message` thô; `details` mới là chỗ mang thông tin điều hướng (`currentStatus`, `reason`, `eligibleAt`, `retryAfterSeconds`).
+- [x] Gọi đúng đường dẫn có **dấu `/` cuối** cho ba route collection — `POST /companies/`, `POST /jobs/`, `POST|GET /applications/`. Gateway chỉ khai báo `location /companies/`, `/jobs/`, `/applications/`, nên bỏ dấu `/` là bị nginx redirect sang host nội bộ `api-gateway`, không phải lỗi từ service; lỗi này không có mã nghiệp vụ để bắt. Khi FE gọi qua proxy `/api` của Next (cấu hình Docker), `next.config.mjs` phải bật `skipTrailingSlashRedirect` và giữ dấu `/` trong rewrite, nếu không Next tự redirect 308 và bỏ dấu `/` trước khi proxy (sửa ở mục 2.58).
+- [x] Bộ xử lý `409` dùng chung cho optimistic locking: tải lại resource, so sánh, cho người dùng quyết định gửi lại — **không retry mù**. Áp cho `APPLICATION_CHANGED_CONCURRENTLY`, `JOB_STATE_CHANGED`, `COMPANY_UPDATE_CONFLICT`. Shared primitive và Company consumer đã hoàn thành; Job/Application consumer sẽ đóng cùng mutation flow tương ứng.
+- [x] Bộ xử lý `429`/`503` phân biệt hai nhóm: nhóm **có** `Retry-After` đếm ngược và tự thử lại đúng một lần; nhóm **không có** như `MEDIA_UPLOAD_RATE_LIMITED` của Company hay AI rate-limit quy về `503` ở Application dùng local backoff 2–30 giây và khóa nút đến khi được phép thử lại.
+- [x] Tôn trọng `Cache-Control: private, no-store` + `Vary: Authorization` trên dữ liệu riêng: mọi request private dùng `credentials: include`, `cache: no-store` và header no-cache; không có service worker/Web Storage; root session boundary xóa sạch React state khi logout, 401 hoặc đổi tài khoản.
+- [x] Kiểm định dạng UUID v4 trước khi điều hướng vào trang chi tiết, vì id sai định dạng bị chặn bằng `400 INVALID_JOB_ID` trước khi tới service.
+- [x] Không gửi field lạ trong body/query: `ValidationPipe` của Company và Job bật `forbidNonWhitelisted`, còn `/ai/chat` bật `extra=forbid` — thừa một field là `400`/`422`.
+
+#### 2. Company Service Frontend
+
+**Tiến độ bàn giao baseline:**
+- [x] Dựng Recruiter UI cho company verification/media handshake.
+- [x] Nối cập nhật Company với API thật và thêm shared conflict snapshot/panel: giữ draft, tải server đúng một lần, so sánh phiên bản/trường và chỉ gửi lại khi người dùng chủ động bấm lưu; 10/10 API/conflict unit test, typecheck, build và strict UI audit PASS.
 - [x] Thêm Company onboarding: `404 COMPANY_NOT_FOUND` hiển thị empty state, route `/recruiter/company/new` gọi `POST /companies/`, validate/focus lỗi đúng DTO và xử lý membership conflict; 19/19 unit test PASS.
 - [x] Thêm máy trạng thái xác minh Company và nối `POST /companies/me/submit-verification`: chỉ hiện lý do/nút gửi lại ở `REJECTED`, chuyển badge về `PENDING`, xử lý `409 INVALID_RESUBMISSION_TRANSITION` bằng một lần tải lại và không retry mutation; 22/22 unit test PASS.
 - [x] Thêm shared accessible `ConfirmationDialog` cho thay đổi pháp lý ở Company `VERIFIED`: chỉ gọi `PUT /companies/:id` sau xác nhận, hủy vẫn giữ draft, pending khóa hành động và badge dùng response backend; 23/23 unit test PASS.
@@ -1652,61 +1703,11 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 - [x] Thêm Company media replace-all editor: kéo thả và nút bàn phím để sắp xếp, xóa gallery/logo có hoàn tác, gửi lại toàn bộ `media` với `sortOrder`, chặn quá 10 IMAGE/1 VIDEO và mọi `fileId` trùng logo/gallery; không gửi `logo` cùng `removeLogo`; 28/28 unit test PASS.
 - [x] Thêm route `/companies` tìm kiếm Company công khai: debounce an toàn với IME, cursor mờ chỉ giữ trong memory, khóa `q`/`limit` suốt chuỗi, append khử trùng theo `id`, infinite scroll có nút fallback và kết thúc theo `hasMore`; 30/30 unit test PASS.
 - [x] Thêm route `/companies/[companyId]` cho hồ sơ Company công khai: validate UUID ở Gateway mode, render riêng `404`/chưa xác minh, placeholder khi `logoUrl=null`, sắp media ổn định, empty state khi media chưa xử lý và không giả định file vừa confirm đã công khai; 32/32 unit test PASS.
-- [x] Thêm luồng OWNER mời thành viên bằng `POST /companies/:id/members`: normalize/validate email, không retry mutation, hiển thị `invitationToken` chỉ trong memory ngay sau response, copy có fallback thủ công, cảnh báo reload/mời lại làm mất hoặc vô hiệu token cũ; 34/34 unit test PASS.
+- [x] Thêm luồng OWNER mời thành viên bằng `POST /companies/:id/members`: normalize/validate email, không retry mutation, hiển thị `invitationToken` chỉ trong memory ngay sau response, copy có fallback thủ công, cảnh báo reload/mời lại cùng email sẽ mất hoặc vô hiệu token cũ; 34/34 unit test PASS.
 - [x] Thêm route `/recruiter/invitations/accept` gọi `POST /companies/invitations/accept`: token chỉ ở memory, validate 32–128 ký tự, thành công hiển thị membership; mapping CTA riêng cho không tìm thấy, hết hạn, không active, cần phát lại, đã có công ty, sai email, tài khoản inactive/forbidden/invalid và lỗi retryable; 37/37 unit test PASS.
 - [x] Thêm Company membership owner console: self-role lookup bằng account id trong memory, list/remove member, shared confirmation cho remove/transfer, sau transfer hạ local role về MEMBER ngay rồi re-fetch authoritative role; toàn bộ edit pháp lý, resubmit, media, invite và member action fail-closed theo role; 40/40 unit test PASS.
-- [x] Nối recruiter Job state machine: action được suy từ exact status (`DRAFT` gửi duyệt, `PUBLISHED` đóng; còn lại read-only), gọi PATCH publish/close không retry mutation, dùng response backend cập nhật row và khóa duplicate action; 42/42 unit test PASS.
-- [x] Thêm luồng Job bị admin trả về: danh sách hiện `rejectionReason`, CTA “Sửa theo góp ý”, route `/recruiter/jobs/[jobId]/edit` gọi PUT rồi PATCH submit-for-approval; nếu PUT thành công nhưng PATCH lỗi chỉ retry bước gửi duyệt, không lưu lặp; 43/43 unit test PASS.
-- [x] Chuẩn hóa form tạo/sửa Job bằng validator dùng chung bám `CreateJobDto`: deadline sau ngày UTC hiện tại; salary bắt buộc/đúng thứ tự hoặc omit hoàn toàn khi thỏa thuận; skills NFKC/trim/khử trùng trong khoảng 1–50; kiểm thêm mọi field bắt buộc, kinh nghiệm và số lượng. Form tạo gọi `POST /jobs/`, mutation không auto-retry; 45/45 unit test PASS.
-- [x] Hoàn thiện tìm việc công khai OFFSET/CURSOR: gửi đủ filter/sort allowlist, validate trước request, reset traversal khi criteria/mode/limit đổi; OFFSET chặn cửa sổ 10.000 và có CTA chuyển mode/thu hẹp filter, CURSOR append khử trùng theo id và chỉ tải bằng `nextCursor`; 47/47 unit test PASS.
-- [x] Xử lý stale cursor cho Job Search và Recommendation theo exact error code: giữ list hiện tại trong lúc restart, bỏ cursor và tải trang đầu đúng một lần, cuộn về đầu vùng kết quả sau snapshot mới, hiện thông báo mềm; stale lặp lại mới vào error state; 48/48 unit test PASS.
-- [x] Minh bạch nguồn search/recommendation: `ELASTICSEARCH|POSTGRESQL` và `AI|PREFERENCES|LATEST` có nhãn + giải thích; sáu fallback reason của Candidate recommendation có nội dung/CTA riêng, `NO_ACTIVE_CV` dẫn tới quản lý CV còn các nhánh AI/profile làm mới recommendation có pending lock; 50/50 unit test PASS.
-- [x] Thêm pagination recommendation theo `nextCursor`: adapter gửi cursor/limit, UI append khử trùng và có IntersectionObserver kèm nút fallback; chỉ `source=AI` cùng cursor khác null mới bật tải thêm, PREFERENCES/LATEST luôn ép cursor null và ẩn điều khiển; stale continuation vẫn restart trang đầu đúng một lần; 51/51 unit test PASS.
-- [x] Thêm route recruiter `/recruiter/jobs/[jobId]` để xem gợi ý ứng viên: render candidate card/điểm/skills; đủ sáu empty reason với nội dung và CTA riêng; response HTTP 200 có mảng rỗng được coi là trạng thái nghiệp vụ bình thường, không rơi vào error state; 52/52 unit test PASS.
-- [x] Bảo vệ endpoint gợi ý ứng viên bằng debounce 300 ms và request lock: UI vô hiệu thao tác lặp trong lúc chờ; lỗi 429 được nhận theo HTTP status nên chịu được cả body gateway/service, đọc `Retry-After` từ header hoặc `details.retryAfterSeconds`, đếm ngược và chỉ tự thử lại một lần; 54/54 unit test PASS.
-- [x] Hoàn thiện bảng recruiter cho hợp đồng `GET /jobs/mine` trả toàn bộ mảng: tìm kiếm NFKC, lọc status, ba kiểu sắp xếp, cỡ trang 5/10/20 và điều hướng trang đều chạy trên bản sao dữ liệu ở client, không phát request mới hoặc mutate response gốc; 56/56 unit test PASS.
-- [x] Phân biệt phạm vi Job theo membership authoritative: OWNER được giải thích là xem toàn công ty, MEMBER chỉ xem tin do mình tạo; bỏ nhãn role suy đoán trên từng row, nhận diện đúng `403 JOB_ACCESS_DENIED`, hiển thị safe message và đồng bộ lại cả danh sách lẫn vai trò; 58/58 unit test PASS.
-- [x] Thêm versioned command adapter cho toàn bộ Application write flow: status, withdraw, match refresh, send offer và offer response đều gửi exact expected version, tắt auto-retry mutation và giữ `version`/`applicationVersion` từ response làm nguồn cho lệnh kế tiếp; thêm detail read để lấy version authoritative; 60/60 unit test PASS.
-- [x] Nối màn Candidate Offer với `PATCH /offers/:id/respond`: gửi đồng thời hai version độc lập, validate lý do decline, khóa double-submit và cập nhật cả hai version theo response; bốn mã 409 có bốn nội dung/CTA riêng, không retry mù; 61/61 unit test PASS.
-- [x] Thay Application demo actions bằng state machine theo actor: Candidate chỉ withdraw ở bốn trạng thái active và lấy detail version trước mutation; Recruiter pipeline gọi PATCH status đúng cạnh, reject bắt buộc lý do, terminal read-only; `INTERVIEW→OFFER` có route soạn Offer riêng gọi POST `/offer`, không giả lập status; 64/64 unit test PASS.
-- [x] Nối ApplyForm với POST `/applications/`, giữ form trong React memory và khóa double-submit; exact `409 REAPPLICATION_COOLDOWN` đọc `details.eligibleAt`, render mốc ngày/giờ vi-VN bằng `<time>` và giải thích 30 ngày chờ thay vì lỗi chung; 65/65 unit test PASS.
-- [x] Nâng recruiter Application pipeline thành bảng offset 0-based: đủ status/date/skills, ba sort, size 10/20/50/100; validate `appliedFrom<=appliedTo` và chuẩn hóa UTC trước request; theo dõi total + ID theo từng page, tự restart trang đầu khi offset drift và re-fetch sau mutation; 67/67 unit test PASS.
-- [x] Chuẩn bị UI/guard cho file Offer: form hiển thị rõ attachment tạm chưa khả dụng, vẫn cho gửi Offer không file; command chặn cặp thiếu `fileId/fileUrl`, chỉ nhận URL HTTP(S) cùng UUID v4 và bỏ file thì xóa đồng thời cả hai field; 68/68 unit test PASS. Live handshake chưa thể bật vì Media policy v1 chưa có `OFFER_LETTER` và Recruiter không được phép tạo loại file này.
-- [x] Thêm `/candidate/bookmarks` và `/recruiter/dashboard` cho degraded response: bookmark `job=null` giữ card/ID cùng CTA đồng bộ lại thay vì crash; dashboard mask raw warning, hiển thị `activeJobs` là “—” nhưng giữ mọi metric Application và bảng theo Job; 70/70 unit test PASS.
-- [x] Nối nút làm mới match score trong recruiter pipeline: gửi expected version, cập nhật score/version từ response, map an toàn bốn reason `AI_MATCH_NOT_READY`, tự poll đúng một lần sau 5 giây rồi chuyển sang retry thủ công; conflict version vẫn reload riêng; 71/71 unit test PASS.
-- [x] Nối recruiter CV qua Application boundary: mỗi lần xem gọi lại metadata no-store và POST lấy URL, mở cửa sổ ngay từ user gesture, không giữ signed URL; URL phải HTTPS và còn hơn 1 giây, nếu quá ngắn/hết hạn xin lại đúng một lần; 73/73 unit test PASS.
-- [x] Hoàn thiện phần Evaluation trong API-gap: form validate score/ba criteria/note đúng DTO, POST không retry; success hoặc exact `409 EVALUATION_ALREADY_EXISTS` đều chuyển thành “Đã đánh giá” trong React session dù backend không có GET; 75/75 unit test PASS. Gap Offer vẫn chờ Notification handoff thật.
-- [x] Khóa ba prefix Application trong `applicationApiRoutes.ts` và refactor toàn adapter dùng chung: collection/resource `/applications/`, bookmark exact `/applications/bookmarks`, response Offer `/offers/`; contract test chặn ghép Offer nhầm vào Application; 76/76 unit test PASS.
-- [x] Tạo route `/ai` và session boundary cho chatbot: sinh UUID v4 canonical lowercase ở client sau hydration, giữ duy nhất trong React memory suốt hội thoại, tạo mới khi người dùng chủ động bắt đầu lại; kiểm response phải khớp exact session; 78/78 unit test PASS.
-- [x] Dựng khung hội thoại AI trong React memory và nối exact `POST /ai/chat`: request chỉ có `session_id`/`message`, response thêm đúng một cặp user/assistant; reset/reload chủ động bỏ phần hiển thị vì backend không có history endpoint; 80/80 unit test PASS.
-- [x] Khoá một request đang bay trên mỗi AI `session_id`: shared in-flight guard nhả lock bằng `finally`, exact `409 CHAT_SESSION_BUSY` chỉ mở retry thủ công và tuyệt đối không auto-POST lại mutation có thể đã được ghi; 82/82 unit test PASS.
-- [x] Phân tách backpressure chatbot: `429 CHAT_RATE_LIMITED` khóa composer/đếm ngược đúng `Retry-After`; `503 CHAT_BUSY` có header chỉ auto-retry một lần với delay tối đa 2 giây; Provider/History không header luôn retry thủ công; 85/85 unit test PASS.
-- [x] Render feature/auth states chatbot: exact `CHAT_NOT_CONFIGURED` ẩn khung chat, `CHAT_ACCESS_FORBIDDEN` hiện sai vai trò; API client có Auth-owned refresh hook single-flight, chỉ retry 401 một lần cho cùng account rồi fail-closed/xóa session; không lưu refresh token ở FE Người 2; 88/88 unit test PASS.
-- [x] Validate message chatbot đồng nhất backend ở cả UI và adapter: normalize NFC/trim, không rỗng, tối đa 2.000 Unicode code point và 8.000 byte UTF-8, chỉ cho tab/newline trong nhóm control; composer hiện live counters/error; 92/92 unit test PASS.
-- [x] Render response chatbot text-only: không inner HTML/Markdown parser, chặn response blank/control/>8.000 ký tự; chỉ parse exact dãy job đánh số, UUID vẫn là text; intent deterministic mở CTA nội bộ `#suitable-jobs`; 95/95 unit test PASS.
-- [x] Khóa public API boundary cho AI FE Người 2: chatbot chỉ `/ai/chat`, gợi ý việc/ứng viên chỉ qua `/jobs/recommended` và `/jobs/:id/recommended-candidates`; mọi biến thể internal AI bị fail-closed; 97/97 unit test PASS.
-- [x] Hoàn tất shared optimistic `409` cho cả ba consumer: Company, Job edit/submit và Application status/match đều reload authoritative đúng một lần, giữ draft/intent, mở bảng so sánh và chỉ gửi lại sau quyết định chủ động; 99/99 unit test PASS.
-- [x] Thêm Playwright Gateway-contract E2E cho đủ bốn service Người 2: Company success/error và chống lộ raw message; Job Search/Recommendation giữ đúng hai contract; Application lấy detail version trước withdraw; AI Chat gửi exact private body/no-store/cookie và render text-only. Chrome desktop 1440px + mobile 390px đều không tràn document; 10/10 E2E PASS.
-- [x] Mở rộng recovery E2E: Job edit gặp exact `409 JOB_STATE_CHANGED` giữ local draft, reload authoritative đúng một lần, không gọi lại PUT/PATCH rồi cho chọn bản server; AI Chat gặp `429 CHAT_RATE_LIMITED` khóa composer theo `Retry-After` và không replay POST. Full browser suite 14/14 PASS.
-- [ ] Nối các màn trên với API Gateway/Auth session thật, hoàn thiện error mapping/409/429/503 và thêm component/E2E test trước khi đóng checkbox endpoint bên dưới.
-  - [x] Browser E2E với Gateway contract đã có cho Company, Job & Search, Application và AI, gồm success, safe error, optimistic conflict và rate-limit; chạy bằng `NEXT_PUBLIC_API_MODE=gateway`, không fallback demo.
-  - [ ] Live Auth bootstrap, môi trường Gateway triển khai thật và cross-service E2E vẫn chờ phần Auth/vận hành dùng chung; test intercept không được dùng để tuyên bố deployed PASS.
->
-> Danh sách bám theo **48 endpoint user-facing có thật**, khảo sát trực tiếp từ code controller và đối chiếu với `infra/nginx/nginx.conf` — không suy đoán từ tài liệu.
 
-#### Nền tảng dùng chung (làm trước mọi màn hình)
-
-- [x] API client bóc envelope thống nhất: thành công là `{data, meta}`, lỗi là `{code, message, details}`. Hiển thị theo `code` chứ không hiển thị `message` thô; `details` mới là chỗ mang thông tin điều hướng (`currentStatus`, `reason`, `eligibleAt`, `retryAfterSeconds`).
-- [x] Gọi đúng đường dẫn có **dấu `/` cuối** cho ba route collection — `POST /companies/`, `POST /jobs/`, `POST|GET /applications/`. Gateway chỉ khai báo `location /companies/`, `/jobs/`, `/applications/`, nên bỏ dấu `/` là bị nginx redirect sang host nội bộ `api-gateway`, không phải lỗi từ service; lỗi này không có mã nghiệp vụ để bắt. Khi FE gọi qua proxy `/api` của Next (cấu hình Docker), `next.config.mjs` phải bật `skipTrailingSlashRedirect` và giữ dấu `/` trong rewrite, nếu không Next tự redirect 308 và bỏ dấu `/` trước khi proxy (sửa ở mục 2.58).
-- [x] Bộ xử lý `409` dùng chung cho optimistic locking: tải lại resource, so sánh, cho người dùng quyết định gửi lại — **không retry mù**. Áp cho `APPLICATION_CHANGED_CONCURRENTLY`, `JOB_STATE_CHANGED`, `COMPANY_UPDATE_CONFLICT`.
-  - Shared primitive và Company consumer đã hoàn thành; Job/Application consumer sẽ đóng cùng mutation flow tương ứng.
-- [x] Bộ xử lý `429`/`503` phân biệt hai nhóm: nhóm **có** `Retry-After` đếm ngược và tự thử lại đúng một lần; nhóm **không có** như `MEDIA_UPLOAD_RATE_LIMITED` của Company hay AI rate-limit quy về `503` ở Application dùng local backoff 2–30 giây và khóa nút đến khi được phép thử lại.
-- [x] Tôn trọng `Cache-Control: private, no-store` + `Vary: Authorization` trên dữ liệu riêng: mọi request private dùng `credentials: include`, `cache: no-store` và header no-cache; không có service worker/Web Storage; root session boundary xóa sạch React state khi logout, 401 hoặc đổi tài khoản.
-- [x] Kiểm định dạng UUID v4 trước khi điều hướng vào trang chi tiết, vì id sai định dạng bị chặn bằng `400 INVALID_JOB_ID` trước khi tới service.
-- [x] Không gửi field lạ trong body/query: `ValidationPipe` của Company và Job bật `forbidNonWhitelisted`, còn `/ai/chat` bật `extra=forbid` — thừa một field là `400`/`422`.
-
-#### Company Service — 16 endpoint
-
+**Checklist hợp đồng endpoint Company Service (16 endpoint, 12 [x], 1 [ ]):**
 - [x] Màn tạo công ty + empty-state onboarding: `404 COMPANY_NOT_FOUND` của `GET /companies/me` được render thành CTA sang `/recruiter/company/new`; form gọi `POST /companies/`, giữ dữ liệu khi lỗi và chuyển về hồ sơ sau khi tạo, không hiển thị màn hình lỗi kỹ thuật.
 - [x] Máy trạng thái xác minh `PENDING → VERIFIED | REJECTED → (gửi lại) → PENDING`: hiện `rejectReason` và action chỉ ở `REJECTED`; `POST /companies/me/submit-verification` cập nhật ngay badge về `PENDING`; `409 INVALID_RESUBMISSION_TRANSITION` tải lại resource đúng một lần, không retry mutation.
 - [x] Dialog cảnh báo chuyển trạng thái ngầm: sửa `name` hoặc `taxCode` của công ty đang `VERIFIED` mở shared accessible warning dialog trước khi gọi `PUT /companies/:id`; chỉ mutation sau xác nhận, hủy giữ nguyên draft, pending khóa nút, rồi cập nhật badge về `PENDING` và xóa `rejectReason` theo response backend.
@@ -1721,8 +1722,23 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 - [x] Ẩn/khoá trước các nút OWNER-only: FE lấy `memberRole` qua self-membership bằng account id trong memory; khi role là MEMBER/null/lỗi, ẩn edit pháp lý, resubmit, media, invitation, remove và transfer trước request; backend `403 COMPANY_OWNER_REQUIRED` vẫn là lớp bảo vệ cuối.
 - [ ] Màn admin duyệt công ty (`GET /companies/` + `PATCH /companies/:id/verify`): hàng đợi lọc theo trạng thái, phân trang `{page, limit, total, totalPages}`. Endpoint đã có sẵn, nhưng console admin nằm ở P16 admin và phụ thuộc Admin Service của Người 1.
 
-#### Job & Search Service — 15 endpoint
+#### 3. Job & Search Service Frontend
 
+**Tiến độ bàn giao baseline:**
+- [x] Dựng Candidate UI cho job search hai mode, job detail và Recruiter UI cho job list/filter/state action, form tạo job có validation client.
+- [x] Nối recruiter Job state machine: action được suy từ exact status (`DRAFT` gửi duyệt, `PUBLISHED` đóng; còn lại read-only), gọi PATCH publish/close không retry mutation, dùng response backend cập nhật row và khóa duplicate action; 42/42 unit test PASS.
+- [x] Thêm luồng Job bị admin trả về: danh sách hiện `rejectionReason`, CTA “Sửa theo góp ý”, route `/recruiter/jobs/[jobId]/edit` gọi PUT rồi PATCH submit-for-approval; nếu PUT thành công nhưng PATCH lỗi chỉ retry bước gửi duyệt, không lưu lặp; 43/43 unit test PASS.
+- [x] Chuẩn hóa form tạo/sửa Job bằng validator dùng chung bám `CreateJobDto`: deadline sau ngày UTC hiện tại; salary bắt buộc/đúng thứ tự hoặc omit hoàn toàn khi thỏa thuận; skills NFKC/trim/khử trùng trong khoảng 1–50; kiểm thêm mọi field bắt buộc, kinh nghiệm và số lượng. Form tạo gọi `POST /jobs/`, mutation không auto-retry; 45/45 unit test PASS.
+- [x] Hoàn thiện tìm việc công khai OFFSET/CURSOR: gửi đủ filter/sort allowlist, validate trước request, reset traversal khi criteria/mode/limit đổi; OFFSET chặn cửa sổ 10.000 và có CTA chuyển mode/thu hẹp filter, CURSOR append khử trùng theo id và chỉ tải bằng `nextCursor`; 47/47 unit test PASS.
+- [x] Xử lý stale cursor cho Job Search và Recommendation theo exact error code: giữ list hiện tại trong lúc restart, bỏ cursor và tải trang đầu đúng một lần, cuộn về đầu vùng kết quả sau snapshot mới, hiện thông báo mềm; stale lặp lại mới vào error state; 48/48 unit test PASS.
+- [x] Minh bạch nguồn search/recommendation: `ELASTICSEARCH|POSTGRESQL` và `AI|PREFERENCES|LATEST` có nhãn + giải thích; sáu fallback reason của Candidate recommendation có nội dung/CTA riêng, `NO_ACTIVE_CV` dẫn tới quản lý CV còn các nhánh AI/profile làm mới recommendation có pending lock; 50/50 unit test PASS.
+- [x] Thêm pagination recommendation theo `nextCursor`: adapter gửi cursor/limit, UI append khử trùng và có IntersectionObserver kèm nút fallback; chỉ `source=AI` cùng cursor khác null mới bật tải thêm, PREFERENCES/LATEST luôn ép cursor null và ẩn điều khiển; stale continuation vẫn restart trang đầu đúng một lần; 51/51 unit test PASS.
+- [x] Thêm route recruiter `/recruiter/jobs/[jobId]` để xem gợi ý ứng viên: render candidate card/điểm/skills; đủ sáu empty reason với nội dung và CTA riêng; response HTTP 200 có mảng rỗng được coi là trạng thái nghiệp vụ bình thường, không rơi vào error state; 52/52 unit test PASS.
+- [x] Bảo vệ endpoint gợi ý ứng viên bằng debounce 300 ms và request lock: UI vô hiệu thao tác lặp trong lúc chờ; lỗi 429 được nhận theo HTTP status nên chịu được cả body gateway/service, đọc `Retry-After` từ header hoặc `details.retryAfterSeconds`, đếm ngược và chỉ tự thử lại một lần; 54/54 unit test PASS.
+- [x] Hoàn thiện bảng recruiter cho hợp đồng `GET /jobs/mine` trả toàn bộ mảng: tìm kiếm NFKC, lọc status, ba kiểu sắp xếp, cỡ trang 5/10/20 và điều hướng trang đều chạy trên bản sao dữ liệu ở client, không phát request mới hoặc mutate response gốc; 56/56 unit test PASS.
+- [x] Phân biệt phạm vi Job theo membership authoritative: OWNER được giải thích là xem toàn công ty, MEMBER chỉ xem tin do mình tạo; bỏ nhãn role suy đoán trên từng row, nhận diện đúng `403 JOB_ACCESS_DENIED`, hiển thị safe message và đồng bộ lại cả danh sách lẫn vai trò; 58/58 unit test PASS.
+
+**Checklist hợp đồng endpoint Job & Search Service (15 endpoint, 11 [x], 2 [ ]):**
 - [x] Máy trạng thái tin `DRAFT → PENDING_APPROVAL → PUBLISHED → CLOSED` (và `EXPIRED` do job nền tự đặt): FE suy action từ exact `status`, chỉ cho DRAFT gửi admin duyệt và PUBLISHED đóng tin; PENDING_APPROVAL/CLOSED/EXPIRED read-only, mutation gọi API thật và cập nhật bằng response backend.
 - [x] Đổi nhãn nút "Đăng tin" cho đúng nghĩa: `PATCH /jobs/:id/publish` là **gửi đi chờ duyệt**, không phải đăng ngay. Kèm màn hiện `rejectionReason` khi admin trả tin về `DRAFT` và luồng sửa–gửi lại.
 - [x] Form tạo/sửa tin tự validate trước khi gửi: `deadline` phải sau hôm nay; `isNegotiable=true` thì bỏ trống `salaryMin`/`salaryMax`, ngược lại phải đủ cả hai và `min <= max`; `skills` ít nhất một giá trị không rỗng, tối đa 50.
@@ -1737,15 +1753,29 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 - [ ] Màn admin duyệt tin (`GET /jobs/pending` + `approve`/`reject`): hàng đợi **bị cắt cứng ở 50 bản ghi, không có cursor** — phải cảnh báo admin khi hàng đợi có thể đang bị cắt bớt.
 - [ ] Trang vận hành reindex Elasticsearch (`POST /jobs/reindex`, `GET /jobs/reindex/failures`, `POST /jobs/reindex/failures/retry`): xem dead letter và replay. Thuộc console admin.
 
-#### Application Service — 16 endpoint
+#### 4. Application Service Frontend
 
+**Tiến độ bàn giao baseline:**
+- [x] Dựng Candidate UI cho application state và offer response bằng dữ liệu demo có kiểu TypeScript.
+- [x] Thêm versioned command adapter cho toàn bộ Application write flow: status, withdraw, match refresh, send offer và offer response đều gửi exact expected version, tắt auto-retry mutation và giữ `version`/`applicationVersion` từ response làm nguồn cho lệnh kế tiếp; thêm detail read để lấy version authoritative; 60/60 unit test PASS.
+- [x] Nối màn Candidate Offer với `PATCH /offers/:id/respond`: gửi đồng thời hai version độc lập, validate lý do decline, khóa double-submit và cập nhật cả hai version theo response; bốn mã 409 có bốn nội dung/CTA riêng, không retry mù; 61/61 unit test PASS.
+- [x] Thay Application demo actions bằng state machine theo actor: Candidate chỉ withdraw ở bốn trạng thái active và lấy detail version trước mutation; Recruiter pipeline gọi PATCH status đúng cạnh, reject bắt buộc lý do, terminal read-only; `INTERVIEW→OFFER` có route soạn Offer riêng gọi POST `/offer`, không giả lập status; 64/64 unit test PASS.
+- [x] Nối ApplyForm với POST `/applications/`, giữ form trong React memory và khóa double-submit; exact `409 REAPPLICATION_COOLDOWN` đọc `details.eligibleAt`, render mốc ngày/giờ vi-VN bằng `<time>` và giải thích 30 ngày chờ thay vì lỗi chung; 65/65 unit test PASS.
+- [x] Nâng recruiter Application pipeline thành bảng offset 0-based: đủ status/date/skills, ba sort, size 10/20/50/100; validate `appliedFrom<=appliedTo` và chuẩn hóa UTC trước request; theo dõi total + ID theo từng page, tự restart trang đầu khi offset drift và re-fetch sau mutation; 67/67 unit test PASS.
+- [x] Chuẩn bị UI/guard cho file Offer: form hiển thị rõ attachment tạm chưa khả dụng, vẫn cho gửi Offer không file; command chặn cặp thiếu `fileId/fileUrl`, chỉ nhận URL HTTP(S) cùng UUID v4 và bỏ file thì xóa đồng thời cả hai field; 68/68 unit test PASS. Live handshake chưa thể bật vì Media policy v1 chưa có `OFFER_LETTER` và Recruiter không được phép tạo loại file này.
+- [x] Thêm `/candidate/bookmarks` và `/recruiter/dashboard` cho degraded response: bookmark `job=null` giữ card/ID cùng CTA đồng bộ lại thay vì crash; dashboard mask raw warning, hiển thị `activeJobs` là “—” nhưng giữ mọi metric Application và bảng theo Job; 70/70 unit test PASS.
+- [x] Nối nút làm mới match score trong recruiter pipeline: gửi expected version, cập nhật score/version từ response, map an toàn bốn reason `AI_MATCH_NOT_READY`, tự poll đúng một lần sau 5 giây rồi chuyển sang retry thủ công; conflict version vẫn reload riêng; 71/71 unit test PASS.
+- [x] Nối recruiter CV qua Application boundary: mỗi lần xem gọi lại metadata no-store và POST lấy URL, mở cửa sổ ngay từ user gesture, không giữ signed URL; URL phải HTTPS và còn hơn 1 giây, nếu quá ngắn/hết hạn xin lại đúng một lần; 73/73 unit test PASS.
+- [x] Hoàn thiện phần Evaluation trong API-gap: form validate score/ba criteria/note đúng DTO, POST không retry; success hoặc exact `409 EVALUATION_ALREADY_EXISTS` đều chuyển thành “Đã đánh giá” trong React session dù backend không có GET; 75/75 unit test PASS. Gap Offer vẫn chờ Notification handoff thật.
+- [x] Khóa ba prefix Application trong `applicationApiRoutes.ts` và refactor toàn adapter dùng chung: collection/resource `/applications/`, bookmark exact `/applications/bookmarks`, response Offer `/offers/`; contract test chặn ghép Offer nhầm vào Application; 76/76 unit test PASS.
+
+**Checklist hợp đồng endpoint Application Service (16 endpoint, 10 [x], 1 [ ]):**
 - [x] Lưu và gắn `expectedVersion` cho **mọi lệnh ghi** (đổi trạng thái, rút hồ sơ, gửi offer, phản hồi offer, làm mới match score): giữ `version` từ mọi response và gắn vào request kế tiếp.
 - [x] Luồng phản hồi offer giữ **hai version độc lập** (`expectedOfferVersion` + `expectedApplicationVersion`) và tách **bốn** loại `409` thành bốn thông báo/hành động khác nhau: `OFFER_EXPIRED`, `OFFER_ALREADY_RESPONDED`, `OFFER_CHANGED_CONCURRENTLY`, `APPLICATION_CHANGED_CONCURRENTLY`.
 - [x] Máy trạng thái hồ sơ phía client để chỉ hiện nút hợp lệ: `APPLIED→REVIEWING`, `REVIEWING→INTERVIEW`, `→REJECTED` (bắt buộc lý do) từ `APPLIED`/`REVIEWING`/`INTERVIEW`/`OFFER`; `INTERVIEW→OFFER` chỉ qua `POST /offer`; `OFFER→HIRED|REJECTED` chỉ do ứng viên phản hồi; `WITHDRAWN` từ bốn trạng thái active. `PATCH /status` đoán sai là `409 INVALID_APPLICATION_TRANSITION`; riêng `POST /offer` trả `409 APPLICATION_NOT_ELIGIBLE_FOR_OFFER` hoặc `409 OFFER_ALREADY_EXISTS` và form Offer tải lại trạng thái cho cả hai.
 - [x] Màn nộp hồ sơ xử lý cooldown: `details.eligibleAt` cho biết mốc 30 ngày kể từ lần `REJECTED` gần nhất — hiện ngày cụ thể thay vì lỗi chung.
 - [x] Bảng hồ sơ của nhà tuyển dụng: phân trang **offset** (`page`/`size`, tối đa 100) cùng bộ lọc `job_id`/`status`/`appliedFrom`/`appliedTo`/`skills` và ba kiểu sắp xếp. Đây **không** phải cursor nên phải xử lý trôi dữ liệu khi có hồ sơ mới chèn vào giữa các trang; tự validate `appliedFrom <= appliedTo` trước khi gửi.
-- [ ] Handshake upload file offer với Media **trước khi** gọi `POST /offer`: phải có cặp `fileId` + `fileUrl` đã xác nhận, thiếu một trong hai là `400`; bỏ file thì gửi cả hai rỗng.
-  - FE guard/form đã sẵn sàng nhưng checkbox giữ mở: Media hiện không có `OFFER_LETTER`, còn `CHAT_ATTACHMENT` là private và không trả stable canonical URL nên không được dùng thay thế sai policy.
+- [ ] Handshake upload file offer với Media **trước khi** gọi `POST /offer`: phải có cặp `fileId` + `fileUrl` đã xác nhận, thiếu một trong hai là `400`; bỏ file thì gửi cả hai rỗng. FE guard/form đã sẵn sàng nhưng checkbox giữ mở: Media hiện không có `OFFER_LETTER`, còn `CHAT_ATTACHMENT` là private và không trả stable canonical URL nên không được dùng thay thế sai policy.
 - [x] Hai loại phản hồi suy giảm phải render được thay vì báo lỗi: danh sách bookmark trả `200` với `job=null` khi Job Service lỗi (thẻ placeholder), và dashboard trả `warnings[]` cùng `summary.activeJobs.available=false` (hiện số liệu một phần kèm cảnh báo).
 - [x] Nút làm mới match score xử lý riêng `409 AI_MATCH_NOT_READY` kèm `details.reason`: đây là trạng thái "chưa sẵn sàng" cần cho thử lại/poll, **khác hẳn** `409` xung đột version.
 - [x] Màn xem/tải CV của recruiter: `expiresAt` rất ngắn nên phải mở ngay và xin link mới khi hết hạn; không cache metadata lẫn link.
@@ -1755,8 +1785,19 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
   - [x] Evaluation đọc lại bằng `GET /applications/:id/evaluations` (chỉ Recruiter cùng công ty) và vẫn coi exact duplicate `409` là “đã đánh giá”.
 - [x] Chú ý ba prefix khác nhau: hồ sơ ở `/applications/`, bookmark ở `/applications/bookmarks`, còn **phản hồi offer nằm ở prefix riêng `/offers/`**.
 
-#### AI chatbot — 1 endpoint
+#### 5. AI Chatbot Frontend
 
+**Tiến độ bàn giao baseline:**
+- [x] Tạo route `/ai` và session boundary cho chatbot: sinh UUID v4 canonical lowercase ở client sau hydration, giữ duy nhất trong React memory suốt hội thoại, tạo mới khi người dùng chủ động bắt đầu lại; kiểm response phải khớp exact session; 78/78 unit test PASS.
+- [x] Dựng khung hội thoại AI trong React memory và nối exact `POST /ai/chat`: request chỉ có `session_id`/`message`, response thêm đúng một cặp user/assistant; reset/reload chủ động bỏ phần hiển thị vì backend không có history endpoint; 80/80 unit test PASS.
+- [x] Khoá một request đang bay trên mỗi AI `session_id`: shared in-flight guard nhả lock bằng `finally`, exact `409 CHAT_SESSION_BUSY` chỉ mở retry thủ công và tuyệt đối không auto-POST lại mutation có thể đã được ghi; 82/82 unit test PASS.
+- [x] Phân tách backpressure chatbot: `429 CHAT_RATE_LIMITED` khóa composer/đếm ngược đúng `Retry-After`; `503 CHAT_BUSY` có header chỉ auto-retry một lần với delay tối đa 2 giây; Provider/History không header luôn retry thủ công; 85/85 unit test PASS.
+- [x] Render feature/auth states chatbot: exact `CHAT_NOT_CONFIGURED` ẩn khung chat, `CHAT_ACCESS_FORBIDDEN` hiện sai vai trò; API client có Auth-owned refresh hook single-flight, chỉ retry 401 một lần cho cùng account rồi fail-closed/xóa session; không lưu refresh token ở FE Người 2; 88/88 unit test PASS.
+- [x] Validate message chatbot đồng nhất backend ở cả UI và adapter: normalize NFC/trim, không rỗng, tối đa 2.000 Unicode code point và 8.000 byte UTF-8, chỉ cho tab/newline trong nhóm control; composer hiện live counters/error; 92/92 unit test PASS.
+- [x] Render response chatbot text-only: không inner HTML/Markdown parser, chặn response blank/control/>8.000 ký tự; chỉ parse exact dãy job đánh số, UUID vẫn là text; intent deterministic mở CTA nội bộ `#suitable-jobs`; 95/95 unit test PASS.
+- [x] Khóa public API boundary cho AI FE Người 2: chatbot chỉ `/ai/chat`, gợi ý việc/ứng viên chỉ qua `/jobs/recommended` và `/jobs/:id/recommended-candidates`; mọi biến thể internal AI bị fail-closed; 97/97 unit test PASS.
+
+**Checklist hợp đồng endpoint AI Chatbot (1 endpoint, 8 [x]):**
 - [x] Tự sinh và giữ `session_id`: backend **không có** endpoint tạo session. Phải sinh UUID v4 canonical chữ thường và giữ nguyên suốt hội thoại; sai định dạng là `422`.
 - [x] Tự dựng toàn bộ khung hội thoại: API chỉ trả một câu trả lời cho một tin nhắn và **không có endpoint đọc lại lịch sử** (lịch sử ở Redis chỉ để làm ngữ cảnh cho model). Reload trang là mất hiển thị dù server vẫn còn ngữ cảnh.
 - [x] Khoá gửi theo từng session: chỉ một request `/ai/chat` đang bay cho mỗi `session_id`; gặp `409 CHAT_SESSION_BUSY` thì báo và thử lại, **tuyệt đối không gửi trùng** vì server có thể đã ghi lượt đó vào lịch sử.
@@ -1765,6 +1806,17 @@ Các bài browser dùng API fixture/gateway stub, không thay thế nghiệm thu
 - [x] Validate trước ở client đúng luật server: chuẩn hoá NFC, trim, chặn rỗng, giới hạn **đồng thời** 2.000 ký tự **và** 8.000 byte UTF-8 (tiếng Việt có dấu tốn nhiều byte hơn ký tự), lọc ký tự điều khiển.
 - [x] Render câu trả lời **an toàn, không dựng HTML thô**: model có thể trả danh sách việc làm đánh số và UUID dạng chữ, nhưng **không kèm dữ liệu job có cấu trúc, không có `source` hay `fallbackReason`** — muốn có link sang màn Việc làm phù hợp thì FE phải tự nhận diện ý định.
 - [x] Không gọi thẳng `/ai/match`, `/ai/recommend/jobs`, `/ai/recommend/candidates`: nginx trả `404` và server đòi `X-Internal-Api-Key`. Gợi ý việc phải qua `/jobs/recommended`, gợi ý ứng viên phải qua `/jobs/:id/recommended-candidates`.
+
+#### 6. Kiểm thử E2E Browser & Phục hồi lỗi (Recovery)
+
+- [x] Thêm Playwright Gateway-contract E2E cho đủ bốn service Người 2: Company success/error và chống lộ raw message; Job Search/Recommendation giữ đúng hai contract; Application lấy detail version trước withdraw; AI Chat gửi exact private body/no-store/cookie và render text-only. Chrome desktop 1440px + mobile 390px đều không tràn document; 10/10 E2E PASS.
+- [x] Mở rộng recovery E2E: Job edit gặp exact `409 JOB_STATE_CHANGED` giữ local draft, reload authoritative đúng một lần, không gọi lại PUT/PATCH rồi cho chọn bản server; AI Chat gặp `429 CHAT_RATE_LIMITED` khóa composer theo `Retry-After` và không replay POST. Full browser suite 14/14 PASS.
+
+#### 7. Hạng mục kết nối Gateway/Auth còn mở (Pending)
+
+- [ ] Nối các màn trên với API Gateway/Auth session thật, hoàn thiện error mapping/409/429/503 và thêm component/E2E test trước khi đóng checkbox endpoint bên dưới.
+  - [x] Browser E2E với Gateway contract đã có cho Company, Job & Search, Application và AI, gồm success, safe error, optimistic conflict và rate-limit; chạy bằng `NEXT_PUBLIC_API_MODE=gateway`, không fallback demo.
+  - [ ] Live Auth bootstrap, môi trường Gateway triển khai thật và cross-service E2E vẫn chờ phần Auth/vận hành dùng chung; test intercept không được dùng để tuyên bố deployed PASS.
 
 ## P17 — Kiểm thử tích hợp, bảo mật và phát hành
 
