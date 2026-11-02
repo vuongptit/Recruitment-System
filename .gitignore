@@ -27,3 +27,12 @@ service-account*.json
 **/.gocache/
 .env-prod
 env
+
+
+# Local dev runner scripts
+docker-compose.remote-db.yml
+scripts/start-db-tunnel.ps1
+start.bat
+start.ps1
+stop.bat
+stop.ps1
