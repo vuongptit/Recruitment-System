@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -14,13 +16,36 @@ import (
 	_ "github.com/lib/pq"
 )
 
+const TargetSchema = "notification"
+
+// EnsureSearchPath guarantees the target schema and public fallback are present in search_path.
+func EnsureSearchPath(databaseURL, schema string) string {
+	target := schema + ",public"
+	u, err := url.Parse(databaseURL)
+	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") {
+		if strings.Contains(databaseURL, "search_path") {
+			return databaseURL
+		}
+		return strings.TrimSpace(databaseURL) + " search_path=" + target
+	}
+
+	q := u.Query()
+	if q.Get("search_path") == "" {
+		q.Set("search_path", target)
+		u.RawQuery = q.Encode()
+	}
+	return u.String()
+}
+
 func ConnectWithRetry(databaseURL string, maxRetries int, retryInterval time.Duration) (*sql.DB, error) {
 	var db *sql.DB
 	var err error
 
+	normalizedURL := EnsureSearchPath(databaseURL, TargetSchema)
+
 	for i := 1; i <= maxRetries; i++ {
 		log.Printf("[DB] Connecting to notification database (attempt %d/%d)...", i, maxRetries)
-		db, err = sql.Open("postgres", databaseURL)
+		db, err = sql.Open("postgres", normalizedURL)
 		if err == nil {
 			err = db.Ping()
 			if err == nil {
@@ -42,12 +67,18 @@ func ConnectWithRetry(databaseURL string, maxRetries int, retryInterval time.Dur
 
 func RunMigrations(db *sql.DB, migrationsFS embed.FS) error {
 	log.Println("[Migration] Running auto-migrations for notification-service...")
+
+	if _, err := db.Exec(fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", TargetSchema)); err != nil {
+		return fmt.Errorf("failed to ensure schema %s exists: %w", TargetSchema, err)
+	}
+
 	d, err := iofs.New(migrationsFS, ".")
 	if err != nil {
 		return fmt.Errorf("failed to create iofs driver: %w", err)
 	}
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{
+		SchemaName:      TargetSchema,
 		MigrationsTable: "notification_schema_migrations",
 	})
 	if err != nil {
@@ -66,3 +97,4 @@ func RunMigrations(db *sql.DB, migrationsFS embed.FS) error {
 	log.Println("[Migration] Notification database migrations applied successfully!")
 	return nil
 }
+

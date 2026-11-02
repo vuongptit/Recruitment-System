@@ -426,7 +426,7 @@ services:
     env_file:
       - ./env/notification-service.env
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?sslmode=disable&search_path=notification,public
       KAFKA_BROKERS: kafka:9092
       JWT_JWKS_URI: http://auth-service:8080/auth/.well-known/jwks.json
       JWT_ALLOW_INSECURE_JWKS: "true"
@@ -524,7 +524,7 @@ services:
       - ./env/chat-service.env
     environment:
       PORT: "8080"
-      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?sslmode=disable&search_path=chat,public
       KAFKA_BROKERS: kafka:9092
       JWT_JWKS_URI: http://auth-service:8080/auth/.well-known/jwks.json
       JWT_ISSUER: ${JWT_ISSUER:-https://auth.recruitment.local}
@@ -634,7 +634,7 @@ services:
     env_file:
       - ./env/video-service.env
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?sslmode=disable
+      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?sslmode=disable&search_path=video,public
       JWT_JWKS_URI: http://auth-service:8080/auth/.well-known/jwks.json
       JWT_ISSUER: ${JWT_ISSUER:-https://auth.recruitment.local}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-recruitment-api}
