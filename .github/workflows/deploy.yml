@@ -1,53 +1,160 @@
 name: Deploy
 
-# Chỉ chạy khi push tag: git tag v1.0.0 && git push origin v1.0.0
 on:
   push:
-    tags: ['v*']
+    tags:
+      - 'v*'
+      - 'go-v*'
+      - 'chat-v*'
+      - 'notification-v*'
+      - 'video-v*'
+      - 'frontend-v*'
+      - 'company-v*'
+      - 'job-v*'
+      - 'profile-v*'
+      - 'auth-v*'
+      - 'media-v*'
+      - 'ai-v*'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Service cần build & deploy'
+        required: true
+        default: 'go-services'
+        type: choice
+        options:
+          - 'go-services'
+          - 'all'
+          - 'chat-service'
+          - 'notification-service'
+          - 'video-service'
+          - 'frontend'
+          - 'auth-service'
+          - 'application-service'
+          - 'interview-service'
+          - 'admin-service'
+          - 'profile-service'
+          - 'company-service'
+          - 'job-search-service'
+          - 'media-service'
+          - 'ai-service'
+      tag:
+        description: 'Tag phiên bản (để trống sẽ tự dùng tag git hoặc v2.0.3)'
+        required: false
+        default: ''
 
 concurrency: deploy-production
 
 env:
-  DEPLOY_DIR: /home/ubuntu/careerhub   # thư mục trên server chứa docker-compose.prod.yml, .env, env/, secrets/
+  DEPLOY_DIR: /home/ubuntu/careerhub   # Thư mục trên server
 
 jobs:
-  # 1) GitHub build image từ Dockerfile của từng service rồi đẩy lên GHCR
+  # 1) Xác định danh sách service cần build và deploy
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      target: ${{ steps.set-matrix.outputs.target }}
+      tag: ${{ steps.set-matrix.outputs.tag }}
+      services_to_pull: ${{ steps.set-matrix.outputs.services_to_pull }}
+    steps:
+      - id: set-matrix
+        run: |
+          TARGET="${{ github.event.inputs.target }}"
+          REF_NAME="${{ github.ref_name }}"
+          CUSTOM_TAG="${{ github.event.inputs.tag }}"
+
+          # Xác định Target nếu chạy bằng push tag
+          if [ -z "$TARGET" ]; then
+            if [[ "$REF_NAME" =~ ^go-v ]]; then
+              TARGET="go-services"
+            elif [[ "$REF_NAME" =~ ^chat-v ]]; then
+              TARGET="chat-service"
+            elif [[ "$REF_NAME" =~ ^notification-v ]]; then
+              TARGET="notification-service"
+            elif [[ "$REF_NAME" =~ ^video-v ]]; then
+              TARGET="video-service"
+            elif [[ "$REF_NAME" =~ ^frontend-v ]]; then
+              TARGET="frontend"
+            elif [[ "$REF_NAME" =~ ^company-v ]]; then
+              TARGET="company-service"
+            elif [[ "$REF_NAME" =~ ^job-v ]]; then
+              TARGET="job-search-service"
+            elif [[ "$REF_NAME" =~ ^profile-v ]]; then
+              TARGET="profile-service"
+            elif [[ "$REF_NAME" =~ ^media-v ]]; then
+              TARGET="media-service"
+            elif [[ "$REF_NAME" =~ ^ai-v ]]; then
+              TARGET="ai-service"
+            elif [[ "$REF_NAME" =~ ^auth-v ]]; then
+              TARGET="auth-service"
+            else
+              TARGET="all"
+            fi
+          fi
+
+          # Xác định Tag
+          if [ -n "$CUSTOM_TAG" ]; then
+            TAG="$CUSTOM_TAG"
+          elif [[ "$REF_NAME" =~ v[0-9] ]]; then
+            TAG="v${REF_NAME#*v}"
+          else
+            TAG="v2.0.3"
+          fi
+
+          echo "Target determined: $TARGET"
+          echo "Tag determined: $TAG"
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          # Định nghĩa toàn bộ danh sách service
+          CATALOG=$(cat << 'EOF'
+          [
+            { "name": "auth-service",         "path": "services/auth-service", "group": "auth-service", "compose": "auth-service" },
+            { "name": "application-service",  "path": "services/application-service", "group": "application-service", "compose": "application-service" },
+            { "name": "interview-service",    "path": "services/interview-service", "group": "interview-service", "compose": "interview-service" },
+            { "name": "admin-service",        "path": "services/admin-service", "group": "admin-service", "compose": "admin-service" },
+            { "name": "profile-service",      "path": "services/profile-service", "group": "profile-service", "compose": "profile-service" },
+            { "name": "profile-migrate",      "path": "services/profile-service", "target": "build", "group": "profile-service", "compose": "profile-migrate" },
+            { "name": "company-service",      "path": "services/company-service", "group": "company-service", "compose": "company-service" },
+            { "name": "job-search-service",   "path": "services/job-search-service", "group": "job-search-service", "compose": "job-search-service" },
+            { "name": "notification-service", "path": "services/notification-service", "target": "runtime", "group": "notification-service", "compose": "notification-service" },
+            { "name": "media-service",        "path": "services/media-service", "group": "media-service", "compose": "media-service" },
+            { "name": "media-migrate",        "path": "services/media-service", "target": "build", "group": "media-service", "compose": "media-migrate" },
+            { "name": "chat-service",         "path": "services/chat-service", "group": "chat-service", "compose": "chat-service" },
+            { "name": "ai-service",           "path": "services/ai-service", "target": "runtime", "group": "ai-service", "compose": "ai-service" },
+            { "name": "ai-worker",            "path": "services/ai-service", "target": "worker", "group": "ai-service", "compose": "ai-job-embedding-worker ai-cv-embedding-worker" },
+            { "name": "video-service",        "path": "services/video-service", "group": "video-service", "compose": "video-service" },
+            { "name": "frontend",             "path": "frontend", "group": "frontend", "compose": "frontend", "build_args": "NEXT_PUBLIC_API_BASE_URL=/api\nNEXT_PUBLIC_API_MODE=gateway\nNEXT_PUBLIC_GATEWAY_URL=https://doantvv.ddns.net\nNEXT_PUBLIC_GOOGLE_LOGIN_ENABLED=true\nAPI_INTERNAL_BASE_URL=http://api-gateway:8080" }
+          ]
+          EOF
+          )
+
+          # Lọc ma trận và danh sách compose service cần pull
+          if [ "$TARGET" = "all" ]; then
+            FILTERED="$CATALOG"
+            SERVICES=""
+          elif [ "$TARGET" = "go-services" ]; then
+            FILTERED=$(echo "$CATALOG" | jq -c '[.[] | select(.name == "chat-service" or .name == "notification-service" or .name == "video-service")]')
+            SERVICES="chat-service notification-service video-service"
+          else
+            FILTERED=$(echo "$CATALOG" | jq -c --arg tgt "$TARGET" '[.[] | select(.group == $tgt)]')
+            SERVICES=$(echo "$FILTERED" | jq -r '.[].compose' | tr '\n' ' ' | xargs)
+          fi
+
+          echo "matrix=$FILTERED" >> "$GITHUB_OUTPUT"
+          echo "services_to_pull=$SERVICES" >> "$GITHUB_OUTPUT"
+
+  # 2) Build image song song cho các service được lọc
   build:
+    needs: prepare
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     strategy:
       matrix:
-        # name   = tên image (khớp docker-compose.prod.yml: <IMAGE_PREFIX>-<name>:<TAG>, ví dụ ghcr.io/vuongptit/recruitment-system-auth-service:v1.0.0)
-        # path   = thư mục chứa Dockerfile
-        # target = stage của Dockerfile (để trống = stage cuối)
-        include:
-          - { name: auth-service,         path: services/auth-service }
-          - { name: application-service,  path: services/application-service }
-          - { name: interview-service,    path: services/interview-service }
-          - { name: admin-service,        path: services/admin-service }
-          - { name: profile-service,      path: services/profile-service }
-          - { name: profile-migrate,      path: services/profile-service, target: build }
-          - { name: company-service,      path: services/company-service }
-          - { name: job-search-service,   path: services/job-search-service }
-          - { name: notification-service, path: services/notification-service, target: runtime }
-          - { name: media-service,        path: services/media-service }
-          - { name: media-migrate,        path: services/media-service, target: build }
-          - { name: chat-service,         path: services/chat-service }
-          - { name: ai-service,           path: services/ai-service, target: runtime }
-          - { name: ai-worker,            path: services/ai-service, target: worker }
-          - { name: video-service,        path: services/video-service }
-          - name: frontend
-            path: frontend
-            # NEXT_PUBLIC_* được nhúng vào bundle lúc build, nên phải truyền ở đây
-            # (giữ khớp với phần frontend trong docker-compose.prod.yml).
-            build_args: |
-              NEXT_PUBLIC_API_BASE_URL=/api
-              NEXT_PUBLIC_API_MODE=gateway
-              NEXT_PUBLIC_GATEWAY_URL=https://doantvv.ddns.net
-              NEXT_PUBLIC_GOOGLE_LOGIN_ENABLED=true
-              API_INTERNAL_BASE_URL=http://api-gateway:8080
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -64,15 +171,16 @@ jobs:
           target: ${{ matrix.target }}
           build-args: ${{ matrix.build_args }}
           push: true
-          tags: ${{ env.IMAGE }}:${{ github.ref_name }}
-          # Gắn package GHCR với repo này để GITHUB_TOKEN được phép đẩy các lần sau
+          tags: |
+            ${{ env.IMAGE }}:${{ needs.prepare.outputs.tag }}
+            ${{ env.IMAGE }}:latest
           labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
-  # 2) Server chỉ pull image mới rồi khởi động lại
+  # 3) Deploy lên server
   deploy:
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -90,7 +198,6 @@ jobs:
           TARGET="${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
           ssh -i ~/.ssh/id_deploy -p ${{ secrets.SSH_PORT || 22 }} "$TARGET" \
             "mkdir -p $DEPLOY_DIR/infra/nginx $DEPLOY_DIR/infra/postgres"
-          # scp ghi đè tại chỗ (giữ nguyên inode) nên nginx đang mount file vẫn thấy nội dung mới
           scp $SSH_OPTS docker-compose.prod.yml "$TARGET:$DEPLOY_DIR/"
           scp $SSH_OPTS infra/nginx/nginx.prod.conf "$TARGET:$DEPLOY_DIR/infra/nginx/"
           scp $SSH_OPTS infra/postgres/init-schemas.sql "$TARGET:$DEPLOY_DIR/infra/postgres/"
@@ -98,30 +205,35 @@ jobs:
       - name: Pull image mới và khởi động lại
         run: |
           IMAGE_PREFIX="ghcr.io/${GITHUB_REPOSITORY,,}"
+          TAG="${{ needs.prepare.outputs.tag }}"
+          TARGET="${{ needs.prepare.outputs.target }}"
+          SERVICES="${{ needs.prepare.outputs.services_to_pull }}"
+
           ssh -i ~/.ssh/id_deploy -p ${{ secrets.SSH_PORT || 22 }} \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} bash -s <<REMOTE
           set -e
           cd $DEPLOY_DIR
           touch .env
           sed -i '/^TAG=/d;/^IMAGE_PREFIX=/d' .env
-          echo "TAG=${{ github.ref_name }}" >> .env
+          echo "TAG=$TAG" >> .env
           echo "IMAGE_PREFIX=$IMAGE_PREFIX" >> .env
 
-          docker compose -f docker-compose.prod.yml pull
+          if [ "$TARGET" = "all" ]; then
+            echo "=== FULL DEPLOY ==="
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml run --rm --no-deps api-gateway nginx -t
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate api-gateway
 
-          # Kiểm tra cú pháp nginx bằng container tạm: sai thì dừng, gateway cũ vẫn chạy
-          docker compose -f docker-compose.prod.yml run --rm --no-deps api-gateway nginx -t
+            HOST_SUM=\$(sha256sum infra/nginx/nginx.prod.conf | cut -d' ' -f1)
+            CONT_SUM=\$(docker compose -f docker-compose.prod.yml exec -T api-gateway sha256sum /etc/nginx/nginx.conf | cut -d' ' -f1)
+            [ "\$HOST_SUM" = "\$CONT_SUM" ] || { echo "nginx.conf trong container KHÁC file vừa chép"; exit 1; }
+          else
+            echo "=== SELECTIVE DEPLOY: $SERVICES ==="
+            docker compose -f docker-compose.prod.yml pull $SERVICES
+            docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate $SERVICES
+          fi
 
-          docker compose -f docker-compose.prod.yml up -d --remove-orphans
-
-          # Tạo lại gateway để chắc chắn đọc đúng file mới
-          docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate api-gateway
-
-          # Đối chiếu file trong container với file vừa chép lên server
-          HOST_SUM=\$(sha256sum infra/nginx/nginx.prod.conf | cut -d' ' -f1)
-          CONT_SUM=\$(docker compose -f docker-compose.prod.yml exec -T api-gateway sha256sum /etc/nginx/nginx.conf | cut -d' ' -f1)
-          [ "\$HOST_SUM" = "\$CONT_SUM" ] || { echo "nginx.conf trong container KHÁC file vừa chép"; exit 1; }
-
-          docker image prune -af --filter "until=168h"
+          docker image prune -af --filter "until=72h"
           docker compose -f docker-compose.prod.yml ps
           REMOTE
