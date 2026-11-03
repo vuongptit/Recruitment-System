@@ -512,12 +512,12 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
   }
 
   // Build a set of ended or rejected call IDs to render appropriate card status
-  const callStatusMap = new Map<string, { action: string; duration?: number }>();
+  const callStatusMap = new Map<string, string>();
   for (const m of messages) {
     const c = parseCallMessage(m.content);
     if (c) {
       if (c.action === "ENDED" || c.action === "REJECTED" || c.action === "ACCEPTED") {
-        callStatusMap.set(c.callId, { action: c.action, duration: c.duration });
+        callStatusMap.set(c.callId, c.action);
       }
     }
   }
@@ -892,10 +892,9 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
                   // 1. Render Video Call Card
                   if (call) {
                     const finalStatus = callStatusMap.get(call.callId);
-                    const isEnded = call.action === "ENDED" || finalStatus?.action === "ENDED";
-                    const isRejected = call.action === "REJECTED" || finalStatus?.action === "REJECTED";
-                    const isAccepted = call.action === "ACCEPTED" || finalStatus?.action === "ACCEPTED";
-                    const durationText = formatDuration(call.duration ?? finalStatus?.duration);
+                    const isEnded = call.action === "ENDED" || finalStatus === "ENDED";
+                    const isRejected = call.action === "REJECTED" || finalStatus === "REJECTED";
+                    const isAccepted = call.action === "ACCEPTED" || finalStatus === "ACCEPTED";
 
                     return (
                       <div
@@ -950,7 +949,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
                                 : "Cuộc gọi video"}
                             </strong>
                             <small style={{ color: "var(--muted)", fontSize: 12 }}>
-                              {durationText ? `Thời lượng: ${durationText}` : formatFullTime(message.created_at)}
+                              {formatFullTime(message.created_at)}
                             </small>
                           </div>
                         </div>
