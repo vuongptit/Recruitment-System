@@ -418,6 +418,8 @@ services:
       JWT_ISSUER: ${JWT_ISSUER:-https://auth.recruitment.local}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-recruitment-api}
       CURSOR_HMAC_KEY: ${NOTIFICATION_CURSOR_HMAC_KEY:?NOTIFICATION_CURSOR_HMAC_KEY is required}
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       ALLOWED_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       PORT: "8080"
     restart: unless-stopped
@@ -513,6 +515,8 @@ services:
       PROFILE_SERVICE_URL: http://profile-service:3000
       COMPANY_INTERNAL_API_KEY: ${COMPANY_INTERNAL_API_KEY_CHAT:?COMPANY_INTERNAL_API_KEY_CHAT is required}
       PROFILE_INTERNAL_API_KEY: ${PROFILE_INTERNAL_API_KEY_CHAT:?PROFILE_INTERNAL_API_KEY_CHAT is required}
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?sslmode=disable&search_path=chat
       KAFKA_BROKERS: kafka:9092
       JWT_JWKS_URI: http://auth-service:8080/auth/.well-known/jwks.json
@@ -641,6 +645,8 @@ services:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret}
       LIVEKIT_URL: ${LIVEKIT_URL:-http://localhost:7880}
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       KAFKA_BROKERS: kafka:9092
       ALLOWED_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
       PORT: "8080"
