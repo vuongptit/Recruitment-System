@@ -75,7 +75,12 @@ func (p *Producer) PublishCallStarted(ctx context.Context, call *model.VideoCall
 	return nil
 }
 
-func (p *Producer) PublishCallEnded(ctx context.Context, call *model.VideoCall) error {
+func (p *Producer) PublishCallEnded(ctx context.Context, call *model.VideoCall, participantIDs ...uuid.UUID) error {
+	pIDs := make([]string, len(participantIDs))
+	for i, id := range participantIDs {
+		pIDs[i] = id.String()
+	}
+
 	event := model.KafkaEvent{
 		EventID:      fmt.Sprintf("evt_%s", uuid.New().String()),
 		EventType:    "video.call.ended",
@@ -87,6 +92,7 @@ func (p *Producer) PublishCallEnded(ctx context.Context, call *model.VideoCall) 
 			"conversation_id": call.ConversationID,
 			"host_id":         call.HostID.String(),
 			"ended_at":        time.Now().UTC().Format(time.RFC3339),
+			"participant_ids": pIDs,
 		},
 	}
 

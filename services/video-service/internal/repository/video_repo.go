@@ -95,6 +95,7 @@ func (r *VideoRepository) FindByID(ctx context.Context, callID uuid.UUID) (*mode
 }
 
 func (r *VideoRepository) ListActiveCalls(ctx context.Context, userID uuid.UUID) ([]*model.VideoCall, error) {
+	_, _ = r.db.ExecContext(ctx, "UPDATE video_calls SET status = 'ended', ended_at = NOW() WHERE status = 'waiting' AND created_at < NOW() - INTERVAL '90 seconds'")
 	query := `
 		SELECT c.id, c.room_name, c.host_id, c.title, c.status, c.started_at, c.ended_at, c.created_at, COALESCE(c.conversation_id, '00000000-0000-0000-0000-000000000000') as conversation_id
 		FROM video_calls c
@@ -207,4 +208,23 @@ func (r *VideoRepository) IsParticipant(ctx context.Context, callID, userID uuid
 		return false, err
 	}
 	return true, nil
+}
+
+func (r *VideoRepository) GetParticipantIDs(ctx context.Context, callID uuid.UUID) ([]uuid.UUID, error) {
+	query := `SELECT user_id FROM video_call_participants WHERE call_id = $1`
+	rows, err := r.db.QueryContext(ctx, query, callID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }

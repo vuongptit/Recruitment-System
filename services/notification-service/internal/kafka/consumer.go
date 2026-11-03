@@ -403,13 +403,45 @@ func (c *Consumer) handleVideoCallStarted(ctx context.Context, event model.Kafka
 }
 
 func (c *Consumer) handleVideoCallEnded(ctx context.Context, event model.KafkaEvent) error {
-	// Data not needed since we don't have participant IDs.
+	data := event.Data
+	callIDStr, _ := data["call_id"].(string)
+	convIDStr, _ := data["conversation_id"].(string)
 
-	// Wait, we don't know the participant IDs to dispatch to!
-	// If we don't know the participant IDs, we can't use sseHub.Dispatch(userID).
-	// But wait, the frontend is listening to 'VIDEO_CALL_ENDED' globally?
-	// The sseHub maps userID -> connection.
-	// We need participant_ids in the event!
+	rawMembers, ok := data["participant_ids"].([]any)
+	if !ok || len(rawMembers) == 0 {
+		return nil
+	}
+
+	metadataJSON, _ := json.Marshal(map[string]string{
+		"call_id":         callIDStr,
+		"conversation_id": convIDStr,
+	})
+
+	for _, m := range rawMembers {
+		mStr, ok := m.(string)
+		if !ok {
+			continue
+		}
+		pID, err := uuid.Parse(mStr)
+		if err != nil {
+			continue
+		}
+
+		notif := &model.Notification{
+			ID:        uuid.New(),
+			UserID:    pID,
+			Type:      "VIDEO_CALL_ENDED",
+			Title:     "Cuộc gọi video đã kết thúc",
+			Body:      fmt.Sprintf("[CALL_ENDED] %s", callIDStr),
+			Metadata:  metadataJSON,
+			IsRead:    true,
+			CreatedAt: time.Now(),
+		}
+
+		// Dispatch via SSE
+		c.sseHub.Dispatch(pID, notif)
+	}
+
 	return nil
 }
 

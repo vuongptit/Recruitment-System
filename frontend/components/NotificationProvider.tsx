@@ -181,7 +181,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       try {
         const notification = JSON.parse((event as MessageEvent).data) as Notification;
         if (typeof notification.id !== "string" || typeof notification.body !== "string") return;
-        if (notification.type !== "VIDEO_CALL_OFFLINE") {
+        if (notification.type !== "VIDEO_CALL_OFFLINE" && notification.type !== "VIDEO_CALL_ENDED") {
           recordUpdates([notification]);
           void fetchUnreadCount(); // Chat notifications are upserts; receiving one does not imply +1.
         }
@@ -192,6 +192,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         }
         if (notification.type === "VIDEO_CALL_OFFLINE" && typeof callId === "string") {
           window.dispatchEvent(new CustomEvent("video_call_offline", { detail: { callId } }));
+        }
+        if (notification.type === "VIDEO_CALL_ENDED" && typeof callId === "string") {
+          setIncomingCall(current => current?.callId === callId ? null : current);
+          window.dispatchEvent(new CustomEvent("video_call_ended", { detail: { callId } }));
         }
         const call = parseCallMessage(notification.body);
         if (call && (call.action === "REJECTED" || call.action === "ENDED")) {

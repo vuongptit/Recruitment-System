@@ -135,7 +135,8 @@ func (s *VideoService) EndCall(ctx context.Context, callID, userID uuid.UUID) er
 	}
 
 	if s.producer != nil {
-		_ = s.producer.PublishCallEnded(ctx, call)
+		pIDs, _ := s.repo.GetParticipantIDs(ctx, callID)
+		_ = s.producer.PublishCallEnded(ctx, call, pIDs...)
 	}
 
 	return nil
@@ -152,7 +153,8 @@ func (s *VideoService) RejectCall(ctx context.Context, callID, userID uuid.UUID)
 	}
 
 	if s.producer != nil {
-		_ = s.producer.PublishCallEnded(ctx, call)
+		pIDs, _ := s.repo.GetParticipantIDs(ctx, callID)
+		_ = s.producer.PublishCallEnded(ctx, call, pIDs...)
 	}
 
 	return nil
