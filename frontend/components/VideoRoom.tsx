@@ -53,6 +53,11 @@ function GoogleMeetConference({
   const endingRef = useRef(false);
   const hadRemoteParticipant = useRef(false);
 
+  const backHrefRef = useRef(backHref);
+  backHrefRef.current = backHref;
+  const conversationIdRef = useRef(conversationId);
+  conversationIdRef.current = conversationId;
+
   const leaveAndEndCall = useCallback(async () => {
     if (endingRef.current) return;
     endingRef.current = true;
@@ -68,9 +73,10 @@ function GoogleMeetConference({
       /* ignore */
     }
 
-    if (conversationId) {
+    const convId = conversationIdRef.current;
+    if (convId) {
       try {
-        await sendChatMessage(conversationId, `[CALL_ENDED] ${callId}`, crypto.randomUUID());
+        await sendChatMessage(convId, `[CALL_ENDED] ${callId}`, crypto.randomUUID());
       } catch {
         /* ignore */
       }
@@ -84,8 +90,11 @@ function GoogleMeetConference({
       /* ignore */
     }
 
-    router.replace(backHref);
-  }, [callId, conversationId, backHref, room, router]);
+    router.replace(backHrefRef.current);
+  }, [callId, room, router]);
+
+  const leaveAndEndCallRef = useRef(leaveAndEndCall);
+  leaveAndEndCallRef.current = leaveAndEndCall;
 
   // Page exit & abrupt disconnect handling
   useEffect(() => {
@@ -111,10 +120,10 @@ function GoogleMeetConference({
       window.removeEventListener("beforeunload", handlePageHide);
       // If user navigated away inside the portal, end call and notify
       if (!endingRef.current) {
-        void leaveAndEndCall();
+        void leaveAndEndCallRef.current();
       }
     };
-  }, [callId, leaveAndEndCall]);
+  }, [callId]);
 
   // If the remote participant joined and then disconnected, auto-end after 3s
   const remoteCount = participants.filter((p) => !p.isLocal).length;
@@ -124,11 +133,11 @@ function GoogleMeetConference({
   useEffect(() => {
     if (hadRemoteParticipant.current && remoteCount === 0) {
       const timer = setTimeout(() => {
-        void leaveAndEndCall();
+        void leaveAndEndCallRef.current();
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [remoteCount, leaveAndEndCall]);
+  }, [remoteCount]);
 
   // Display all tracks, or fallback to local participant
   const displayTracks = tracks.length > 0 ? tracks : [];
@@ -445,9 +454,13 @@ export function VideoRoom({ callId }: { callId: string }) {
   const [revision, setRevision] = useState(0);
 
   const messagePath = portalSection(account?.role ?? "CANDIDATE", "messages");
-  const backHref = credentials?.call.conversation_id
-    ? `${messagePath}?chat=${encodeURIComponent(credentials.call.conversation_id)}`
+  const conversationId = credentials?.call.conversation_id;
+  const backHref = conversationId
+    ? `${messagePath}?chat=${encodeURIComponent(conversationId)}`
     : messagePath;
+
+  const backHrefRef = useRef(backHref);
+  backHrefRef.current = backHref;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -500,7 +513,7 @@ export function VideoRoom({ callId }: { callId: string }) {
 
     const handleEnded = (event: Event) => {
       if ((event as CustomEvent<{ callId: string }>).detail?.callId !== callId) return;
-      router.replace(backHref);
+      router.replace(backHrefRef.current);
     };
 
     const handleOffline = (event: Event) => {
@@ -518,7 +531,7 @@ export function VideoRoom({ callId }: { callId: string }) {
       window.removeEventListener("video_call_ended", handleEnded);
       window.removeEventListener("video_call_offline", handleOffline);
     };
-  }, [callId, revision, account?.id, account?.role, account?.email, backHref, router]);
+  }, [callId, revision, account?.id, account?.role, account?.email, router]);
 
   if (error) {
     return (
@@ -538,7 +551,7 @@ export function VideoRoom({ callId }: { callId: string }) {
         <button
           type="button"
           className="btn"
-          onClick={() => router.replace(backHref)}
+          onClick={() => router.replace(backHrefRef.current)}
           style={{ marginTop: 16 }}
         >
           Quay lại cuộc trò chuyện
