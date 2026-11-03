@@ -13,7 +13,15 @@ export function ChatIdentityAvatar({ identity, size = 42 }: { identity: ChatIden
   return (
     <span
       className={`chat-identity-avatar chat-identity-${identity.kind.toLowerCase()}`}
-      style={{ width: size, height: size, minWidth: size, minHeight: size, fontSize: Math.max(11, Math.round(size * 0.32)) }}
+      style={{
+        width: size,
+        height: size,
+        minWidth: size,
+        minHeight: size,
+        flex: `0 0 ${size}px`,
+        aspectRatio: "1 / 1",
+        fontSize: Math.max(11, Math.round(size * 0.32)),
+      }}
       aria-hidden="true"
     >
       {identity.imageUrl && !failed ? (

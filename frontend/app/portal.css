@@ -33,7 +33,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .chat-conversation-item { display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px; text-align: left; border: 0; border-bottom: 1px solid var(--line); border-left: 3px solid transparent; background: white; color: var(--text); font: inherit; cursor: pointer; }
 .chat-conversation-item:hover { background: var(--surface-2); }
 .chat-conversation-item[aria-pressed="true"] { background: var(--primary-tint); border-left-color: var(--primary); }
-.chat-identity-avatar { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; overflow: hidden; border: 1px solid var(--line); border-radius: 50%; background: var(--primary-tint); color: var(--primary); font-size: 13px; font-weight: 700; }
+.chat-identity-avatar { display: grid; place-items: center; flex-shrink: 0; aspect-ratio: 1 / 1; width: 42px; height: 42px; overflow: hidden; border: 1px solid var(--line); border-radius: 50%; background: var(--primary-tint); color: var(--primary); font-size: 13px; font-weight: 700; }
 .chat-identity-avatar.chat-identity-company { border-radius: 11px; background: white; }
 .chat-identity-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .chat-identity-company img { object-fit: contain; }
@@ -394,4 +394,115 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   flex: 1 !important;
   overflow: hidden !important;
   background: white;
+}
+
+
+/* Full-viewport Video Call Workspace */
+.workspace-shell:has(.call-room-workspace) {
+  height: 100dvh;
+  overflow: hidden;
+}
+.workspace-shell:has(.call-room-workspace) .workspace-body {
+  height: calc(100dvh - 72px);
+  overflow: hidden;
+}
+.workspace-shell:has(.call-room-workspace) .workspace-content {
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+.workspace-shell:has(.call-room-workspace) .workspace-page {
+  max-width: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+}
+.workspace-shell:has(.call-room-workspace) .workspace-page > main {
+  max-width: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+}
+.workspace-shell:has(.call-room-workspace) .workspace-footer {
+  display: none !important;
+}
+.call-room-workspace {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+  background: #202124 !important;
+}
+
+/* Google Meet Call Room Overrides */
+.call-room-workspace .lk-video-conference {
+  height: 100% !important;
+  min-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: #202124 !important;
+}
+.call-room-workspace .lk-video-conference-inner {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+.call-room-workspace .lk-grid-layout {
+  flex: 1 !important;
+  padding: 16px !important;
+  gap: 16px !important;
+  background: transparent !important;
+}
+.call-room-workspace .lk-participant-tile {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  background: #3c4043 !important;
+  border: 2px solid transparent !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2) !important;
+}
+.call-room-workspace .lk-participant-tile[data-lk-speaking="true"] {
+  border-color: #8ab4f8 !important;
+}
+.call-room-workspace .lk-control-bar {
+  padding: 14px 24px !important;
+  gap: 14px !important;
+  background: rgba(32, 33, 36, 0.9) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 40px !important;
+  margin: 0 auto 16px auto !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3) !important;
+}
+.call-room-workspace .lk-disconnect-button {
+  background: #ea4335 !important;
+  border-color: #ea4335 !important;
+  color: #fff !important;
+  border-radius: 28px !important;
+  padding: 10px 24px !important;
+  font-weight: 600 !important;
+  transition: background-color 0.15s ease !important;
+}
+.call-room-workspace .lk-disconnect-button:hover {
+  background: #d93025 !important;
+  border-color: #d93025 !important;
 }

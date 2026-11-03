@@ -30,7 +30,7 @@ func (ti *TokenIssuer) LiveKitURL() string {
 	return ti.livekitURL
 }
 
-func (ti *TokenIssuer) GenerateJoinToken(roomName, identity, name string) (string, error) {
+func (ti *TokenIssuer) GenerateJoinToken(roomName, identity, name, metadata string) (string, error) {
 	apiKey := ti.apiKey
 	apiSecret := ti.apiSecret
 

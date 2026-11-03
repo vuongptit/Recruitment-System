@@ -98,6 +98,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
   // Outgoing call modal state (Wait for recipient to answer)
   const [outgoingCall, setOutgoingCall] = useState<OutgoingCallState | null>(null);
   const [onlineUsers, setOnlineUsers] = useState<Record<string, boolean>>({});
+  const [endedCallIds, setEndedCallIds] = useState<Set<string>>(new Set());
 
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
@@ -169,12 +170,41 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
       }
     };
     void checkOnline();
-    const interval = setInterval(checkOnline, 15000);
+
+    const handlePresenceChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ user_id?: string; online?: boolean }>).detail;
+      if (typeof detail?.user_id === "string" && typeof detail?.online === "boolean") {
+        setOnlineUsers((prev) => ({ ...prev, [detail.user_id as string]: detail.online as boolean }));
+      }
+    };
+    const handleReconnected = () => {
+      void checkOnline();
+    };
+
+    window.addEventListener("user_presence_changed", handlePresenceChanged);
+    window.addEventListener("sse_reconnected", handleReconnected);
+
     return () => {
       active = false;
-      clearInterval(interval);
+      window.removeEventListener("user_presence_changed", handlePresenceChanged);
+      window.removeEventListener("sse_reconnected", handleReconnected);
     };
   }, [counterpartIdsKey]);
+
+  useEffect(() => {
+    const handleEnded = (event: Event) => {
+      const detail = (event as CustomEvent<{ callId?: string }>).detail;
+      if (typeof detail?.callId === "string") {
+        setEndedCallIds((prev) => new Set(prev).add(detail.callId!));
+      }
+    };
+    window.addEventListener("video_call_ended", handleEnded);
+    window.addEventListener("video_call_rejected", handleEnded);
+    return () => {
+      window.removeEventListener("video_call_ended", handleEnded);
+      window.removeEventListener("video_call_rejected", handleEnded);
+    };
+  }, []);
 
   // Outgoing call 30-second timeout (recipient did not answer)
   useEffect(() => {
@@ -578,6 +608,10 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
   for (const m of messages) {
     const c = parseCallMessage(m.content);
     if (c) {
+      const prev = callStatusMap.get(c.callId);
+      if (prev === "ENDED" || prev === "REJECTED") {
+        continue;
+      }
       if (c.action === "ENDED" || c.action === "REJECTED" || c.action === "ACCEPTED") {
         callStatusMap.set(c.callId, c.action);
       }
@@ -965,9 +999,15 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
 
                       const finalStatus = callStatusMap.get(call.callId);
                       const isOld = Date.now() - new Date(message.created_at).getTime() > 2 * 60 * 1000;
-                      const isEnded = call.action === "ENDED" || finalStatus === "ENDED" || (!finalStatus && isOld);
-                    const isRejected = call.action === "REJECTED" || finalStatus === "REJECTED";
-                    const isAccepted = call.action === "ACCEPTED" || finalStatus === "ACCEPTED";
+                      const isVeryOld = Date.now() - new Date(message.created_at).getTime() > 30 * 60 * 1000;
+                      const isEnded =
+                        call.action === "ENDED" ||
+                        finalStatus === "ENDED" ||
+                        endedCallIds.has(call.callId) ||
+                        (!finalStatus && isOld) ||
+                        (finalStatus === "ACCEPTED" && isVeryOld);
+                      const isRejected = call.action === "REJECTED" || finalStatus === "REJECTED";
+                      const isAccepted = !isEnded && !isRejected && (call.action === "ACCEPTED" || finalStatus === "ACCEPTED");
 
                     return (
                       <div

@@ -16,35 +16,54 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+type SSEEvent struct {
+	ID    string
+	Event string
+	Data  []byte
+}
+
+type PresencePayload struct {
+	UserID    string `json:"user_id"`
+	Online    bool   `json:"online"`
+	Timestamp string `json:"timestamp"`
+}
+
 type Hub struct {
 	sync.RWMutex
-	clients map[uuid.UUID]map[chan *model.Notification]bool
+	clients map[uuid.UUID]map[chan SSEEvent]bool
+	peers   map[uuid.UUID]map[uuid.UUID]struct{}
 	rdb     *redis.Client
 }
 
 func NewHub(rdb *redis.Client) *Hub {
 	return &Hub{
-		clients: make(map[uuid.UUID]map[chan *model.Notification]bool),
+		clients: make(map[uuid.UUID]map[chan SSEEvent]bool),
+		peers:   make(map[uuid.UUID]map[uuid.UUID]struct{}),
 		rdb:     rdb,
 	}
 }
 
-func (h *Hub) Register(userID uuid.UUID, ch chan *model.Notification) {
+func (h *Hub) Register(userID uuid.UUID, ch chan SSEEvent) {
 	h.Lock()
-	defer h.Unlock()
-
+	wasOnline := len(h.clients[userID]) > 0
 	if _, exists := h.clients[userID]; !exists {
-		h.clients[userID] = make(map[chan *model.Notification]bool)
+		h.clients[userID] = make(map[chan SSEEvent]bool)
 	}
 	h.clients[userID][ch] = true
-	log.Printf("[SSE Hub] User %s connected to SSE (total clients: %d)", userID, len(h.clients[userID]))
+	totalClients := len(h.clients[userID])
+	h.Unlock()
 
-	if h.rdb != nil {
-		go func(uid uuid.UUID) {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			_ = h.rdb.Set(ctx, fmt.Sprintf("presence:online:%s", uid), "1", 45*time.Second).Err()
-		}(userID)
+	log.Printf("[SSE Hub] User %s connected to SSE (total clients: %d)", userID, totalClients)
+
+	if !wasOnline {
+		if h.rdb != nil {
+			go func(uid uuid.UUID) {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer cancel()
+				_ = h.rdb.Set(ctx, fmt.Sprintf("presence:online:%s", uid), "1", 45*time.Second).Err()
+			}(userID)
+		}
+		go h.BroadcastPresence(userID, true)
 	}
 }
 
@@ -55,6 +74,113 @@ func (h *Hub) TouchPresence(userID uuid.UUID) {
 			defer cancel()
 			_ = h.rdb.Expire(ctx, fmt.Sprintf("presence:online:%s", uid), 45*time.Second).Err()
 		}(userID)
+	}
+}
+
+func (h *Hub) LinkUsers(userID uuid.UUID, peerIDs []uuid.UUID) {
+	if len(peerIDs) == 0 {
+		return
+	}
+
+	h.Lock()
+	if _, exists := h.peers[userID]; !exists {
+		h.peers[userID] = make(map[uuid.UUID]struct{})
+	}
+	for _, pid := range peerIDs {
+		if pid == uuid.Nil || pid == userID {
+			continue
+		}
+		h.peers[userID][pid] = struct{}{}
+		if _, exists := h.peers[pid]; !exists {
+			h.peers[pid] = make(map[uuid.UUID]struct{})
+		}
+		h.peers[pid][userID] = struct{}{}
+	}
+	h.Unlock()
+
+	if h.rdb != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			pipe := h.rdb.Pipeline()
+			for _, pid := range peerIDs {
+				if pid == uuid.Nil || pid == userID {
+					continue
+				}
+				key1 := fmt.Sprintf("presence:peers:%s", userID)
+				key2 := fmt.Sprintf("presence:peers:%s", pid)
+				pipe.SAdd(ctx, key1, pid.String())
+				pipe.Expire(ctx, key1, 7*24*time.Hour)
+				pipe.SAdd(ctx, key2, userID.String())
+				pipe.Expire(ctx, key2, 7*24*time.Hour)
+			}
+			_, _ = pipe.Exec(ctx)
+		}()
+	}
+}
+
+func (h *Hub) LinkGroup(memberIDs []uuid.UUID) {
+	for i := 0; i < len(memberIDs); i++ {
+		h.LinkUsers(memberIDs[i], memberIDs)
+	}
+}
+
+func (h *Hub) BroadcastPresence(userID uuid.UUID, online bool) {
+	// 1. Gather linked peers from in-memory dictionary
+	h.RLock()
+	peerSet := make(map[uuid.UUID]struct{})
+	if peersMap, exists := h.peers[userID]; exists {
+		for peerID := range peersMap {
+			peerSet[peerID] = struct{}{}
+		}
+	}
+	h.RUnlock()
+
+	// 2. If memory is empty, fallback to Redis Set
+	if len(peerSet) == 0 && h.rdb != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		members, err := h.rdb.SMembers(ctx, fmt.Sprintf("presence:peers:%s", userID)).Result()
+		if err == nil {
+			for _, m := range members {
+				if pUUID, err := uuid.Parse(m); err == nil {
+					peerSet[pUUID] = struct{}{}
+				}
+			}
+		}
+	}
+
+	if len(peerSet) == 0 {
+		return
+	}
+
+	payload := PresencePayload{
+		UserID:    userID.String(),
+		Online:    online,
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+	dataBytes, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+
+	msg := SSEEvent{
+		Event: "presence",
+		Data:  dataBytes,
+	}
+
+	h.RLock()
+	defer h.RUnlock()
+	for peerID := range peerSet {
+		if clients, exists := h.clients[peerID]; exists {
+			for ch := range clients {
+				select {
+				case ch <- msg:
+				default:
+					log.Printf("[SSE Hub] Presence buffer full for user %s, skipping frame", peerID)
+				}
+			}
+		}
 	}
 }
 
@@ -117,38 +243,60 @@ func (h *Hub) GetUsersOnlineStatuses(userIDs []uuid.UUID) map[uuid.UUID]bool {
 	return statuses
 }
 
-func (h *Hub) Unregister(userID uuid.UUID, ch chan *model.Notification) {
+func (h *Hub) Unregister(userID uuid.UUID, ch chan SSEEvent) {
 	h.Lock()
-	defer h.Unlock()
-
-	lastConnection := false
+	isLast := false
 	if userClients, exists := h.clients[userID]; exists {
 		delete(userClients, ch)
 		close(ch)
 		if len(userClients) == 0 {
 			delete(h.clients, userID)
-			lastConnection = true
+			isLast = true
 		}
 	}
+	h.Unlock()
+
 	log.Printf("[SSE Hub] User %s disconnected from SSE", userID)
 
-	if lastConnection && h.rdb != nil {
+	if isLast {
 		go func(uid uuid.UUID) {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			_ = h.rdb.Del(ctx, fmt.Sprintf("presence:online:%s", uid)).Err()
+			// Grace period 3 seconds to avoid disconnect flicker on page navigation/refresh
+			time.Sleep(3 * time.Second)
+			h.RLock()
+			stillConnected := len(h.clients[uid]) > 0
+			h.RUnlock()
+
+			if !stillConnected {
+				if h.rdb != nil {
+					ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+					defer cancel()
+					_ = h.rdb.Del(ctx, fmt.Sprintf("presence:online:%s", uid)).Err()
+				}
+				h.BroadcastPresence(uid, false)
+			}
 		}(userID)
 	}
 }
 
 func (h *Hub) Dispatch(userID uuid.UUID, notif *model.Notification) {
+	dataBytes, err := json.Marshal(notif)
+	if err != nil {
+		return
+	}
+
+	msg := SSEEvent{
+		ID:    notif.ID.String(),
+		Event: "notification",
+		Data:  dataBytes,
+	}
+
 	h.RLock()
 	defer h.RUnlock()
 
 	if userClients, exists := h.clients[userID]; exists {
 		for ch := range userClients {
 			select {
-			case ch <- notif:
+			case ch <- msg:
 			default:
 				log.Printf("[SSE Hub] Buffer full for user %s, skipping frame", userID)
 			}
@@ -174,7 +322,7 @@ func (h *Hub) ServeStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	messageChan := make(chan *model.Notification, 64)
+	messageChan := make(chan SSEEvent, 64)
 	h.Register(userID, messageChan)
 	defer h.Unregister(userID, messageChan)
 
@@ -195,16 +343,15 @@ func (h *Hub) ServeStream(w http.ResponseWriter, r *http.Request) {
 			_, _ = fmt.Fprint(w, ": ping\n\n")
 			flusher.Flush()
 
-		case notif, ok := <-messageChan:
+		case msg, ok := <-messageChan:
 			if !ok {
 				return
 			}
-			dataBytes, err := json.Marshal(notif)
-			if err != nil {
-				continue
+			if msg.ID != "" {
+				_, _ = fmt.Fprintf(w, "id: %s\nevent: %s\ndata: %s\n\n", msg.ID, msg.Event, string(msg.Data))
+			} else {
+				_, _ = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", msg.Event, string(msg.Data))
 			}
-
-			_, _ = fmt.Fprintf(w, "id: %s\nevent: notification\ndata: %s\n\n", notif.ID, string(dataBytes))
 			flusher.Flush()
 		}
 	}
