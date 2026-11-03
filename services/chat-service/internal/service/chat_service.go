@@ -130,9 +130,13 @@ func (s *ChatService) SendMessage(ctx context.Context, convID, senderID, clientM
 		return msg, nil, nil
 	}
 
-	// Only publish Kafka event if it was newly created (idempotency)
+	// Publish Kafka event asynchronously if newly created (idempotency)
 	if isNew && s.producer != nil {
-		_ = s.producer.PublishMessageCreated(ctx, msg, memberIDs)
+		go func(m *model.Message, mIDs []uuid.UUID) {
+			pubCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = s.producer.PublishMessageCreated(pubCtx, m, mIDs)
+		}(msg, memberIDs)
 	}
 
 	return msg, memberIDs, nil

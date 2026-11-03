@@ -7,6 +7,7 @@ export interface ChatConversation {
   created_at: string;
   updated_at: string;
   last_message_at?: string;
+  last_message_content?: string;
   members?: string[];
   unread_count?: number;
   avatar_url?: string;
@@ -46,6 +47,8 @@ export interface ChatMessage {
   content: string;
   created_at: string;
   client_message_id?: string;
+  status?: "sending" | "sent" | "delivered" | "failed";
+  error?: string;
 }
 
 export function mergeConversationMessages(conversationId: string, current: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
@@ -55,7 +58,7 @@ export function mergeConversationMessages(conversationId: string, current: ChatM
     const index = merged.findIndex(existing => existing.id === message.id ||
       (!!message.client_message_id && existing.client_message_id === message.client_message_id));
     if (index === -1) merged.push(message);
-    else merged[index] = message;
+    else merged[index] = { ...merged[index], ...message };
   }
   return merged.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at) || a.id.localeCompare(b.id));
 }
@@ -74,6 +77,6 @@ export function sendChatMessage(conversationId: string, content: string, clientM
 }
 
 export function parseCallMessage(content: string): { action: "STARTED" | "ACCEPTED" | "REJECTED" | "ENDED"; callId: string } | null {
-  const match = /^\[CALL_(STARTED|ACCEPTED|REJECTED|ENDED)\] ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(content);
+  const match = /^\[CALL_(STARTED|ACCEPTED|REJECTED|ENDED)\] ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(content.trim());
   return match ? { action: match[1].toUpperCase() as "STARTED" | "ACCEPTED" | "REJECTED" | "ENDED", callId: match[2].toLowerCase() } : null;
 }

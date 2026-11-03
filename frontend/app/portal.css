@@ -311,3 +311,23 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .company-job-body .text-link { font-size: 12px; }
 @media (max-width: 1100px) { .company-jobs-grid { grid-template-columns: 1fr; } }
 @media (max-width: 680px) { .company-job-card { padding: 16px; gap: 10px; } .company-job-icon { width: 34px; height: 34px; border-radius: 9px; } }
+
+/* Messenger Chat Enhancements */
+.show-on-mobile { display: none !important; }
+@media (max-width: 768px) {
+  .show-on-mobile { display: inline-flex !important; }
+  .hide-on-mobile { display: none !important; }
+  .messages-workspace { flex-direction: column; height: calc(100dvh - 180px) !important; min-height: 480px !important; }
+}
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 1s linear infinite;
+}

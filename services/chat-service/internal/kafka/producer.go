@@ -24,6 +24,8 @@ func NewProducer(brokers []string) *Producer {
 		Balancer:     &kafka.LeastBytes{},
 		WriteTimeout: 5 * time.Second,
 		RequiredAcks: kafka.RequireOne,
+		BatchSize:    1,
+		BatchTimeout: 5 * time.Millisecond,
 	}
 
 	return &Producer{writer: writer}
