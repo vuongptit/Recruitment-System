@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"github.com/redis/go-redis/v9"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -12,6 +12,7 @@ import (
 	"video-service/internal/repository"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
 type VideoService struct {
@@ -82,7 +83,7 @@ type JoinCallResult struct {
 	Call       *model.VideoCall `json:"call"`
 }
 
-func (s *VideoService) JoinCall(ctx context.Context, callID, userID uuid.UUID, userName string) (*JoinCallResult, error) {
+func (s *VideoService) JoinCall(ctx context.Context, callID, userID uuid.UUID, userName string, avatarURL ...string) (*JoinCallResult, error) {
 	call, err := s.repo.FindByID(ctx, callID)
 	if err != nil {
 		return nil, err
@@ -96,7 +97,13 @@ func (s *VideoService) JoinCall(ctx context.Context, callID, userID uuid.UUID, u
 		return nil, err
 	}
 
-	token, err := s.tokenIssuer.GenerateJoinToken(call.RoomName, userID.String(), userName)
+	var metadata string
+	if len(avatarURL) > 0 && avatarURL[0] != "" {
+		metaBytes, _ := json.Marshal(map[string]string{"avatar_url": avatarURL[0]})
+		metadata = string(metaBytes)
+	}
+
+	token, err := s.tokenIssuer.GenerateJoinToken(call.RoomName, userID.String(), userName, metadata)
 	if err != nil {
 		return nil, err
 	}
@@ -115,8 +122,12 @@ func (s *VideoService) EndCall(ctx context.Context, callID, userID uuid.UUID) er
 		return err
 	}
 
-	if call.HostID != userID {
-		return fmt.Errorf("only host can end the call")
+	isParticipant, err := s.repo.IsParticipant(ctx, callID, userID)
+	if err != nil {
+		return err
+	}
+	if call.HostID != userID && !isParticipant {
+		return fmt.Errorf("user is not authorized to end this call")
 	}
 
 	if err := s.repo.EndCall(ctx, callID); err != nil {

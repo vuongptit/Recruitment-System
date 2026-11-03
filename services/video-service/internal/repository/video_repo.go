@@ -195,3 +195,16 @@ func (r *VideoRepository) RemoveParticipant(ctx context.Context, callID, userID 
 	_, err := r.db.ExecContext(ctx, query, time.Now(), callID, userID)
 	return err
 }
+
+func (r *VideoRepository) IsParticipant(ctx context.Context, callID, userID uuid.UUID) (bool, error) {
+	query := `SELECT 1 FROM video_call_participants WHERE call_id = $1 AND user_id = $2`
+	var one int
+	err := r.db.QueryRowContext(ctx, query, callID, userID).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}

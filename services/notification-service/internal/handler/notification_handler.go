@@ -198,6 +198,10 @@ func (h *NotificationHandler) OnlineStatus(w http.ResponseWriter, r *http.Reques
 		userIDs = append(userIDs, uid)
 	}
 
+	if viewerID, ok := middleware.GetUserID(r.Context()); ok && len(userIDs) > 0 {
+		h.sseHub.LinkUsers(viewerID, userIDs)
+	}
+
 	statuses := h.sseHub.GetUsersOnlineStatuses(userIDs)
 	stringStatuses := make(map[string]bool, len(statuses))
 	var isOnline bool

@@ -107,7 +107,7 @@ func (h *VideoHandler) EndCall(w http.ResponseWriter, r *http.Request) {
 	if err := h.videoService.EndCall(r.Context(), callID, userID); err != nil {
 		if err == repository.ErrCallNotFound {
 			sendError(w, err.Error(), http.StatusNotFound)
-		} else if err.Error() == "only host can end the call" {
+		} else if err.Error() == "user is not authorized to end this call" {
 			sendError(w, err.Error(), http.StatusForbidden)
 		} else {
 			sendError(w, err.Error(), http.StatusBadRequest)

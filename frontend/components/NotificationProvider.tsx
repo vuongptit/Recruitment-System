@@ -199,10 +199,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         }
       } catch { /* Ignore malformed stream data; the inbox can always be refreshed. */ }
     });
+    source.addEventListener("presence", event => {
+      if (!isCurrent()) return;
+      try {
+        const payload = JSON.parse((event as MessageEvent).data) as { user_id?: string; online?: boolean };
+        if (typeof payload.user_id === "string" && typeof payload.online === "boolean") {
+          window.dispatchEvent(new CustomEvent("user_presence_changed", { detail: payload }));
+        }
+      } catch { /* Ignore malformed presence event */ }
+    });
     source.addEventListener("connected", () => {
       // Reconcile missed events after reconnect only when the inbox is open.
       if (inboxVisible.current) void refresh();
       else void fetchUnreadCount();
+      window.dispatchEvent(new CustomEvent("sse_reconnected"));
     });
     const poll = setInterval(() => { if (document.visibilityState === "visible") void fetchUnreadCount(); }, 30000);
     return () => { active = false; source.close(); clearInterval(poll); window.removeEventListener("video_call_signal", handleCallSignal); };

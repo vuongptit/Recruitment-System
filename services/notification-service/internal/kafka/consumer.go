@@ -280,6 +280,18 @@ func (c *Consumer) handleMessageCreated(ctx context.Context, event model.KafkaEv
 	senderID, _ := uuid.Parse(senderIDStr)
 	log.Printf("[Kafka Consumer] Sender: %s, Members: %d", senderID, len(rawMembers))
 
+	var memberUUIDs []uuid.UUID
+	for _, m := range rawMembers {
+		if mStr, ok := m.(string); ok {
+			if mUID, err := uuid.Parse(mStr); err == nil {
+				memberUUIDs = append(memberUUIDs, mUID)
+			}
+		}
+	}
+	if len(memberUUIDs) > 1 {
+		c.sseHub.LinkGroup(memberUUIDs)
+	}
+
 	metadataJSON, _ := json.Marshal(map[string]string{
 		"conversation_id": convIDStr,
 		"sender_id":       senderIDStr,
