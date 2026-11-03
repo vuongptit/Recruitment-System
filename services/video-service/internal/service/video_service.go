@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"github.com/redis/go-redis/v9"
 	"fmt"
 	"strings"
 
@@ -17,23 +18,39 @@ type VideoService struct {
 	repo        *repository.VideoRepository
 	tokenIssuer *livekit.TokenIssuer
 	producer    *kafka.Producer
+	rdb         *redis.Client
 }
 
 func NewVideoService(
 	repo *repository.VideoRepository,
 	tokenIssuer *livekit.TokenIssuer,
 	producer *kafka.Producer,
+	rdb *redis.Client,
 ) *VideoService {
 	return &VideoService{
 		repo:        repo,
 		tokenIssuer: tokenIssuer,
 		producer:    producer,
+		rdb:         rdb,
 	}
 }
 
 func (s *VideoService) CreateCall(ctx context.Context, hostID uuid.UUID, title string, participantIDs []uuid.UUID, conversationID string) (*model.VideoCall, error) {
 	if strings.TrimSpace(title) == "" {
 		title = "Cuộc phỏng vấn mới"
+	}
+
+	// Check if non-host participants are online via Redis presence
+	if s.rdb != nil {
+		for _, pid := range participantIDs {
+			if pid == hostID {
+				continue
+			}
+			val, err := s.rdb.Get(ctx, fmt.Sprintf("presence:online:%s", pid)).Result()
+			if err != nil || val != "1" {
+				return nil, fmt.Errorf("Người nhận hiện không trực tuyến")
+			}
+		}
 	}
 
 	roomName := fmt.Sprintf("interview_%s", uuid.New().String()[:8])

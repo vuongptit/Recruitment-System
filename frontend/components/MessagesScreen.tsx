@@ -4,7 +4,7 @@ import { portalCall, portalSection, type AccountRole } from "@/lib/portalRoutes"
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCurrentAccount } from "@/components/SessionGate";
-import { PageHeader, EmptyState, ErrorState, LoadingState } from "@/components/ui";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { requestApi, toUserMessage } from "@/lib/apiClientCore";
 import {
   listChatMessages,
@@ -97,6 +97,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
 
   // Outgoing call modal state (Wait for recipient to answer)
   const [outgoingCall, setOutgoingCall] = useState<OutgoingCallState | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<Record<string, boolean>>({});
 
   const conversationsRef = useRef(conversations);
   conversationsRef.current = conversations;
@@ -143,6 +144,62 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
   useEffect(() => {
     void fetchConversations();
   }, [fetchConversations]);
+
+
+  // Query online presence for all counterpart users
+  const counterpartIds = Array.from(
+    new Set(conversations.flatMap((c) => (c.members ?? []).filter((id) => id !== accountId)))
+  );
+  const counterpartIdsKey = counterpartIds.sort().join(",");
+
+  useEffect(() => {
+    if (!counterpartIds.length) return;
+    let active = true;
+    const checkOnline = async () => {
+      try {
+        const res = await requestApi<{ online: boolean; statuses?: Record<string, boolean> }>(
+          `/api/notifications/online-status?user_ids=${encodeURIComponent(counterpartIdsKey)}`,
+          { privateData: true, maxRetries: 0 }
+        );
+        if (active && res.data?.statuses) {
+          setOnlineUsers(res.data.statuses);
+        }
+      } catch {
+        /* ignore network failures for presence */
+      }
+    };
+    void checkOnline();
+    const interval = setInterval(checkOnline, 15000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [counterpartIdsKey]);
+
+  // Outgoing call 30-second timeout (recipient did not answer)
+  useEffect(() => {
+    if (!outgoingCall) return;
+    const currentCall = outgoingCall;
+    const timer = setTimeout(async () => {
+      setOutgoingCall((prev) =>
+        prev?.callId === currentCall.callId ? { ...prev, statusText: "Người nhận không phản hồi" } : prev
+      );
+      try {
+        await requestApi(`/api/calls/${encodeURIComponent(currentCall.callId)}/end`, {
+          method: "POST",
+          privateData: true,
+          maxRetries: 0,
+        });
+        await sendChatMessage(currentCall.conversationId, `[CALL_REJECTED] ${currentCall.callId}`, crypto.randomUUID());
+      } catch {
+        /* ignore */
+      }
+      setTimeout(() => {
+        setOutgoingCall((prev) => (prev?.callId === currentCall.callId ? null : prev));
+      }, 2500);
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [outgoingCall?.callId]);
 
   // Reset thread on conversation switch
   useEffect(() => {
@@ -430,6 +487,11 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
       setActionError("Chưa xác định được người nhận. Hãy tải lại hội thoại.");
       return;
     }
+    const recipientId = participantIds[0];
+    if (recipientId && !onlineUsers[recipientId]) {
+      setActionError("Người nhận hiện không trực tuyến, không thể thực hiện cuộc gọi.");
+      return;
+    }
     const conversationId = selected.id;
     const recipientName = selectedIdentity?.name || "Đối phương";
 
@@ -523,12 +585,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
   }
 
   return (
-    <main>
-      <PageHeader
-        eyebrow="TRAO ĐỔI"
-        title="Tin nhắn"
-        description="Trao đổi công việc và tuyển dụng nhanh chóng với ứng viên và nhà tuyển dụng."
-      />
+    <main style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
 
       {/* Outgoing Calling Modal (Waiting for recipient) */}
       {outgoingCall && (
@@ -619,14 +676,15 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
       )}
 
       <div
-        className="messages-workspace card"
+        className="messages-workspace"
         style={{
           padding: 0,
           overflow: "hidden",
-          borderRadius: 16,
-          border: "1px solid var(--line)",
           display: "flex",
-          minHeight: 620,
+          width: "100%",
+          height: "100%",
+          flex: 1,
+          minHeight: 0,
           background: "white",
         }}
       >
@@ -679,6 +737,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
             )}
             {conversations.map((conversation) => {
               const identity = conversationIdentity(conversation, accountId);
+              const peerId = (conversation.members ?? []).find((id) => id !== accountId) || conversation.counterpart?.user_id;
               const isSelected = selectedId === conversation.id;
               const preview = conversation.last_message_content || identity.description;
               const timeDisplay = formatChatTime(conversation.updated_at);
@@ -711,7 +770,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
                 >
                   <div style={{ position: "relative" }}>
                     <ChatIdentityAvatar identity={identity} size={46} />
-                    {connected && (
+                    {peerId && onlineUsers[peerId] && (
                       <span
                         style={{
                           position: "absolute",
@@ -813,12 +872,18 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
                     >
                       {selectedIdentity?.name || "Cuộc trò chuyện"}
                     </h2>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <Circle size={8} fill={connected ? "#22c55e" : "#eab308"} color="transparent" />
-                      <small style={{ color: "var(--muted)", fontSize: 12 }}>
-                        {connected ? "Đang hoạt động" : "Đang kết nối lại..."}
-                      </small>
-                    </div>
+                    {(() => {
+                      const peerId = (selected?.members ?? []).find((id) => id !== accountId) || selected?.counterpart?.user_id;
+                      const isOnline = peerId ? !!onlineUsers[peerId] : false;
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <Circle size={8} fill={isOnline ? "#22c55e" : "#94a3b8"} color="transparent" />
+                          <small style={{ color: "var(--muted)", fontSize: 12 }}>
+                            {isOnline ? "Đang hoạt động" : "Không trực tuyến"}
+                          </small>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -885,14 +950,22 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
                   </div>
                 )}
 
-                {messages.map((message) => {
-                  const isMe = message.sender_id === accountId;
-                  const call = parseCallMessage(message.content);
+                {(() => {
+                  const renderedCallIds = new Set<string>();
+                  return messages.map((message) => {
+                    const isMe = message.sender_id === accountId;
+                    const call = parseCallMessage(message.content);
 
-                  // 1. Render Video Call Card
-                  if (call) {
-                    const finalStatus = callStatusMap.get(call.callId);
-                    const isEnded = call.action === "ENDED" || finalStatus === "ENDED";
+                    // 1. Render Video Call Card
+                    if (call) {
+                      if (renderedCallIds.has(call.callId)) {
+                        return null;
+                      }
+                      renderedCallIds.add(call.callId);
+
+                      const finalStatus = callStatusMap.get(call.callId);
+                      const isOld = Date.now() - new Date(message.created_at).getTime() > 2 * 60 * 1000;
+                      const isEnded = call.action === "ENDED" || finalStatus === "ENDED" || (!finalStatus && isOld);
                     const isRejected = call.action === "REJECTED" || finalStatus === "REJECTED";
                     const isAccepted = call.action === "ACCEPTED" || finalStatus === "ACCEPTED";
 
@@ -1079,7 +1152,8 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
                       </div>
                     </article>
                   );
-                })}
+                });
+                })()}
               </div>
 
               {/* Message Input Form */}

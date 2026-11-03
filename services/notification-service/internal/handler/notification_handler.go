@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"notification-service/internal/cursor"
@@ -169,21 +170,52 @@ func (h *NotificationHandler) RegisterPushToken(w http.ResponseWriter, r *http.R
 }
 
 func (h *NotificationHandler) OnlineStatus(w http.ResponseWriter, r *http.Request) {
+	userIDsStr := r.URL.Query().Get("user_ids")
 	userIDStr := r.URL.Query().Get("user_id")
-	if userIDStr == "" {
-		http.Error(w, `{"error":"user_id is required"}`, http.StatusBadRequest)
+
+	if userIDsStr == "" && userIDStr == "" {
+		http.Error(w, `{"error":"user_id or user_ids is required"}`, http.StatusBadRequest)
 		return
 	}
 
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		http.Error(w, `{"error":"invalid user_id format"}`, http.StatusBadRequest)
-		return
+	var userIDs []uuid.UUID
+	if userIDsStr != "" {
+		for _, part := range strings.Split(userIDsStr, ",") {
+			trimmed := strings.TrimSpace(part)
+			if trimmed == "" {
+				continue
+			}
+			if uid, err := uuid.Parse(trimmed); err == nil {
+				userIDs = append(userIDs, uid)
+			}
+		}
+	} else if userIDStr != "" {
+		uid, err := uuid.Parse(userIDStr)
+		if err != nil {
+			http.Error(w, `{"error":"invalid user_id format"}`, http.StatusBadRequest)
+			return
+		}
+		userIDs = append(userIDs, uid)
 	}
 
-	isOnline := h.sseHub.IsUserConnected(userID)
+	statuses := h.sseHub.GetUsersOnlineStatuses(userIDs)
+	stringStatuses := make(map[string]bool, len(statuses))
+	var isOnline bool
+	for uid, on := range statuses {
+		stringStatuses[uid.String()] = on
+		if userIDStr != "" && uid.String() == userIDStr {
+			isOnline = on
+		}
+	}
+	if userIDStr != "" && len(userIDs) == 1 {
+		isOnline = statuses[userIDs[0]]
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"data": map[string]bool{"online": isOnline},
+		"data": map[string]any{
+			"online":   isOnline,
+			"statuses": stringStatuses,
+		},
 	})
 }

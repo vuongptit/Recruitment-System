@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/redis/go-redis/v9"
 	"fmt"
 	"log"
 	"net/http"
@@ -41,6 +42,8 @@ func main() {
 	allowedOriginsStr := getEnv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:8080")
 	cursorHmacKey := getEnv("CURSOR_HMAC_KEY", "default_secret_hmac_key_for_cursor_pagination")
 	port := getEnv("PORT", "8080")
+	redisAddr := getEnv("REDIS_ADDR", "redis:6379")
+	redisPassword := getEnv("REDIS_PASSWORD", "")
 
 	// Connect to Database with Retry
 	database, err := db.ConnectWithRetry(dbURL, 15, 2*time.Second)
@@ -66,8 +69,25 @@ func main() {
 	eventRepo := repository.NewProcessedEventRepository(database)
 	notifSvc := service.NewNotificationService(notifRepo)
 
+	// Redis client for presence tracking
+	var rdb *redis.Client
+	if redisAddr != "" {
+		rdb = redis.NewClient(&redis.Options{
+			Addr:     redisAddr,
+			Password: redisPassword,
+			DB:       0,
+		})
+		pingCtx, pingCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		if err := rdb.Ping(pingCtx).Err(); err != nil {
+			log.Printf("[Notification Service] Warning: Redis ping failed (%v), presence will be in-memory only", err)
+		} else {
+			log.Println("[Notification Service] Connected to Redis for presence tracking")
+		}
+		pingCancel()
+	}
+
 	// SSE Hub
-	sseHub := sse.NewHub()
+	sseHub := sse.NewHub(rdb)
 
 	// Kafka Consumer (chat-events, video.call.started)
 	kafkaBrokers := strings.Split(kafkaBrokersStr, ",")

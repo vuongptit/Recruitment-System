@@ -331,3 +331,67 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .spin {
   animation: spin 1s linear infinite;
 }
+
+
+/* Edge-to-edge workspace header */
+.workspace-header .topbar-inner {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding-inline: 24px !important;
+}
+
+/* Full-viewport Chat Workspace */
+.workspace-shell:has(.messages-workspace) {
+  height: 100dvh;
+  overflow: hidden;
+}
+.workspace-shell:has(.messages-workspace) .workspace-body {
+  height: calc(100dvh - 72px);
+  overflow: hidden;
+}
+.workspace-shell:has(.messages-workspace) .workspace-content {
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+.workspace-shell:has(.messages-workspace) .workspace-page {
+  max-width: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+}
+.workspace-shell:has(.messages-workspace) .workspace-page > main {
+  max-width: none !important;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+}
+.workspace-shell:has(.messages-workspace) .workspace-footer {
+  display: none !important;
+}
+.messages-workspace {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+  background: white;
+}

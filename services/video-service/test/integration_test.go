@@ -89,7 +89,7 @@ func TestVideoServiceIntegration(t *testing.T) {
 	// 5. Initialize Repositories and Service
 	videoRepo := repository.NewVideoRepository(database)
 	tokenIssuer := livekit.NewTokenIssuer("ws://localhost:7880", "devkey", "secret")
-	videoSvc := service.NewVideoService(videoRepo, tokenIssuer, producer)
+	videoSvc := service.NewVideoService(videoRepo, tokenIssuer, producer, nil)
 
 	// 6. Execute Test Cases
 	t.Run("Only invited users reject calls and rejected rooms stay closed", func(t *testing.T) {

@@ -436,11 +436,15 @@ services:
       JWT_AUDIENCE: ${JWT_AUDIENCE:-recruitment-api}
       CURSOR_HMAC_KEY: ${NOTIFICATION_CURSOR_HMAC_KEY:?NOTIFICATION_CURSOR_HMAC_KEY is required}
       ALLOWED_ORIGINS: *prod_origin
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       PORT: "8080"
     logging: *logging
     restart: unless-stopped
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
@@ -650,6 +654,8 @@ services:
       LIVEKIT_URL: ${LIVEKIT_URL:?LIVEKIT_URL is required}
       KAFKA_BROKERS: kafka:9092
       ALLOWED_ORIGINS: *prod_origin
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       PORT: "8080"
     logging: *logging
     secrets:
@@ -658,6 +664,8 @@ services:
     restart: unless-stopped
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       auth-service:
         condition: service_started

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"github.com/redis/go-redis/v9"
 	"log"
 	"net/http"
 	"os"
@@ -41,6 +43,8 @@ func main() {
 	livekitAPISecret := getEnv("LIVEKIT_API_SECRET", "secret01234567890123456789012345")
 	allowedOriginsStr := getEnv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:8080")
 	port := getEnv("PORT", "8080")
+	redisAddr := getEnv("REDIS_ADDR", "redis:6379")
+	redisPassword := getEnv("REDIS_PASSWORD", "")
 
 	// Connect to Database with Retry
 	database, err := db.ConnectWithRetry(dbURL, 15, 2*time.Second)
@@ -69,9 +73,26 @@ func main() {
 	// Initialize LiveKit Token Issuer
 	tokenIssuer := livekit.NewTokenIssuer(livekitURL, livekitAPIKey, livekitAPISecret)
 
+	// Redis client for presence check
+	var rdb *redis.Client
+	if redisAddr != "" {
+		rdb = redis.NewClient(&redis.Options{
+			Addr:     redisAddr,
+			Password: redisPassword,
+			DB:       0,
+		})
+		pingCtx, pingCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		if err := rdb.Ping(pingCtx).Err(); err != nil {
+			log.Printf("[Video Service] Warning: Redis ping failed (%v), presence check will be skipped", err)
+		} else {
+			log.Println("[Video Service] Connected to Redis for presence checks")
+		}
+		pingCancel()
+	}
+
 	// Repositories & Services
 	videoRepo := repository.NewVideoRepository(database)
-	videoSvc := service.NewVideoService(videoRepo, tokenIssuer, producer)
+	videoSvc := service.NewVideoService(videoRepo, tokenIssuer, producer, rdb)
 
 	// Handlers
 	videoHandler := handler.NewVideoHandler(videoSvc)
