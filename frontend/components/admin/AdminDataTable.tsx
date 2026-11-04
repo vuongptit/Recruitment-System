@@ -1,9 +1,11 @@
 import {
   BriefcaseBusiness,
   Building2,
+  Ban,
   Eye,
   Flag,
   LockKeyhole,
+  RotateCcw,
 } from "lucide-react";
 import { StatusBadge } from "../ui";
 
@@ -27,6 +29,13 @@ export const targetLabels: Record<string, string> = {
   AUTH: "Tài khoản",
   REPORT: "Báo cáo vi phạm",
 };
+const jobStatusLabels: Record<string, string> = {
+  DRAFT: "Bản nháp",
+  PENDING_APPROVAL: "Chờ duyệt",
+  PUBLISHED: "Đang đăng",
+  CLOSED: "Đã đóng",
+  EXPIRED: "Hết hạn",
+};
 const outcomes: Record<string, string> = {
   SUCCESS: "Thành công",
   SUCCEEDED: "Thành công",
@@ -45,6 +54,10 @@ const actionLabels: Record<string, string> = {
   RESOLVE_REPORT: "Xử lý báo cáo",
   DISMISS_REPORT: "Bỏ qua báo cáo",
   HANDLE_REPORT: "Xử lý báo cáo",
+  SUSPEND_JOB: "Gỡ tin tuyển dụng",
+  RESTORE_JOB: "Khôi phục tin tuyển dụng",
+  SUSPEND_COMPANY: "Đình chỉ công ty",
+  RESTORE_COMPANY: "Khôi phục công ty",
 };
 const auditTitle = (row: AdminRow) =>
   actionLabels[String(row.action)] || text(row.action, "Hoạt động quản trị");
@@ -156,10 +169,10 @@ export function AdminDataTable({
                         aria-hidden="true"
                       >
                         {tab === "companies" &&
-                        typeof row.logoUrl === "string" &&
-                        /^https?:\/\//.test(row.logoUrl) ? (
+                        typeof (row.logoUrl ?? (row.logo as Record<string, unknown> | undefined)?.url) === "string" &&
+                        /^https?:\/\//.test(String(row.logoUrl ?? (row.logo as Record<string, unknown> | undefined)?.url)) ? (
                           <img
-                            src={row.logoUrl}
+                            src={String(row.logoUrl ?? (row.logo as Record<string, unknown> | undefined)?.url)}
                             alt=""
                             width={36}
                             height={36}
@@ -184,7 +197,9 @@ export function AdminDataTable({
                           : tab === "jobs"
                             ? text(
                                 row.companyName ?? row.company_name,
-                                "Tin chờ kiểm duyệt",
+                                typeof row.companyId === "string"
+                                  ? `Mã công ty: ${row.companyId}`
+                                  : "Chưa rõ công ty",
                               )
                             : tab === "users"
                               ? text(row.locked_reason, "")
@@ -279,7 +294,9 @@ export function AdminDataTable({
                   <>
                     <td>{text(row.industry)}</td>
                     <td>
-                      <StatusBadge tone="warning">Chờ xác minh</StatusBadge>
+                      <StatusBadge tone={row.isSuspended ? "danger" : row.verifiedStatus === "VERIFIED" ? "success" : row.verifiedStatus === "REJECTED" ? "danger" : "warning"}>
+                        {row.isSuspended ? "Đình chỉ" : row.verifiedStatus === "VERIFIED" ? "Đã xác minh" : row.verifiedStatus === "REJECTED" ? "Từ chối" : "Chờ xác minh"}
+                      </StatusBadge>
                     </td>
                     <td className="admin-nowrap">
                       {date(row.createdAt ?? row.created_at)}
@@ -290,7 +307,9 @@ export function AdminDataTable({
                     <td>{text(row.location)}</td>
                     <td className="admin-nowrap">{date(row.deadline)}</td>
                     <td>
-                      <StatusBadge tone="warning">Chờ duyệt</StatusBadge>
+                      <StatusBadge tone={row.isSuspended ? "danger" : row.status === "PUBLISHED" ? "success" : row.status === "REJECTED" ? "danger" : "warning"}>
+                        {row.isSuspended ? "Đã gỡ" : jobStatusLabels[String(row.status)] || text(row.status, "Chưa rõ trạng thái")}
+                      </StatusBadge>
                     </td>
                   </>
                 )}
@@ -305,7 +324,7 @@ export function AdminDataTable({
                     >
                       <Eye size={17} aria-hidden="true" />
                     </button>
-                    {tab === "companies" && (
+                    {tab === "companies" && row.verifiedStatus === "PENDING" && (
                       <>
                         <button
                           className="btn admin-approve"
@@ -336,7 +355,7 @@ export function AdminDataTable({
                         </button>
                       </>
                     )}
-                    {tab === "jobs" && (
+                    {tab === "jobs" && row.status === "PENDING_APPROVAL" && (
                       <>
                         <button
                           className="btn admin-approve"
@@ -357,6 +376,26 @@ export function AdminDataTable({
                           Từ chối
                         </button>
                       </>
+                    )}
+                    {(tab === "companies" || tab === "jobs") && (
+                      <button
+                        type="button"
+                        className={`btn ${row.isSuspended ? "admin-approve" : "admin-danger"}`}
+                        disabled={pending || typeof row.aggregateVersion !== "number"}
+                        title={typeof row.aggregateVersion !== "number" ? "Thiếu phiên bản dữ liệu để cập nhật an toàn" : undefined}
+                        onClick={() => {
+                          const suspended = !row.isSuspended;
+                          choose(
+                            `${tab}/${id}/moderation`,
+                            { suspended, expectedVersion: row.aggregateVersion, operationId: crypto.randomUUID() },
+                            suspended ? (tab === "companies" ? "Đình chỉ công ty" : "Gỡ tin tuyển dụng") : (tab === "companies" ? "Khôi phục công ty" : "Khôi phục tin tuyển dụng"),
+                            true,
+                          );
+                        }}
+                      >
+                        {row.isSuspended ? <RotateCcw size={14} aria-hidden="true" /> : <Ban size={14} aria-hidden="true" />}
+                        {row.isSuspended ? "Khôi phục" : "Gỡ"}
+                      </button>
                     )}
                     {tab === "users" && (
                       <button
@@ -403,12 +442,7 @@ export function AdminDataTable({
                         </button>
                         <button
                           className="btn admin-danger"
-                          disabled={pending || row.target_type !== "USER"}
-                          title={
-                            row.target_type !== "USER"
-                              ? "Chỉ áp dụng cho báo cáo tài khoản"
-                              : undefined
-                          }
+                          disabled={pending}
                           onClick={() =>
                             choose(
                               `reports/${id}`,
@@ -416,7 +450,11 @@ export function AdminDataTable({
                                 status: "RESOLVED",
                                 expectedVersion: row.version,
                               },
-                              "Chấp nhận báo cáo và khóa tài khoản",
+                              row.target_type === "USER"
+                                ? "Chấp nhận báo cáo và khóa tài khoản"
+                                : row.target_type === "COMPANY"
+                                  ? "Chấp nhận báo cáo và đình chỉ công ty"
+                                  : "Chấp nhận báo cáo và gỡ tin tuyển dụng",
                               true,
                             )
                           }
@@ -447,6 +485,10 @@ export function AdminDetail({ row, tab }: { row: AdminRow; tab: AdminTab }) {
           ["website", "Website"],
           ["taxCode", "Mã số thuế"],
           ["verifiedStatus", "Trạng thái"],
+          ["rejectReason", "Lý do từ chối"],
+          ["isSuspended", "Đang đình chỉ"],
+          ["suspensionReason", "Lý do đình chỉ"],
+          ["aggregateVersion", "Phiên bản dữ liệu"],
         ]
       : tab === "jobs"
         ? [
@@ -455,6 +497,12 @@ export function AdminDetail({ row, tab }: { row: AdminRow; tab: AdminTab }) {
             ["benefits", "Quyền lợi"],
             ["location", "Địa điểm"],
             ["deadline", "Hạn ứng tuyển"],
+            ["status", "Trạng thái"],
+            ["rejectionReason", "Lý do từ chối"],
+            ["companyId", "Mã công ty"],
+            ["isSuspended", "Đang gỡ"],
+            ["suspensionReason", "Lý do gỡ"],
+            ["aggregateVersion", "Phiên bản dữ liệu"],
           ]
         : tab === "users"
           ? [
@@ -499,8 +547,11 @@ export function AdminDetail({ row, tab }: { row: AdminRow; tab: AdminTab }) {
                 ? date(row[key])
                 : key === "created_at"
                   ? date(row[key], true)
+                  : typeof row[key] === "boolean"
+                    ? row[key] ? "Có" : "Không"
                   : roleLabels[String(row[key])] ||
                     targetLabels[String(row[key])] ||
+                    jobStatusLabels[String(row[key])] ||
                     reportLabels[String(row[key])] ||
                     outcomes[String(row[key])] ||
                     text(row[key])}
@@ -534,8 +585,8 @@ export function AdminDetail({ row, tab }: { row: AdminRow; tab: AdminTab }) {
       )}
       {tab === "reports" && row.target_type !== "USER" && (
         <p className="admin-data-note">
-          Thao tác khóa chỉ áp dụng cho báo cáo tài khoản. Báo cáo tin tuyển
-          dụng và công ty có thể được xem xét hoặc bỏ qua.
+          Khi chấp nhận báo cáo này, tin tuyển dụng sẽ được gỡ khỏi phần công khai
+          hoặc công ty sẽ bị đình chỉ. Dữ liệu và lịch sử ứng tuyển được giữ lại.
         </p>
       )}
     </div>

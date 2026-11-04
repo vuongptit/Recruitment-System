@@ -21,6 +21,8 @@ export class CompanyMediaResponseDto extends LogoReferenceResponseDto {
 }
 
 export class CompanyProfileDto {
+  @ApiProperty() isSuspended!: boolean;
+  @ApiPropertyOptional({ nullable: true }) suspensionReason!: string | null;
   @ApiProperty({ format: 'uuid' })
   id!: string;
 

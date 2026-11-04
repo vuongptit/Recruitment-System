@@ -39,8 +39,14 @@ Gateway strips `/admin`; direct service routes below have no prefix.
 | Method | Route | Access |
 |---|---|---|
 | GET | /companies/pending?page=1&limit=20 | ADMIN |
+| GET | /companies?status=PENDING&q=&suspended=&page=1&limit=20 | ADMIN; complete directory |
+| GET | /companies/{id} | ADMIN; detail |
+| PATCH | /companies/{id}/moderation | ADMIN; suspend/restore with reason, expectedVersion and operationId |
 | PATCH | /companies/{id}/verify | ADMIN; APPROVE or REJECT, rejection needs reason |
 | GET | /jobs/pending | ADMIN; upstream currently returns at most 50 |
+| GET | /jobs?status=&q=&company_id=&suspended=&page=1&limit=20 | ADMIN; complete directory |
+| GET | /jobs/{id} | ADMIN; detail |
+| PATCH | /jobs/{id}/moderation | ADMIN; remove/restore with reason, expectedVersion and operationId |
 | PATCH | /jobs/{id}/approve | ADMIN |
 | PATCH | /jobs/{id}/reject | ADMIN; reason required |
 | GET | /users?email=&role=&locked=&page=1&limit=20 | ADMIN |
@@ -65,7 +71,18 @@ Remote moderation cannot share a database transaction with Admin. Admin first co
 
 Reports use a row lock and expectedVersion compare-and-set. Reports enter PROCESSING before remote action. Only a successful remote action can produce RESOLVED. USER reports lock their exact target through Auth. DISMISSED performs no remote action. A definite remote rejection reopens the report; an ambiguous failure leaves PROCESSING for operator investigation. An unexpected process crash may likewise leave PROCESSING. This version does not automate that investigation or provide a force-resolve endpoint.
 
-Existing Job/Company services do not offer Admin takedown for already published jobs/verified companies. Those reports can be received/listed/dismissed; RESOLVED fails explicitly with TAKEDOWN_CONTRACT_UNAVAILABLE and reopens the report. Approval/rejection endpoints only review pending resources. Integration must add an idempotent takedown contract before enabling the remaining resolution actions.
+Admin directory and takedown contracts are now available:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/companies?status=PENDING&q=&suspended=&page=1&limit=20` | Search all company verification states, optionally filtering suspended records |
+| `GET` | `/companies/{id}` | Read the full company record for Admin review |
+| `PATCH` | `/companies/{id}/moderation` | Suspend/restore with `expectedVersion`, idempotent `operationId`, and required `reason` |
+| `GET` | `/jobs?status=PENDING_APPROVAL&q=&suspended=&page=1&limit=20` | Search jobs across lifecycle states |
+| `GET` | `/jobs/{id}` | Read a job in any state |
+| `PATCH` | `/jobs/{id}/moderation` | Remove/restore with the same version, operation and reason contract |
+
+The owning Company/Job service stores moderation state and operation identity, increments its aggregate version, and retains the underlying record and application history. Public company/job reads and new applications exclude suspended targets. Reports targeting COMPANY/JOB now use the same owning-service operation before a report can become RESOLVED. These operations remain cross-service actions: UNKNOWN outcomes require reconciliation against the owner before another operation is started.
 
 ## Statistics semantics
 

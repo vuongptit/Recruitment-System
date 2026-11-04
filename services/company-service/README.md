@@ -2,6 +2,12 @@
 
 This NestJS service owns company profiles and company membership data.
 
+## Admin company directory and suspension
+
+Admin can list every verification state through `GET /?verified_status=PENDING|VERIFIED|REJECTED|ALL&q=&suspended=&page=1&limit=20`, and read an individual record through `GET /admin/:id`. `PATCH /:id/moderation` requires `suspended`, `expectedVersion`, UUID `operationId`, and a reason. The service records each operation and an append-only company audit entry in its own database, increments the aggregate version, and keeps the company and its related records intact. Repeating the same operation ID with the same request returns the original result.
+
+Suspended companies disappear from public company search/detail and recruiter company context. The internal, key-protected `GET /internal/moderation/suspended` exposes bounded UUID keyset pages to Job Search so published jobs and application eligibility are immediately restricted without accessing this service's database.
+
 ## Optimistic profile updates
 
 Every `PUT /companies/:id`, including media attachment, replacement and removal,

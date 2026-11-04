@@ -19,6 +19,7 @@ import {
   JobSearchCursorService,
 } from './job-search-cursor.service';
 import { PrismaService } from './prisma.service';
+import { CompanyClientService } from './company-client.service';
 
 const ELASTICSEARCH_MAX_RESULT_WINDOW = 10_000;
 const DEFAULT_MAX_OPEN_PITS = 64;
@@ -68,6 +69,7 @@ export class JobSearchService {
     config: ConfigService,
     private readonly indexing: JobIndexingService,
     private readonly cursor: JobSearchCursorService,
+    private readonly companies: CompanyClientService,
   ) {
     const configuredTimeout = Number(
       config.get<string>('ELASTICSEARCH_REQUEST_TIMEOUT_MS') ?? '2000',
@@ -107,15 +109,19 @@ export class JobSearchService {
       ? this.cursor.decode(query.cursor, query)
       : null;
     const eligibilityDate = cursor?.eligibilityDate ?? utcDate();
+    const suspendedCompanies = await this.companies.suspendedCompanyIds();
+    const suspendedJobs = await this.prisma.job.findMany({ where: { isSuspended: true }, select: { id: true }, take: 10001 });
+    if (suspendedJobs.length > 10000) throw new ApiException('MODERATION_FILTER_LIMIT', 'Moderation filter capacity exceeded', HttpStatus.SERVICE_UNAVAILABLE);
+    const restrictions = { companies: suspendedCompanies, jobs: suspendedJobs.map(job => job.id) };
     if (!this.indexing.isSearchReady()) {
       if (cursorMode) this.throwContinuationUnavailable();
       this.logger.warn(
         'Elasticsearch baseline is not ready; using PostgreSQL fallback',
       );
-      return this.searchPostgres(query, eligibilityDate);
+      return this.searchPostgres(query, eligibilityDate, restrictions.companies);
     }
     try {
-      return await this.searchElasticsearch(query, cursor, eligibilityDate);
+      return await this.searchElasticsearch(query, cursor, eligibilityDate, restrictions);
     } catch (error) {
       if (
         error instanceof ApiException &&
@@ -140,7 +146,7 @@ export class JobSearchService {
       this.logger.warn(
         `Elasticsearch unavailable; using PostgreSQL fallback: ${message}`,
       );
-      return this.searchPostgres(query, eligibilityDate);
+      return this.searchPostgres(query, eligibilityDate, restrictions.companies);
     }
   }
 
@@ -148,6 +154,7 @@ export class JobSearchService {
     query: JobSearchQueryDto,
     cursor: JobSearchCursor | null,
     eligibilityDate: string,
+    restrictions: { companies: string[]; jobs: string[] },
   ): Promise<JobSearchResultDto> {
     const cursorMode = query.pagination === JobSearchPaginationMode.CURSOR;
     const continuation = cursor !== null;
@@ -155,6 +162,10 @@ export class JobSearchService {
       cursor?.expiresAt ?? Date.now() + JOB_SEARCH_CURSOR_TTL_MS;
     const must: estypes.QueryDslQueryContainer[] = [];
     const filter: estypes.QueryDslQueryContainer[] = [
+      { bool: { must_not: [
+        ...(restrictions.companies.length ? [{ terms: { companyId: restrictions.companies } }] : []),
+        ...(restrictions.jobs.length ? [{ terms: { jobId: restrictions.jobs } }] : []),
+      ] } },
       { term: { searchable: true } },
       { term: { status: JobStatus.PUBLISHED } },
       { range: { deadline: { gte: eligibilityDate } } },
@@ -345,9 +356,11 @@ export class JobSearchService {
   private async searchPostgres(
     query: JobSearchQueryDto,
     eligibilityDate: string,
+    suspendedCompanies: string[],
   ): Promise<JobSearchResultDto> {
     const today = new Date(`${eligibilityDate}T00:00:00.000Z`);
     const and: Prisma.JobWhereInput[] = [
+      { isSuspended: false, companyId: { notIn: suspendedCompanies } },
       { status: JobStatus.PUBLISHED },
       { deadline: { gte: today } },
     ];

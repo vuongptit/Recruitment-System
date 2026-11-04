@@ -51,17 +51,34 @@ model Job {
   aggregateVersion Int              @default(1) @map("aggregate_version")
   publishedAt      DateTime?        @map("published_at") @db.Timestamptz(3)
   rejectionReason  String?          @map("rejection_reason") @db.VarChar(1000)
+  isSuspended      Boolean          @default(false) @map("is_suspended")
+  suspensionReason String?          @map("suspension_reason") @db.VarChar(1000)
   reviewedBy       String?          @map("reviewed_by") @db.Uuid
   reviewedAt       DateTime?        @map("reviewed_at") @db.Timestamptz(3)
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
   eventOutbox      JobEventOutbox[]
   indexSync        JobIndexSync?
+  moderationOperations JobModerationOperation[]
 
   @@index([companyId, status])
   @@index([createdBy, status])
   @@index([status, deadline])
+  @@index([isSuspended, id], map: "jobs_suspended_idx")
   @@map("jobs")
+}
+
+model JobModerationOperation {
+  operationId String @id @map("operation_id") @db.Uuid
+  jobId String @map("job_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  suspended Boolean
+  reason String @db.VarChar(1000)
+  resultingVersion Int @map("resulting_version")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  job Job @relation(fields: [jobId], references: [id], onDelete: Restrict)
+  @@index([jobId, createdAt], map: "job_moderation_operations_target_idx")
+  @@map("job_moderation_operations")
 }
 
 /// Durable desired state for the Elasticsearch projection. One row per Job

@@ -74,6 +74,7 @@ import { RecruiterCandidateRecommendationService } from './recruiter-candidate-r
 import { JobSearchService } from './job-search.service';
 import { JobIndexFailure, JobIndexingService } from './job-indexing.service';
 import { JobService } from './job.service';
+import { AdminJobQueryDto, ModerateJobDto } from './job-admin.dto';
 
 interface HeaderResponse {
   setHeader(name: string, value: string): void;
@@ -235,6 +236,26 @@ export class JobController {
   @ApiOkResponse({ schema: envelope(true) })
   listPending(): Promise<JobDto[]> {
     return this.jobs.listPending();
+  }
+
+  @Get('admin/list')
+  @Roles(SystemRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin: paginated jobs in all states with title/company/status filters' })
+  listAdmin(@Query() query: AdminJobQueryDto) { return this.jobs.listAdmin(query); }
+
+  @Get('admin/:id')
+  @Roles(SystemRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin: read any job, including unpublished or removed content' })
+  getAdmin(@Param('id', JOB_ID_PIPE) id: string) { return this.jobs.getAdmin(id); }
+
+  @Patch(':id/moderation')
+  @Roles(SystemRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remove/restore a job without deleting application history' })
+  moderate(@CurrentUser() user: AuthUser, @Param('id', JOB_ID_PIPE) id: string, @Body() dto: ModerateJobDto) {
+    return this.jobs.moderate(user.id, id, dto);
   }
 
   @Public()

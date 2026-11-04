@@ -1,3 +1,4 @@
+import { CompanyClientService } from './company-client.service';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { JobStatus, Prisma } from '@prisma/client';
 import {
@@ -54,6 +55,7 @@ export class JobRecommendationService {
     private readonly prisma: PrismaService,
     private readonly profiles: ProfileRecommendationClientService,
     private readonly ai: AiRecommendationClientService,
+    private readonly companies: CompanyClientService,
   ) {}
 
   isConfigured(): boolean {
@@ -158,7 +160,7 @@ export class JobRecommendationService {
     const jobs = await this.prisma.job.findMany({
       select: RECOMMENDATION_JOB_SELECT,
       where: {
-        ...this.activeFilters(query, now),
+        ...await this.activeFilters(query, now),
         id: { in: recommendation.items.map(({ jobId }) => jobId) },
       },
     });
@@ -208,7 +210,7 @@ export class JobRecommendationService {
   ): Promise<JobRecommendationResultDto> {
     const jobs = await this.prisma.job.findMany({
       select: RECOMMENDATION_JOB_SELECT,
-      where: this.activeFilters(query, now),
+      where: await this.activeFilters(query, now),
       orderBy: LATEST_JOB_ORDER,
       take: query.limit,
     });
@@ -248,7 +250,7 @@ export class JobRecommendationService {
       return this.latest(query, fallbackReason, now);
     }
 
-    const baseFilters = this.activeFilters(query, now);
+    const baseFilters = await this.activeFilters(query, now);
     const result = await this.prisma.$transaction(async (transaction) => {
       const matching = await transaction.job.findMany({
         select: RECOMMENDATION_JOB_SELECT,
@@ -339,14 +341,16 @@ export class JobRecommendationService {
     return filters;
   }
 
-  private activeFilters(
+  private async activeFilters(
     query: JobRecommendationQueryDto,
     now: Date,
-  ): Prisma.JobWhereInput {
+  ): Promise<Prisma.JobWhereInput> {
     const today = new Date(now);
     today.setUTCHours(0, 0, 0, 0);
     return {
       status: JobStatus.PUBLISHED,
+      isSuspended: false,
+      companyId: { notIn: await this.companies.suspendedCompanyIds() },
       deadline: { gte: today },
       ...(query.location !== undefined
         ? {

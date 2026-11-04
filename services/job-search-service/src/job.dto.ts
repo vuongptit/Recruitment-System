@@ -122,6 +122,8 @@ export class RejectJobDto {
 }
 
 export class JobDto {
+  @ApiPropertyOptional() isSuspended?: boolean;
+  @ApiPropertyOptional({ nullable: true }) suspensionReason?: string | null;
   @ApiProperty({ minimum: 1 }) aggregateVersion!: number;
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ format: 'uuid' }) companyId!: string;

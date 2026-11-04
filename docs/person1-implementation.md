@@ -33,7 +33,7 @@ Backend Auth/Profile/Media đã có nhiều nghiệp vụ và kiểm thử trư�
 ## Giới hạn tích hợp còn lại
 
 - Cập nhật 16/10/2026 (GMT+7): Gmail SMTP đã kiểm thử thật qua đăng ký Candidate/Recruiter và đặt lại mật khẩu. Cloudinary đã có đủ sáu signed preset; CV và avatar đã qua upload/confirm/lưu/đọc/xóa với provider thật trên Docker localhost. Xem [báo cáo Cloudinary](person1-cloudinary-2026-10-16.md). Chủ dự án đã trực tiếp xác nhận đăng nhập Google thành công và vào đúng vai trò; state/binder/cookie của hai cổng được kiểm thử tự động. Kết quả mở rộng ở [báo cáo toàn hệ thống](system-regression-2026-10-16.md).
-- Job/Company chưa có API Admin gỡ đối tượng đã công khai. Báo cáo các loại này được tiếp nhận nhưng không giả lập RESOLVED; cần hợp đồng từ Người 2.
+- Admin có thể duyệt/tra cứu toàn bộ trạng thái tin và công ty, gỡ/đình chỉ hoặc khôi phục bằng lý do, kiểm tra phiên bản và mã thao tác idempotent. Báo cáo JOB/COMPANY chỉ chuyển sang RESOLVED sau khi dịch vụ sở hữu thực hiện gỡ/đình chỉ thành công.
 - UNKNOWN/PROCESSING sau remote timeout cần đối soát vận hành; chưa có tự động phục hồi tác vụ quản trị xuyên service.
 - PostgreSQL Compose hiện tách schema trong một cluster, chưa chuyển thành database/container/credential độc lập như kiến trúc đích.
 - Mô hình Auth hiện cho access token cũ tồn tại tối đa TTL 15 phút sau khóa. Admin kiểm tra trạng thái bền vững qua /auth/me trước thao tác; các service khác giữ hợp đồng stateless hiện có.

@@ -10,6 +10,7 @@ type Filters = {
   locked: string;
   status: string;
   targetType: string;
+  suspended: string;
 };
 const today = () =>
   new Intl.DateTimeFormat("en-CA", {
@@ -18,15 +19,16 @@ const today = () =>
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-const defaults = (): Filters => ({
+const defaults = (tab = ""): Filters => ({
   page: 1,
   from: today().slice(0, 8) + "01",
   to: today(),
   query: "",
   role: "",
   locked: "",
-  status: "OPEN",
+  status: tab === "companies" ? "PENDING" : tab === "jobs" ? "PENDING_APPROVAL" : tab === "reports" ? "OPEN" : "",
   targetType: "",
+  suspended: "",
 });
 const validDate = (value: string | null, fallback: string) =>
   value &&
@@ -42,7 +44,7 @@ export function useAdminFilters(tab: string) {
   useEffect(() => {
     const restore = () => {
       const p = new URLSearchParams(window.location.search);
-      const initial = defaults();
+      const initial = defaults(tab);
       setFilters({
         page: Math.min(
           10000,
@@ -50,22 +52,28 @@ export function useAdminFilters(tab: string) {
         ),
         from: validDate(p.get("from"), initial.from),
         to: validDate(p.get("to"), initial.to),
-        query: (p.get("email") || "").slice(0, 200),
+        query: (p.get(tab === "companies" || tab === "jobs" ? "q" : "email") || "").slice(0, 200),
         role: ["CANDIDATE", "RECRUITER", "ADMIN"].includes(p.get("role") || "")
           ? p.get("role")!
           : "",
         locked: ["true", "false"].includes(p.get("locked") || "")
           ? p.get("locked")!
           : "",
-        status:
-          p.has("status") &&
-          ["", "OPEN", "PROCESSING", "RESOLVED", "DISMISSED"].includes(
-            p.get("status")!,
-          )
+        status: (() => {
+          const allowed = tab === "companies"
+            ? ["PENDING", "VERIFIED", "REJECTED", "ALL"]
+            : tab === "jobs"
+              ? ["DRAFT", "PENDING_APPROVAL", "PUBLISHED", "CLOSED", "EXPIRED", "ALL"]
+              : ["", "OPEN", "PROCESSING", "RESOLVED", "DISMISSED"];
+          return p.has("status") && allowed.includes(p.get("status")!)
             ? p.get("status")!
-            : "OPEN",
+            : defaults(tab).status;
+        })(),
         targetType: ["JOB", "COMPANY", "USER"].includes(p.get("type") || "")
           ? p.get("type")!
+          : "",
+        suspended: ["true", "false"].includes(p.get("suspended") || "")
+          ? p.get("suspended")!
           : "",
       });
       setReady(true);
@@ -93,8 +101,14 @@ export function useAdminFilters(tab: string) {
         status: filters.status,
         type: filters.targetType,
       });
+    if (tab === "companies" || tab === "jobs")
+      Object.assign(values, {
+        status: filters.status,
+        q: filters.query,
+        suspended: filters.suspended,
+      });
     for (const [key, value] of Object.entries(values)) {
-      if (value || key === "status") p.set(key, value);
+      if (value) p.set(key, value);
       else p.delete(key);
     }
     const target =
@@ -130,5 +144,6 @@ export function useAdminFilters(tab: string) {
     setLocked: setter("locked"),
     setStatus: setter("status"),
     setTargetType: setter("targetType"),
+    setSuspended: setter("suspended"),
   };
 }

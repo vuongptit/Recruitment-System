@@ -680,6 +680,7 @@ export class JobIndexingService implements OnModuleInit, OnModuleDestroy {
     const searchable = Boolean(
       job &&
       job.status === JobStatus.PUBLISHED &&
+      !job.isSuspended &&
       job.deadline.getTime() >= today.getTime(),
     );
     let document: JobIndexDocument;

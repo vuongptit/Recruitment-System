@@ -38,6 +38,7 @@ import { SystemRole } from '../common/auth/system-role.enum';
 import { ApiException } from '../common/errors/api-exception';
 import { ApiSuccessResponse } from '../common/http/api-response.interceptor';
 import { CompanyService } from './company.service';
+import { ModerateCompanyDto } from './dto/moderate-company.dto';
 import {
   CompanyMediaResponseDto,
   CompanyProfileDto,
@@ -270,6 +271,29 @@ export class CompanyController {
     @Query() query: PublicCompanySearchQueryDto,
   ): Promise<ApiSuccessResponse<PublicCompanySearchSummaryDto[]>> {
     return this.companyService.searchPublic(query);
+  }
+
+  @Get('admin/:id')
+  @Roles(SystemRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin: read a company in any verification/moderation state' })
+  getAdminDetail(@Param('id', COMPANY_ID_PIPE) id: string) { return this.companyService.getAdminDetail(id); }
+
+  @Patch(':id/moderation')
+  @Roles(SystemRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Suspend or restore a company with version check and idempotent operation ID' })
+  moderate(@CurrentUser() user: AuthUser, @Param('id', COMPANY_ID_PIPE) id: string, @Body() dto: ModerateCompanyDto) {
+    return this.companyService.moderate(user.id, id, dto);
+  }
+
+  @Public()
+  @UseGuards(JobSearchInternalGuard)
+  @Get('internal/moderation/suspended')
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'Internal: suspended company IDs, keyset pages of 1000' })
+  suspendedIds(@Query('after', new ParseUUIDPipe({ version: '4', optional: true })) after?: string) {
+    return this.companyService.suspendedIds(after);
   }
 
   @Public()

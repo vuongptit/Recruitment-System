@@ -10,6 +10,9 @@ Nginx strips the `/jobs` gateway prefix before forwarding requests.
 | `POST /` | `POST /jobs/` | RECRUITER, VERIFIED company |
 | `GET /mine` | `GET /jobs/mine` | RECRUITER |
 | `GET /pending` | `GET /jobs/pending` | ADMIN |
+| `GET /admin/list?status=&q=&company_id=&suspended=&page=1&limit=20` | `GET /jobs/admin/list` | ADMIN; directory across lifecycle states |
+| `GET /admin/:id` | `GET /jobs/admin/:id` | ADMIN; detail in any state |
+| `PATCH /:id/moderation` | `PATCH /jobs/:id/moderation` | ADMIN; remove/restore with expected version, operation ID and reason |
 | `GET /search` | `GET /jobs/search` | Public |
 | `GET /recommended` | `GET /jobs/recommended` | CANDIDATE |
 | `GET /:jobId/recommended-candidates` | `GET /jobs/:jobId/recommended-candidates` | RECRUITER, manageable active Job |
@@ -29,6 +32,8 @@ Nginx strips the `/jobs` gateway prefix before forwarding requests.
 Creating a job always stores `DRAFT`. Company membership and VERIFIED status
 are resolved through `GET /companies/by-user/:userId` with the caller JWT.
 OWNER manages every company job; MEMBER only manages jobs they created.
+
+Admin suspension is soft removal: it preserves the Job, applications and history, records an idempotent moderation operation, increments `aggregateVersion`, and queues a new indexing/event projection. Public detail, search, recommendations and application availability omit suspended jobs and suspended-company jobs. Company restrictions are obtained over the scoped internal Company API; if their current state cannot be verified, search/application paths fail closed.
 
 ## Optimistic job updates
 

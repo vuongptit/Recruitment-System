@@ -34,6 +34,7 @@ import {
 } from './dto/company-media-upload.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { ListCompaniesQueryDto } from './dto/list-companies-query.dto';
+import { ModerateCompanyDto } from './dto/moderate-company.dto';
 import {
   PublicCompanySearchQueryDto,
   PublicCompanySearchSummaryDto,
@@ -204,7 +205,12 @@ export class CompanyService {
     query: ListCompaniesQueryDto,
   ): Promise<ApiSuccessResponse<CompanyProfileDto[]>> {
     const where: Prisma.CompanyWhereInput = {
-      verifiedStatus: query.verified_status,
+      ...(query.verified_status === 'ALL' ? {} : { verifiedStatus: query.verified_status }),
+      ...(query.suspended ? { isSuspended: query.suspended === 'true' } : {}),
+      ...(query.q ? { OR: [
+        { name: { contains: query.q, mode: 'insensitive' as const } },
+        { taxCode: { contains: query.q, mode: 'insensitive' as const } },
+      ] } : {}),
     };
     const skip = (query.page - 1) * query.limit;
 
@@ -228,6 +234,50 @@ export class CompanyService {
         totalPages: Math.ceil(total / query.limit),
       },
     );
+  }
+
+  async getAdminDetail(companyId: string): Promise<CompanyProfileDto> {
+    const company = await this.prisma.company.findUnique({ where: { id: companyId }, ...COMPANY_WITH_MEDIA });
+    if (!company) throw new ApiException('COMPANY_NOT_FOUND', 'Company was not found', HttpStatus.NOT_FOUND);
+    return this.toProfile(company);
+  }
+
+  async suspendedIds(after?: string) {
+    const rows = await this.prisma.company.findMany({
+      where: { isSuspended: true, ...(after ? { id: { gt: after } } : {}) },
+      select: { id: true }, orderBy: { id: 'asc' }, take: 1001,
+    });
+    return { companyIds: rows.slice(0, 1000).map(row => row.id), nextCursor: rows.length > 1000 ? rows[999].id : null };
+  }
+
+  async moderate(adminId: string, companyId: string, dto: ModerateCompanyDto) {
+    try {
+      return await this.prisma.$transaction(async transaction => {
+        const replay = await transaction.companyModerationOperation.findUnique({ where: { operationId: dto.operationId } });
+        if (replay) {
+          if (replay.companyId !== companyId || replay.actorId !== adminId || replay.suspended !== dto.suspended || replay.reason !== dto.reason)
+            throw new ApiException('OPERATION_CONFLICT', 'Operation ID already used', HttpStatus.CONFLICT);
+          return { id: companyId, isSuspended: replay.suspended, aggregateVersion: replay.resultingVersion, operationId: dto.operationId };
+        }
+        const current = await transaction.company.findUnique({ where: { id: companyId } });
+        if (!current) throw new ApiException('COMPANY_NOT_FOUND', 'Company was not found', HttpStatus.NOT_FOUND);
+        if (current.aggregateVersion !== dto.expectedVersion)
+          throw new ApiException('VERSION_CONFLICT', 'Reload company before moderating', HttpStatus.CONFLICT);
+        const updated = await transaction.company.update({
+          where: { id: companyId, aggregateVersion: dto.expectedVersion },
+          data: { isSuspended: dto.suspended, suspensionReason: dto.suspended ? dto.reason : null, aggregateVersion: { increment: 1 } },
+        });
+        await transaction.companyModerationOperation.create({ data: {
+          operationId: dto.operationId, companyId, actorId: adminId, suspended: dto.suspended,
+          reason: dto.reason, resultingVersion: updated.aggregateVersion,
+        } });
+        await transaction.companyAuditLog.create({ data: {
+          companyId, actorId: adminId, action: dto.suspended ? CompanyAuditAction.SUSPENDED : CompanyAuditAction.RESTORED,
+          resultingAggregateVersion: updated.aggregateVersion, reason: dto.reason,
+        } });
+        return { id: companyId, isSuspended: updated.isSuspended, aggregateVersion: updated.aggregateVersion, operationId: dto.operationId };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) { this.throwPersistenceError(error); }
   }
 
   async verify(
@@ -431,6 +481,7 @@ export class CompanyService {
       where: {
         id: companyId,
         verifiedStatus: CompanyVerificationStatus.VERIFIED,
+        isSuspended: false,
       },
       ...COMPANY_WITH_MEDIA,
     });
@@ -481,7 +532,7 @@ export class CompanyService {
             ELSE c."logo_url"
           END AS "logoUrl"
         FROM company.companies c
-        WHERE c."verified_status" = 'VERIFIED'::company."CompanyVerificationStatus"
+        WHERE c."verified_status" = 'VERIFIED'::company."CompanyVerificationStatus" AND c."is_suspended" = false
           ${searchPredicate}
           ${cursorPredicate}
         ORDER BY c."normalized_name" ASC, c."id" ASC
@@ -1419,6 +1470,8 @@ export class CompanyService {
 
   private toProfile(company: CompanyWithMedia): CompanyProfileDto {
     return {
+      isSuspended: company.isSuspended,
+      suspensionReason: company.suspensionReason,
       id: company.id,
       name: company.name,
       slug: company.slug,

@@ -27,8 +27,8 @@ type Command = {
 };
 const labels: Record<Tab, string> = {
   stats: "Thống kê",
-  companies: "Xác minh công ty",
-  jobs: "Duyệt tin tuyển dụng",
+  companies: "Quản lý công ty",
+  jobs: "Quản lý tin tuyển dụng",
   users: "Quản lý người dùng",
   reports: "Báo cáo vi phạm",
   audit: "Nhật ký hoạt động",
@@ -63,6 +63,7 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
     locked,
     status,
     targetType,
+    suspended,
     ready,
     setPage,
     setQuery,
@@ -70,6 +71,7 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
     setLocked,
     setStatus,
     setTargetType,
+    setSuspended,
   } = useAdminFilters(tab);
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
@@ -95,17 +97,33 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
     setDetail(null);
     async function load() {
       const paths = {
-        companies: "companies/pending",
-        jobs: "jobs/pending",
+        companies: "companies",
+        jobs: "jobs",
         users: "users",
         reports: "reports",
         audit: "audit-logs",
       };
-      const result = await requestApi<Row[]>("/api/admin/" + paths[tab], {
+      const result = await requestApi<
+        Row[] | { items?: Row[]; total?: number }
+      >("/api/admin/" + paths[tab], {
         privateData: true,
         signal: controller.signal,
         query: {
-          ...(tab !== "jobs" ? { page, limit: 20 } : {}),
+          ...(tab !== "audit" ? { page, limit: 20 } : {}),
+          ...(tab === "companies"
+            ? {
+                status: status || "PENDING",
+                q: query,
+                suspended: suspended || undefined,
+              }
+            : {}),
+          ...(tab === "jobs"
+            ? {
+                status: status || "PENDING_APPROVAL",
+                q: query,
+                suspended: suspended || undefined,
+              }
+            : {}),
           ...(tab === "users"
             ? {
                 email: query,
@@ -114,17 +132,26 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
               }
             : {}),
           ...(tab === "reports"
-            ? { status: status || undefined, type: targetType || undefined }
+            ? {
+                status: status || undefined,
+                type: targetType || undefined,
+              }
             : {}),
         },
       });
       if (controller.signal.aborted) return;
-      const resultTotal = Number(result.meta?.total ?? result.data.length);
+      const payload = result.data;
+      const pageRows = Array.isArray(payload) ? payload : payload.items ?? [];
+      const resultTotal = Number(
+        result.meta?.total ??
+          (!Array.isArray(payload) ? payload.total : undefined) ??
+          pageRows.length,
+      );
       if (tab !== "audit" && page > 1 && (page - 1) * 20 >= resultTotal) {
         setPage(Math.max(1, Math.ceil(resultTotal / 20)));
         return;
       }
-      setRows(result.data);
+      setRows(pageRows);
       setTotal(resultTotal);
     }
     load()
@@ -135,7 +162,7 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [tab, page, query, role, locked, status, targetType, reload, ready]);
+  }, [tab, page, query, role, locked, status, targetType, suspended, reload, ready]);
   function choose(
     path: string,
     body: Record<string, unknown>,
@@ -187,16 +214,16 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
     }
   }
   const displayedRows =
-    tab === "jobs"
-      ? rows.slice((page - 1) * 20, page * 20)
-      : tab === "audit"
+    tab === "audit"
         ? rows.filter((row) => row.outcome !== "STARTED")
         : rows;
   const descriptions: Record<Tab, string> = {
     stats: "Nắm bắt hoạt động tuyển dụng và theo dõi hiệu quả chuyển đổi.",
     users: "Tra cứu tài khoản, kiểm tra xác minh và quản lý quyền truy cập.",
-    companies: "Kiểm tra hồ sơ doanh nghiệp trước khi xác minh trên CareerHub.",
-    jobs: "Đối chiếu nội dung và phê duyệt các tin đang chờ đăng tuyển.",
+    companies:
+      "Tra cứu hồ sơ, xác minh và quản lý trạng thái hiển thị của doanh nghiệp.",
+    jobs:
+      "Tra cứu tin tuyển dụng, duyệt nội dung và gỡ/khôi phục tin vi phạm.",
     reports: "Xem phản ánh và xử lý các nội dung vi phạm trong hệ thống.",
     audit: "Theo dõi các thao tác quản trị và kết quả xử lý để đối soát.",
   };
@@ -323,6 +350,87 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
             )}
           </form>
         )}
+        {(tab === "companies" || tab === "jobs") && (
+          <form
+            className="admin-filters"
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
+              setPage(1);
+              setQuery(email.trim());
+            }}
+          >
+            <label className="field admin-search-field">
+              {tab === "companies" ? "Tìm công ty" : "Tìm tin tuyển dụng"}
+              <div className="admin-search-input">
+                <Search size={17} aria-hidden="true" />
+                <input
+                  className="input"
+                  name="directory-search"
+                  type="search"
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={200}
+                  placeholder={
+                    tab === "companies"
+                      ? "Tên công ty hoặc mã số thuế"
+                      : "Tên tin tuyển dụng"
+                  }
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+            </label>
+            <label className="field">Trạng thái
+              <select
+                className="select"
+                value={status}
+                onChange={(e) => {
+                  setStatus(e.target.value);
+                  setPage(1);
+                }}
+              >
+                {tab === "companies" ? <>
+                  <option value="PENDING">Chờ xác minh</option><option value="VERIFIED">Đã xác minh</option><option value="REJECTED">Từ chối</option><option value="ALL">Tất cả</option>
+                </> : <>
+                  <option value="PENDING_APPROVAL">Chờ duyệt</option><option value="PUBLISHED">Đang đăng</option><option value="DRAFT">Bản nháp</option><option value="CLOSED">Đã đóng</option><option value="EXPIRED">Hết hạn</option><option value="ALL">Tất cả</option>
+                </>}
+              </select>
+            </label>
+            <label className="field">Gỡ / đình chỉ
+              <select
+                className="select"
+                value={suspended}
+                onChange={(e) => {
+                  setSuspended(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">Tất cả</option><option value="false">Chưa gỡ / đình chỉ</option><option value="true">Đã gỡ / đình chỉ</option>
+              </select>
+            </label>
+            <button className="btn btn-primary" disabled={loading}>Tìm kiếm</button>
+            {(query ||
+              status !==
+                (tab === "companies" ? "PENDING" : "PENDING_APPROVAL") ||
+              suspended) && (
+              <button
+                className="btn"
+                type="button"
+                onClick={() => {
+                  setEmail("");
+                  setQuery("");
+                  setStatus(
+                    tab === "companies" ? "PENDING" : "PENDING_APPROVAL",
+                  );
+                  setSuspended("");
+                  setPage(1);
+                }}
+              >
+                Đặt lại
+              </button>
+            )}
+          </form>
+        )}
         {tab === "reports" && (
           <div className="admin-filters">
             <label className="field">
@@ -372,9 +480,13 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
             <div>
               <h2>
                 {tab === "companies"
-                  ? "Hồ sơ chờ xác minh"
+                  ? status === "PENDING"
+                    ? "Hồ sơ công ty chờ xác minh"
+                    : "Danh sách công ty"
                   : tab === "jobs"
-                    ? "Tin đang chờ duyệt"
+                    ? status === "PENDING_APPROVAL"
+                      ? "Tin tuyển dụng chờ duyệt"
+                      : "Danh sách tin tuyển dụng"
                     : tab === "users"
                       ? "Danh sách tài khoản"
                       : tab === "reports"
@@ -386,7 +498,7 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
                   ? "Đang cập nhật dữ liệu…"
                   : tab === "audit"
                     ? `${count(displayedRows.length)} kết quả xử lý trong trang này`
-                    : `${count(total)} kết quả${tab === "companies" || tab === "jobs" ? " đang chờ duyệt" : " phù hợp"}`}
+                    : `${count(total)} kết quả phù hợp`}
               </p>
             </div>
             {!loading && !error && (
@@ -421,14 +533,14 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
                 tab === "audit"
                   ? "Chưa có kết quả xử lý trong trang này"
                   : tab === "companies" || tab === "jobs"
-                    ? "Đã xử lý hết yêu cầu chờ duyệt"
+                    ? "Không có bản ghi phù hợp với bộ lọc"
                     : "Không có dữ liệu phù hợp"
               }
               description={
                 tab === "audit" && rows.length === 20
                   ? "Chọn Trang sau để xem các nhật ký tiếp theo."
                   : tab === "companies" || tab === "jobs"
-                    ? "Yêu cầu mới sẽ xuất hiện tại đây khi được gửi lên hệ thống."
+                    ? "Thử thay đổi trạng thái hoặc từ khóa tìm kiếm."
                     : "Thử thay đổi bộ lọc hoặc làm mới để xem cập nhật."
               }
             />
@@ -509,6 +621,13 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
                 Thao tác sẽ được ghi vào nhật ký quản trị. Kiểm tra thông tin
                 trước khi xác nhận.
               </p>
+              {command.path.endsWith("/moderation") && (
+                <p className="admin-data-note">
+                  Nội dung sẽ bị ẩn khỏi các trang công khai. Hồ sơ, đơn ứng tuyển
+                  và lịch sử liên quan vẫn được giữ lại; có thể khôi phục tại danh
+                  sách này.
+                </p>
+              )}
               {command.needsReason && (
                 <label className="field">
                   Lý do / kết quả xử lý

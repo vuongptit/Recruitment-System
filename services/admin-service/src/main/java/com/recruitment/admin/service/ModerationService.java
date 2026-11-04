@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.recruitment.admin.dto.moderation.RejectJobRequest;
 import com.recruitment.admin.dto.moderation.UpdateUserLockRequest;
 import com.recruitment.admin.dto.moderation.VerifyCompanyRequest;
+import com.recruitment.admin.dto.moderation.ModerateResourceRequest;
 import com.recruitment.admin.exception.AdminFailure;
 import com.recruitment.admin.infrastructure.client.ServiceGateway;
 import com.recruitment.admin.repository.ModerationRepository;
@@ -45,6 +46,40 @@ public class ModerationService {
     return mutate(actor, "AUTH", id, request.locked() ? "LOCK_USER" : "UNLOCK_USER",
         "/auth/users/" + id + "/lock",
         request.locked() ? Map.of("locked", true, "reason", reason) : Map.of("locked", false), reason);
+  }
+
+  public JsonNode moderateJob(Jwt actor, UUID id, ModerateResourceRequest request) {
+    return moderateResource(actor, "JOB", id, request);
+  }
+
+  public JsonNode moderateCompany(Jwt actor, UUID id, ModerateResourceRequest request) {
+    return moderateResource(actor, "COMPANY", id, request);
+  }
+
+  private JsonNode moderateResource(Jwt actor, String service, UUID id, ModerateResourceRequest request) {
+    gateway.requireCurrentAdmin(actor);
+    String reason = ModerationReason.require(request.reason());
+    UUID admin = UUID.fromString(actor.getSubject());
+    UUID operation = request.operationId();
+    String action = request.suspended()
+        ? "SUSPEND_" + service : "RESTORE_" + service;
+    store.audit(operation, admin, action, service, id, reason, "STARTED");
+    boolean mutationAttempted = false;
+    try {
+      JsonNode current = gateway.call(service, HttpMethod.GET, "/admin/" + id, null, actor).path("data");
+      if (current.isMissingNode() || current.isNull() || !current.hasNonNull("aggregateVersion"))
+        throw new AdminFailure(502, "UPSTREAM_RESPONSE_INVALID");
+      mutationAttempted = true;
+      JsonNode result = gateway.call(service, HttpMethod.PATCH, "/" + id + "/moderation",
+          Map.of("suspended", request.suspended(), "expectedVersion", request.expectedVersion(),
+              "operationId", operation, "reason", reason), actor);
+      store.audit(operation, admin, action, service, id, reason, "SUCCEEDED");
+      return result;
+    } catch (AdminFailure error) {
+      store.audit(operation, admin, action, service, id, reason,
+          mutationAttempted && error.status() >= 500 ? "UNKNOWN" : "FAILED");
+      throw error;
+    }
   }
 
   public JsonNode mutate(Jwt actor, String service, UUID target, String action, String path, Object body, String reason) {

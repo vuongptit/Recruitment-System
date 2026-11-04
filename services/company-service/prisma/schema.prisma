@@ -46,6 +46,8 @@ enum CompanyAuditAction {
   VERIFICATION_APPROVED
   VERIFICATION_REJECTED
   OWNERSHIP_TRANSFERRED
+  SUSPENDED
+  RESTORED
 }
 
 model Company {
@@ -65,6 +67,8 @@ model Company {
   aggregateVersion     Int                        @default(0) @map("aggregate_version")
   verifiedStatus       CompanyVerificationStatus  @default(PENDING) @map("verified_status")
   rejectReason         String?                    @map("reject_reason") @db.Text
+  isSuspended          Boolean                    @default(false) @map("is_suspended")
+  suspensionReason     String?                    @map("suspension_reason") @db.VarChar(1000)
   createdAt            DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime                   @updatedAt @map("updated_at") @db.Timestamptz(3)
   members              CompanyMember[]
@@ -72,8 +76,23 @@ model Company {
   mediaUploadIntents   CompanyMediaUploadIntent[]
   invitations          CompanyInvitation[]
   auditLogs            CompanyAuditLog[]
+  moderationOperations CompanyModerationOperation[]
 
   @@map("companies")
+  @@index([isSuspended, id], map: "companies_suspended_idx")
+}
+
+model CompanyModerationOperation {
+  operationId String @id @map("operation_id") @db.Uuid
+  companyId String @map("company_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  suspended Boolean
+  reason String @db.VarChar(1000)
+  resultingVersion Int @map("resulting_version")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  @@index([companyId, createdAt], map: "company_moderation_operations_target_idx")
+  @@map("company_moderation_operations")
 }
 
 model CompanyAuditLog {

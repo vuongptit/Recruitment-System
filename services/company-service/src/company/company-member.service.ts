@@ -400,6 +400,7 @@ export class CompanyMemberService {
             id: true,
             name: true,
             verifiedStatus: true,
+            isSuspended: true,
           },
         },
       },
@@ -412,6 +413,8 @@ export class CompanyMemberService {
         HttpStatus.NOT_FOUND,
       );
     }
+
+    if (membership.company.isSuspended) throw new ApiException('COMPANY_SUSPENDED', 'Company was suspended by an administrator', HttpStatus.FORBIDDEN);
 
     return {
       companyId: membership.company.id,

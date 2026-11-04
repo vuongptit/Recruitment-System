@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.recruitment.admin.dto.moderation.RejectJobRequest;
 import com.recruitment.admin.dto.moderation.UpdateUserLockRequest;
 import com.recruitment.admin.dto.moderation.VerifyCompanyRequest;
+import com.recruitment.admin.dto.moderation.ModerateResourceRequest;
 import com.recruitment.admin.service.AdminQueryService;
 import com.recruitment.admin.service.ModerationService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -42,6 +43,27 @@ public class ModerationController {
     return queries.pendingCompanies(jwt, page, limit);
   }
 
+  @GetMapping("/companies")
+  public JsonNode companyDirectory(@AuthenticationPrincipal Jwt jwt,
+      @RequestParam(defaultValue = "PENDING") @Pattern(regexp = "PENDING|VERIFIED|REJECTED|ALL") String status,
+      @RequestParam(defaultValue = "") @Size(max = 200) String q,
+      @RequestParam(required = false) @Pattern(regexp = "true|false") String suspended,
+      @RequestParam(defaultValue = "1") @Min(1) @Max(10000) int page,
+      @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+    return queries.pendingCompanies(jwt, status, q, suspended, page, limit);
+  }
+
+  @GetMapping("/companies/{id}")
+  public JsonNode companyDetail(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+    return queries.companyDetail(jwt, id);
+  }
+
+  @PatchMapping("/companies/{id}/moderation")
+  public JsonNode moderateCompany(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+      @Valid @RequestBody ModerateResourceRequest request) {
+    return moderation.moderateCompany(jwt, id, request);
+  }
+
   @PatchMapping("/companies/{id}/verify")
   public JsonNode verify(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
       @Valid @RequestBody VerifyCompanyRequest request) {
@@ -51,6 +73,28 @@ public class ModerationController {
   @GetMapping("/jobs/pending")
   public JsonNode jobs(@AuthenticationPrincipal Jwt jwt) {
     return queries.pendingJobs(jwt);
+  }
+
+  @GetMapping("/jobs")
+  public JsonNode jobDirectory(@AuthenticationPrincipal Jwt jwt,
+      @RequestParam(required = false) @Pattern(regexp = "DRAFT|PENDING_APPROVAL|PUBLISHED|CLOSED|EXPIRED|ALL") String status,
+      @RequestParam(defaultValue = "") @Size(max = 200) String q,
+      @RequestParam(required = false) @jakarta.validation.constraints.Pattern(regexp = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}") String companyId,
+      @RequestParam(required = false) @Pattern(regexp = "true|false") String suspended,
+      @RequestParam(defaultValue = "1") @Min(1) @Max(10000) int page,
+      @RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit) {
+    return queries.jobs(jwt, status, q, companyId, suspended, page, limit);
+  }
+
+  @GetMapping("/jobs/{id}")
+  public JsonNode jobDetail(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+    return queries.jobDetail(jwt, id);
+  }
+
+  @PatchMapping("/jobs/{id}/moderation")
+  public JsonNode moderateJob(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id,
+      @Valid @RequestBody ModerateResourceRequest request) {
+    return moderation.moderateJob(jwt, id, request);
   }
 
   @PatchMapping("/jobs/{id}/approve")

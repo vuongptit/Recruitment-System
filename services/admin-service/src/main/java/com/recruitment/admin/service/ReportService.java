@@ -1,5 +1,6 @@
 package com.recruitment.admin.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.recruitment.admin.dto.common.ApiResponse;
 import com.recruitment.admin.dto.moderation.CreateReportRequest;
 import com.recruitment.admin.dto.moderation.ReportCreatedResponse;
@@ -46,11 +47,23 @@ public class ReportService {
     UUID admin = UUID.fromString(actor.getSubject());
     var report = store.claim(id, request.expectedVersion(), admin, request.resolution(), operation);
     store.audit(operation, admin, "HANDLE_REPORT", "REPORT", id, request.resolution(), "STARTED");
+    boolean ownerMutationAttempted = false;
     try {
       if ("RESOLVED".equals(request.status())) {
         if ("USER".equals(report.targetType())) {
+          ownerMutationAttempted = true;
           gateway.call("AUTH", HttpMethod.PATCH, "/auth/users/" + report.targetId() + "/lock",
               Map.of("locked", true, "reason", request.resolution()), actor);
+        } else if ("JOB".equals(report.targetType()) || "COMPANY".equals(report.targetType())) {
+          String service = report.targetType();
+          JsonNode target = gateway.call(service, HttpMethod.GET,
+              "/admin/" + report.targetId(), null, actor).path("data");
+          int targetVersion = target.path("aggregateVersion").asInt(-1);
+          if (targetVersion < 0) throw new AdminFailure(502, "UPSTREAM_RESPONSE_INVALID");
+          ownerMutationAttempted = true;
+          gateway.call(service, HttpMethod.PATCH, "/" + report.targetId() + "/moderation",
+              Map.of("suspended", true, "expectedVersion", targetVersion,
+                  "operationId", operation, "reason", request.resolution()), actor);
         } else {
           throw new AdminFailure(409, "TAKEDOWN_CONTRACT_UNAVAILABLE");
         }
@@ -59,9 +72,10 @@ public class ReportService {
       store.audit(operation, admin, "HANDLE_REPORT", "REPORT", id, request.resolution(), "SUCCEEDED");
     } catch (AdminFailure error) {
       // Ambiguous failures remain PROCESSING for reconciliation; definite rejection reopens the report.
-      if (error.status() < 500) store.finish(id, operation, "OPEN");
+      boolean ambiguous = ownerMutationAttempted && error.status() >= 500;
+      if (!ambiguous) store.finish(id, operation, "OPEN");
       store.audit(operation, admin, "HANDLE_REPORT", "REPORT", id, request.resolution(),
-          error.status() >= 500 ? "UNKNOWN" : "FAILED");
+          ambiguous ? "UNKNOWN" : "FAILED");
       throw error;
     }
     return ApiResponse.of(new ReportResolutionResponse(id, request.status()));

@@ -18,6 +18,7 @@ import {
   JobDetailDto,
 } from './job-detail.dto';
 import { PrismaService } from './prisma.service';
+import { AdminJobQueryDto, ModerateJobDto } from './job-admin.dto';
 
 interface CommittedJobChange {
   job: Job;
@@ -191,8 +192,9 @@ export class JobService {
   }
 
   async getPublic(jobId: string): Promise<JobDto> {
+    const suspendedCompanies = await this.companies.suspendedCompanyIds();
     const job = await this.prisma.job.findFirst({
-      where: { id: jobId, status: JobStatus.PUBLISHED },
+      where: { id: jobId, status: JobStatus.PUBLISHED, isSuspended: false, companyId: { notIn: suspendedCompanies } },
     });
     if (!job) {
       throw new ApiException(
@@ -227,7 +229,8 @@ export class JobService {
       };
     }
 
-    const reason = this.availabilityReason(job, new Date());
+    const reason = (await this.companies.suspendedCompanyIds()).includes(job.companyId)
+      ? JobAvailabilityReason.NOT_PUBLISHED : this.availabilityReason(job, new Date());
 
     return {
       jobId: job.id,
@@ -250,6 +253,8 @@ export class JobService {
     const jobs = await this.prisma.job.findMany({
       where: {
         id: { in: jobIds },
+        isSuspended: false,
+        companyId: { notIn: await this.companies.suspendedCompanyIds() },
         status: { in: BULK_DETAIL_VISIBLE_STATUSES },
       },
     });
@@ -273,6 +278,8 @@ export class JobService {
     const activeJobCount = await this.prisma.job.count({
       where: {
         companyId,
+        isSuspended: false,
+        AND: [{ companyId: { notIn: await this.companies.suspendedCompanyIds() } }],
         status: JobStatus.PUBLISHED,
         deadline: { gte: today },
       },
@@ -281,13 +288,59 @@ export class JobService {
   }
 
 
+  async getAdmin(id: string) { return this.toDto(await this.requireJob(id), true); }
+
+  async listAdmin(query: AdminJobQueryDto) {
+    const where: Prisma.JobWhereInput = {
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.company_id ? { companyId: query.company_id } : {}),
+      ...(query.suspended ? { isSuspended: query.suspended === 'true' } : {}),
+      ...(query.q ? { title: { contains: query.q, mode: 'insensitive' } } : {}),
+    };
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.job.findMany({ where, skip: (query.page - 1) * query.limit, take: query.limit, orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }] }),
+      this.prisma.job.count({ where }),
+    ]);
+    return { items: items.map(job => this.toDto(job, true)), total, page: query.page, limit: query.limit };
+  }
+
+  async moderate(adminId: string, jobId: string, dto: ModerateJobDto) {
+    try {
+      const result = await this.prisma.$transaction(async transaction => {
+        const replay = await transaction.jobModerationOperation.findUnique({ where: { operationId: dto.operationId } });
+        if (replay) {
+          if (replay.jobId !== jobId || replay.actorId !== adminId || replay.suspended !== dto.suspended || replay.reason !== dto.reason)
+            throw new ApiException('OPERATION_CONFLICT', 'Operation ID already used', HttpStatus.CONFLICT);
+          return { id: jobId, isSuspended: replay.suspended, aggregateVersion: replay.resultingVersion, operationId: dto.operationId };
+        }
+        const changed = await transaction.job.updateMany({
+          where: { id: jobId, aggregateVersion: dto.expectedVersion },
+          data: { isSuspended: dto.suspended, suspensionReason: dto.suspended ? dto.reason : null, aggregateVersion: { increment: 1 } },
+        });
+        if (changed.count !== 1) throw new ApiException('VERSION_CONFLICT', 'Reload job before moderating', HttpStatus.CONFLICT);
+        const job = await this.requireJob(jobId, transaction);
+        await transaction.jobModerationOperation.create({ data: { operationId: dto.operationId, jobId, actorId: adminId,
+          suspended: dto.suspended, reason: dto.reason, resultingVersion: job.aggregateVersion } });
+        await this.indexing.append(transaction, job);
+        await this.events.append(transaction, job, JobEventAction.UPDATED);
+        return { id: jobId, isSuspended: job.isSuspended, aggregateVersion: job.aggregateVersion, operationId: dto.operationId };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      this.indexing.wake(); this.events.wake();
+      return result;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && ['P2034', 'P2002'].includes(error.code))
+        throw new ApiException('VERSION_CONFLICT', 'Concurrent moderation; reload before retrying', HttpStatus.CONFLICT);
+      throw error;
+    }
+  }
+
   async listPending(): Promise<JobDto[]> {
     const jobs = await this.prisma.job.findMany({
       where: { status: JobStatus.PENDING_APPROVAL },
       orderBy: { updatedAt: 'asc' },
       take: 50,
     });
-    return jobs.map((job) => this.toDto(job));
+    return jobs.map((job) => this.toDto(job, true));
   }
 
   async update(
@@ -597,6 +650,7 @@ export class JobService {
     expected: JobStatus,
     action: string,
   ): void {
+    if (job.isSuspended) throw new ApiException('JOB_SUSPENDED', 'Job was removed by an administrator', HttpStatus.CONFLICT);
     if (job.status !== expected) {
       throw new ApiException(
         'INVALID_JOB_STATUS',
@@ -796,8 +850,12 @@ export class JobService {
     };
   }
 
-  private toDto(job: Job): JobDto {
+  private toDto(job: Job, includeModeration = false): JobDto {
     return {
+      ...(includeModeration ? {
+        isSuspended: job.isSuspended,
+        suspensionReason: job.suspensionReason,
+      } : {}),
       aggregateVersion: job.aggregateVersion,
       id: job.id,
       companyId: job.companyId,
@@ -855,10 +913,10 @@ export class JobService {
   }
 
   private availabilityReason(
-    job: Pick<Job, 'status' | 'deadline'>,
+    job: Pick<Job, 'status' | 'deadline'> & { isSuspended?: boolean },
     now: Date,
   ): JobAvailabilityReason | null {
-    if (job.status !== JobStatus.PUBLISHED) {
+    if (job.isSuspended || job.status !== JobStatus.PUBLISHED) {
       return JobAvailabilityReason.NOT_PUBLISHED;
     }
     const today = new Date(now);
