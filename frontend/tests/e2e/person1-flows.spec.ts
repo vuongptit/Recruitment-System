@@ -489,15 +489,15 @@ test("admin rejection requires reason and confirmation before one mutation", asy
   await openWorkspaceMenu(page);
   await page.getByRole("link", { name: "Duyệt tin tuyển dụng", exact: true }).click();
   await page.getByRole("button", { name: "Từ chối", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Xác nhận", exact: true }).click();
   await expect(
     page.getByRole("alert").filter({ hasText: "Nhập lý do" }),
   ).toBeVisible();
   expect(writes).toBe(0);
   await page.getByLabel("Lý do / kết quả xử lý").fill("Nội dung không phù hợp");
-  await page.getByRole("button", { name: "Từ chối", exact: true }).click();
   expect(writes).toBe(0);
   await page
-    .getByRole("alertdialog")
+    .getByRole("dialog")
     .getByRole("button", { name: "Xác nhận", exact: true })
     .click();
   await expect(

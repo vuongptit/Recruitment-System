@@ -66,4 +66,23 @@ class AdminUserDirectoryServiceTest {
   private void allowAdmin() {
     when(current.get(id)).thenReturn(new CurrentAccountResponse(id, "admin@example.com", UserRole.ADMIN, true));
   }
+
+  @Test
+  void identityLookupRequiresCurrentAdminRole() {
+    when(current.get(id)).thenReturn(new CurrentAccountResponse(id, "user@example.com", UserRole.CANDIDATE, true));
+    assertThatThrownBy(() -> service.identities(id, java.util.List.of(UUID.randomUUID()))).isInstanceOf(AuthBusinessException.class);
+    verifyNoInteractions(directory);
+  }
+
+  @Test
+  void identityLookupBoundsBatchAndDeduplicatesExactIds() {
+    allowAdmin();
+    UUID target = UUID.randomUUID();
+    service.identities(id, java.util.List.of(target, target));
+    verify(directory).findIdentities(java.util.List.of(target));
+    org.mockito.Mockito.clearInvocations(directory);
+    assertThatThrownBy(() -> service.identities(id, java.util.List.of())).isInstanceOf(AuthBusinessException.class);
+    assertThatThrownBy(() -> service.identities(id, java.util.Collections.nCopies(101, target))).isInstanceOf(AuthBusinessException.class);
+    verifyNoInteractions(directory);
+  }
 }

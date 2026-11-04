@@ -66,6 +66,45 @@
 .frame :global(.auth-otp-input) { letter-spacing: .5em; text-align: center; font-size: 20px; }
 .frame :global(.auth-help) { margin: 0; color: var(--muted, #3d4a3d); font-size: 12px; line-height: 1.6; }
 .frame a:focus-visible, .frame button:focus-visible { outline: 2px solid var(--primary, #006e2e); outline-offset: 3px; }
+
+/* Match the administration workspace while keeping each login portal independent. */
+.frame[data-auth-frame="admin"] {
+  --primary: #3158b5;
+  --primary-2: #6084d2;
+  --primary-tint: #edf2ff;
+  --surface: #f4f6fa;
+  --surface-1: #fff;
+  --text: #202c40;
+  --muted: #627087;
+  --line: #e1e7f0;
+  font-family: var(--font-sans);
+}
+.frame[data-auth-frame="admin"] .brand { color: #243d6b; }
+.frame[data-auth-frame="admin"] .context {
+  background: #17273f;
+  border-color: #243c5b;
+  border-radius: 10px;
+  color: #e9effa;
+}
+.frame[data-auth-frame="admin"] .contextLabel { color: #b4c9ec; }
+.frame[data-auth-frame="admin"] .context h2 { color: #fff; }
+.frame[data-auth-frame="admin"] .context p { color: #b6c4d9; }
+.frame[data-auth-frame="admin"] .context li span { background: #2a3f61; color: #d9e5ff; }
+.frame[data-auth-frame="admin"] .contextFooter { border-color: #ffffff1a; color: #a8b7ce; }
+.frame[data-auth-frame="admin"] .card { border-radius: 10px; box-shadow: 0 4px 20px #17273f05; }
+.frame[data-auth-frame="admin"] .portalBadge { border-radius: 6px; }
+.frame[data-auth-frame="admin"] :global(.auth-field) input::placeholder { color: #7b879a; }
+.frame[data-auth-frame="admin"] :global(.auth-input-wrap):focus-within { box-shadow: 0 0 0 3px #3158b51a; }
+.frame[data-auth-frame="admin"] :global(.auth-visibility):hover { background: var(--primary-tint); }
+.frame[data-auth-frame="admin"] :global(.auth-submit):hover:not(:disabled) {
+  background: #274995;
+  border-color: #274995;
+  transform: none;
+}
+.frame[data-auth-frame="admin"] :global(.auth-message) { border-color: #dce5f7; background: var(--primary-tint); color: #365789; }
+.frame[data-auth-frame="admin"] a:focus-visible,
+.frame[data-auth-frame="admin"] button:focus-visible,
+.frame[data-auth-frame="admin"] :global(.auth-field) input:focus-visible { outline-color: #79a0f2; }
 @media (max-width: 900px) { .layout { max-width: 560px; grid-template-columns: minmax(0, 1fr); margin-top: 12px; } .context { display: none; } }
 @media (max-width: 560px) { .header, .footer { width: calc(100% - 32px); } .header { min-height: 76px; padding-block: 16px; } .brand { font-size: 22px; } .explore { max-width: 135px; font-size: 12px; gap: 6px; } .layout { width: calc(100% - 32px); margin: 8px auto 24px; } .card { padding: 24px 20px; } .heading h1 { font-size: 28px; } .portals { gap: 2px; } .portals a { padding-inline: 8px; font-size: 11px; } .frame :global(.auth-field) input { font-size: 16px; } }
 @media (prefers-reduced-motion: reduce) { .frame *, .frame *::before, .frame *::after { scroll-behavior: auto; transition: none; animation: none; } }

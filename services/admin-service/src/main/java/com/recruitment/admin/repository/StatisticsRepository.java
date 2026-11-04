@@ -2,6 +2,8 @@ package com.recruitment.admin.repository;
 
 import com.recruitment.admin.model.DailyStatistic;
 import com.recruitment.admin.model.StatEvent;
+import com.recruitment.admin.dto.statistics.HourlyStatisticResponse;
+import java.time.Instant;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -60,7 +62,66 @@ public class StatisticsRepository {
         (row, index) -> new DailyStatistic(row.getDate("stat_date").toLocalDate(), row.getString("metric"), row.getLong("value")), from, to);
   }
 
+  public LocalDate firstRecordedDate() {
+    return db.queryForObject("SELECT (min(occurred_at) AT TIME ZONE 'UTC')::date FROM admin.stat_events WHERE metric IS NOT NULL", LocalDate.class);
+  }
+
+  public Map<String, Long> totals(LocalDate from, LocalDate to) {
+    Map<String, Long> result = new LinkedHashMap<>();
+    db.query("SELECT metric,sum(value) AS value FROM admin.daily_stats WHERE stat_date BETWEEN ? AND ? GROUP BY metric",
+        row -> { result.put(row.getString("metric"), row.getLong("value")); }, from, to);
+    return result;
+  }
+
+  public List<DailyStatistic> trend(LocalDate from, LocalDate to, boolean monthly) {
+    if (!monthly) return daily(from, to);
+    return db.query("SELECT date_trunc('month',stat_date)::date AS stat_date,metric,sum(value) AS value"
+        + " FROM admin.daily_stats WHERE stat_date BETWEEN ? AND ? GROUP BY 1,metric ORDER BY 1,metric",
+        (row, index) -> new DailyStatistic(row.getDate("stat_date").toLocalDate(), row.getString("metric"), row.getLong("value")), from, to);
+  }
+
+  public long pendingDays(LocalDate from, LocalDate to) {
+    Long count = db.queryForObject("SELECT count(*) FROM admin.dirty_stat_dates WHERE stat_date BETWEEN ? AND ?", Long.class, from, to);
+    return count == null ? 0L : count;
+  }
+
+  /** Same first-occurrence semantics as rebuildDay, without writing the materialization. */
+  public List<DailyStatistic> recordedActivity(LocalDate from, LocalDate to, boolean monthly) {
+    String bucket = monthly ? "date_trunc('month',first_at AT TIME ZONE 'UTC')::date" : "(first_at AT TIME ZONE 'UTC')::date";
+    return db.query("WITH firsts AS (SELECT entity_id,metric,min(occurred_at) AS first_at FROM admin.stat_events"
+        + " WHERE metric IS NOT NULL GROUP BY entity_id,metric) SELECT " + bucket + " AS stat_date,metric,count(*) AS value"
+        + " FROM firsts WHERE first_at>=? AND first_at<? GROUP BY 1,metric ORDER BY 1,metric",
+        (row, index) -> new DailyStatistic(row.getDate("stat_date").toLocalDate(), row.getString("metric"), row.getLong("value")),
+        Timestamp.from(from.atStartOfDay().toInstant(ZoneOffset.UTC)), Timestamp.from(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)));
+  }
+
   public Map<String, Long> funnel(LocalDate from, LocalDate to) {
+    return funnel(from.atStartOfDay().toInstant(ZoneOffset.UTC), to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC));
+  }
+
+  public List<HourlyStatisticResponse> recordedHourly(Instant from, Instant toExclusive) {
+    return db.query("""
+        WITH firsts AS (
+          SELECT entity_id,metric,min(occurred_at) AS first_at FROM admin.stat_events
+          WHERE metric IS NOT NULL GROUP BY entity_id,metric
+        ) SELECT date_trunc('hour',first_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' AS bucket_start,metric,count(*) AS value
+        FROM firsts WHERE first_at>=? AND first_at<? GROUP BY 1,metric ORDER BY 1,metric
+        """, (row, index) -> new HourlyStatisticResponse(row.getTimestamp("bucket_start").toInstant(), row.getString("metric"), row.getLong("value")),
+        Timestamp.from(from), Timestamp.from(toExclusive));
+  }
+
+  public Map<String, Long> recordedTotals(Instant from, Instant toExclusive) {
+    Map<String, Long> result = new LinkedHashMap<>();
+    db.query("""
+        WITH firsts AS (
+          SELECT entity_id,metric,min(occurred_at) AS first_at FROM admin.stat_events
+          WHERE metric IS NOT NULL GROUP BY entity_id,metric
+        ) SELECT metric,count(*) AS value FROM firsts WHERE first_at>=? AND first_at<? GROUP BY metric
+        """, row -> { result.put(row.getString("metric"), row.getLong("value")); }, Timestamp.from(from), Timestamp.from(toExclusive));
+    return result;
+  }
+
+  public Map<String, Long> funnel(Instant from, Instant toExclusive) {
     var rows = db.queryForList("""
         WITH cohort AS (
          SELECT entity_id,min(occurred_at) first_at FROM admin.stat_events WHERE metric='APPLIED' GROUP BY entity_id
@@ -68,9 +129,7 @@ public class StatisticsRepository {
         FROM admin.stat_events e JOIN cohort c ON c.entity_id=e.entity_id
         WHERE c.first_at>=? AND c.first_at<? AND e.occurred_at<? AND e.metric IN ('APPLIED','INTERVIEW','OFFER','HIRED')
         GROUP BY e.metric
-        """, Timestamp.from(from.atStartOfDay().toInstant(ZoneOffset.UTC)),
-        Timestamp.from(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)),
-        Timestamp.from(to.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC)));
+        """, Timestamp.from(from), Timestamp.from(toExclusive), Timestamp.from(toExclusive));
     Map<String, Long> counts = new LinkedHashMap<>();
     for (String metric : List.of("APPLIED", "INTERVIEW", "OFFER", "HIRED")) counts.put(metric, 0L);
     for (var row : rows) counts.put((String) row.get("metric"), ((Number) row.get("value")).longValue());

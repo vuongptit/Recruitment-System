@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Person1Gate } from "../../components/Person1Gate";
 import { AdminShell } from "../../components/AdminShell";
+import "./admin.css";
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   if (pathname === "/admin/login") return <>{children}</>;

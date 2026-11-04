@@ -25,7 +25,7 @@ export function AccountNavigation({ workspace = false, portal = "CANDIDATE" }: {
   const [pending, setPending] = useState(false);
   const role = account?.role ?? portal;
   const candidateLinks = [{ label: "Trang chủ", href: "/" }, { label: "Tìm việc làm", href: "/candidate/jobs" }, { label: "Công ty", href: account?.role === "CANDIDATE" ? "/candidate/companies" : "/companies" }];
-  const links = workspace ? role === "CANDIDATE" ? candidateLinks : [{ label: "Trang chủ", href: portalHome(role) }]
+  const links = workspace ? role === "CANDIDATE" ? candidateLinks : [{ label: role === "ADMIN" ? "Trung tâm quản trị" : "Trang chủ", href: portalHome(role) }]
     : portal === "RECRUITER" ? [{ label: "Trang chủ", href: "/recruiter" }, { label: "Giải pháp tuyển dụng", href: "/recruiter#solutions" }, { label: "Quy trình", href: "/recruiter#how-it-works" }]
       : candidateLinks;
   async function logout() {

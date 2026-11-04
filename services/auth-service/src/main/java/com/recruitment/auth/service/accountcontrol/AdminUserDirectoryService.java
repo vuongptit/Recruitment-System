@@ -1,6 +1,8 @@
 package com.recruitment.auth.service.accountcontrol;
 
 import com.recruitment.auth.dto.accountcontrol.AdminUserResponse;
+import com.recruitment.auth.dto.accountcontrol.AdminUserIdentityResponse;
+import java.util.List;
 import com.recruitment.auth.exception.AuthBusinessException;
 import com.recruitment.auth.model.UserRole;
 import com.recruitment.auth.repository.jdbc.AdminUserDirectoryRepository;
@@ -38,5 +40,16 @@ public class AdminUserDirectoryService {
     String pattern = "%" + email.trim().toLowerCase(Locale.ROOT)
         .replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
     return directory.findPage(pattern, role, locked, PageRequest.of(page - 1, limit));
+  }
+
+  @Transactional(readOnly = true)
+  public List<AdminUserIdentityResponse> identities(UUID actingUserId, List<UUID> ids) {
+    if (current.get(actingUserId).role() != UserRole.ADMIN) {
+      throw new AuthBusinessException("ACCESS_DENIED", "Access denied", HttpStatus.FORBIDDEN);
+    }
+    if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(java.util.Objects::isNull)) {
+      throw new AuthBusinessException("VALIDATION_ERROR", "Request 1 to 100 user IDs", HttpStatus.BAD_REQUEST);
+    }
+    return directory.findIdentities(ids.stream().distinct().toList());
   }
 }

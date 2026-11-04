@@ -98,6 +98,11 @@ public class ModerationRepository {
         + " FROM admin.audit_log ORDER BY created_at DESC,id LIMIT ? OFFSET ?", AUDIT_ROW, limit, (page - 1) * limit);
   }
 
+  public long countReports(String status) {
+    Long count = db.queryForObject("SELECT count(*) FROM admin.reports WHERE status=?", Long.class, status);
+    return count == null ? 0L : count;
+  }
+
   private static Instant instant(Timestamp value) {
     return value == null ? null : value.toInstant();
   }

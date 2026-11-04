@@ -12,6 +12,7 @@ import com.recruitment.admin.repository.ModerationRepository;
 import com.recruitment.admin.service.ModerationService;
 import com.recruitment.admin.service.ReportService;
 import com.recruitment.admin.service.AuditService;
+import com.recruitment.admin.service.AuditIdentityResolver;
 import com.recruitment.admin.service.AdminQueryService;
 import java.util.*;
 import org.junit.jupiter.api.Test;
@@ -41,6 +42,9 @@ class SecurityConfigTest {
 
   @MockBean
   ModerationRepository store;
+
+  @MockBean
+  AuditIdentityResolver identities;
 
   @Test
   void anonymousCannotReadModeration() throws Exception {

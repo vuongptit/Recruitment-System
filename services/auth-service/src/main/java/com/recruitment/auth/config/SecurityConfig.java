@@ -75,7 +75,7 @@ class SecurityConfig {
             .requestMatchers(HttpMethod.GET, "/auth/me").authenticated()
             .requestMatchers(HttpMethod.GET, "/auth/me/recruiter-contact").hasRole("RECRUITER")
             .requestMatchers(HttpMethod.PUT, "/auth/me/recruiter-contact").hasRole("RECRUITER")
-            .requestMatchers(HttpMethod.GET, "/auth/users").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.GET, "/auth/users", "/auth/users/identities").hasRole("ADMIN")
             .requestMatchers(HttpMethod.PATCH, "/auth/users/*/lock").hasRole("ADMIN")
             .anyRequest().denyAll();
         })

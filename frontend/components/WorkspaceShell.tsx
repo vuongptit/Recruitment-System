@@ -64,7 +64,7 @@ function WorkspaceContent({ children, role, title, navigationLabel, links, showN
           {avatarUrl ? <img className="workspace-avatar" width={42} height={42} decoding="async" src={avatarUrl} alt="Ảnh đại diện" /> : <span className="workspace-avatar" aria-hidden="true">{initials}</span>}
           <div><strong>{name || title}</strong><span>{title}</span></div>
         </div>
-        <p className="workspace-nav-label">Không gian làm việc</p>
+        <p className="workspace-nav-label">{role === "admin" ? "Điều hành hệ thống" : "Không gian làm việc"}</p>
         <nav ref={navigationRef} className={`workspace-navigation ${role === "candidate" ? "candidate-side-nav" : ""}`} aria-label={navigationLabel}>
           {links.map(({ href, label, icon: Icon, exact, aliases }) => {
             const active = pathname === href || (!exact && pathname.startsWith(href + "/")) || !!aliases?.some(alias => pathname.startsWith(alias));

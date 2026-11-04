@@ -1,6 +1,7 @@
 package com.recruitment.auth.repository.jdbc;
 
 import com.recruitment.auth.dto.accountcontrol.AdminUserResponse;
+import com.recruitment.auth.dto.accountcontrol.AdminUserIdentityResponse;
 import com.recruitment.auth.model.UserRole;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,5 +47,12 @@ public class AdminUserDirectoryRepository {
             + where + " ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
         USER_ROW, args.toArray());
     return new PageImpl<>(users, pageable, total == null ? 0 : total);
+  }
+
+  public List<AdminUserIdentityResponse> findIdentities(List<UUID> ids) {
+    if (ids.isEmpty()) return List.of();
+    String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+    return db.query("SELECT id,email,role FROM auth.users WHERE id IN (" + placeholders + ") ORDER BY id",
+        (row, index) -> new AdminUserIdentityResponse(row.getObject("id", UUID.class), row.getString("email"), UserRole.valueOf(row.getString("role"))), ids.toArray());
   }
 }

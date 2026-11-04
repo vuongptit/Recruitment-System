@@ -21,6 +21,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 @Service
 public class StatisticsService {
@@ -63,9 +64,10 @@ public class StatisticsService {
 
   public List<DailyStatistic> daily(LocalDate from, LocalDate to) {
     range(from, to);
-    return repository.daily(from, to);
+    return repository.pendingDays(from, to) > 0 ? repository.recordedActivity(from, to, false) : repository.daily(from, to);
   }
 
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public ApiResponse<StatisticsOverviewResponse> overview(Jwt actor, LocalDate from, LocalDate to) {
     gateway.requireCurrentAdmin(actor);
     var rows = daily(from, to);
@@ -73,7 +75,8 @@ public class StatisticsService {
     for (var row : rows) totals.merge(row.metric(), row.value(), Long::sum);
     return new ApiResponse<>(new StatisticsOverviewResponse(
         rows.stream().map(DailyStatisticResponse::from).toList(), totals, List.of("NEW_USERS", "NEW_COMPANIES")),
-        Map.of("timezone", "UTC", "aggregatedThrough", LocalDate.now(ZoneOffset.UTC).minusDays(1), "source", "DAILY_STATS"));
+        Map.of("timezone", "UTC", "aggregatedThrough", LocalDate.now(ZoneOffset.UTC).minusDays(1), "source",
+            repository.pendingDays(from, to) > 0 ? "RECORDED_EVENTS" : "DAILY_STATS"));
   }
 
   public ApiResponse<List<FunnelStageResponse>> funnel(Jwt actor, LocalDate from, LocalDate to) {

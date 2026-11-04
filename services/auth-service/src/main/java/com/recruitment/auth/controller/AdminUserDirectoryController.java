@@ -1,6 +1,7 @@
 package com.recruitment.auth.controller;
 
 import com.recruitment.auth.dto.accountcontrol.AdminUserResponse;
+import com.recruitment.auth.dto.accountcontrol.AdminUserIdentityResponse;
 import com.recruitment.auth.dto.common.ApiResponse;
 import com.recruitment.auth.model.UserRole;
 import com.recruitment.auth.service.accountcontrol.AdminUserDirectoryService;
@@ -32,5 +33,10 @@ public class AdminUserDirectoryController {
     var result = directory.list(UUID.fromString(jwt.getSubject()), email, role, locked, page, limit);
     return new ApiResponse<>(result.getContent(), Map.of(
         "page", page, "limit", limit, "total", result.getTotalElements()));
+  }
+
+  @GetMapping("/auth/users/identities")
+  public ApiResponse<List<AdminUserIdentityResponse>> identities(@AuthenticationPrincipal Jwt jwt, @RequestParam List<UUID> ids) {
+    return new ApiResponse<>(directory.identities(UUID.fromString(jwt.getSubject()), ids), Map.of());
   }
 }

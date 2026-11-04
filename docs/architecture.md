@@ -81,6 +81,13 @@ See [Auth Service structure](../services/auth-service/README.md#rest-mvc-structu
 
 ## Admin REST MVC layers
 
+Admin dashboard exposes `GET /admin/stats/snapshot` for current counts and
+`GET /admin/stats/activity` for completed UTC-day activity. Current counts use
+the owning services' APIs plus Admin-owned report queries; unavailable sources
+are represented explicitly. Date presets and previous-period comparison apply
+only to activity. All-time means recorded event history, with monthly series;
+it does not imply a complete baseline for data predating event ingestion.
+
 Admin follows Auth's layer layout with `@RestController`, validated DTOs, services,
 JDBC repositories, model records, configuration, security filters and infrastructure adapters.
 Controllers delegate all privileged decisions and persistence work to services.
@@ -89,6 +96,11 @@ gateway calls, Kafka consumption, scheduled aggregation and CSV/XLSX generation
 have explicit owners. The JDBC/Flyway stack, append-only audit, report version
 checks, event idempotency and existing REST/upstream/Kafka contracts are preserved.
 See [Admin Service structure](../services/admin-service/README.md#rest-mvc-structure).
+
+Audit presentation enriches account/actor IDs through bounded Admin-only Auth
+identity batches, and company/job IDs through owner detail APIs. The original
+append-only entries remain unchanged. Current labels are optional so an
+unavailable source does not hide authorized audit history.
 
 ## Kafka event contracts
 

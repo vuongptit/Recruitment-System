@@ -877,6 +877,20 @@
       }
     },
     {
+      "name": "Admin account display identities (max 100 IDs)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/auth/users/identities?ids={{userId}}",
+        "description": "Admin only. Rechecks current role and lock state. Returns id/email/role for existing requested UUIDs; use a comma-separated batch of 1–100 IDs."
+      }
+    },
+    {
       "name": "Logout",
       "request": {
         "method": "POST",

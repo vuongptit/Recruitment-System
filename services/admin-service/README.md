@@ -51,6 +51,10 @@ Gateway strips `/admin`; direct service routes below have no prefix.
 | GET | /audit-logs?page=1&limit=20 | ADMIN |
 | GET | /stats/overview?from=YYYY-MM-DD&to=YYYY-MM-DD | ADMIN |
 | GET | /stats/funnel?from=&to= | ADMIN |
+| GET | /stats/snapshot | ADMIN; current account/company/job/queue counts |
+| GET | /stats/activity?period=30d | ADMIN; today, 7d, 30d, month, all, custom |
+| GET | /stats/today/export?type=xlsx\|csv | ADMIN; current Vietnam day, hourly rows |
+| GET | /stats/report?type=xlsx\|csv&period=30d | ADMIN; complete formatted dashboard report; custom accepts from/to |
 | GET | /stats/export?type=xlsx\|csv&from=&to= | ADMIN |
 
 Swagger: direct `/swagger-ui/index.html`, OpenAPI `/v3/api-docs`, only with `SWAGGER_ENABLED=true`. Public deployment should keep docs disabled. Auth uses RS256 JWKS with issuer/audience/time/subject/role validation. Every administrative operation also checks durable Admin status via Auth's `/auth/me`; Auth outage fails closed. Bearer tokens are forwarded only to configured service origins, never to user-selected URLs.
@@ -74,6 +78,32 @@ Malformed events are quarantined by topic/partition/offset without storing the m
 The funnel is a cohort: applications first APPLIED within the requested dates, counted through the end of the requested range. Overview reads daily materializations; funnel reads raw events. New-user/new-company metrics are explicitly unavailable because there is no approved source event. Historical counts require an upstream baseline if the service starts after historical events have expired from Kafka.
 
 Exports accept at most 367 calendar days of the five daily metrics (at most 1,835 rows), so synchronous XLSX/CSV stays below the document's 50,000-row async threshold. Raw arbitrary-size exports are not offered.
+
+### Dashboard contracts
+
+`GET /stats/snapshot` is independent of activity dates. It checks durable Admin state once before bounded parallel GET requests to the configured Auth, Company and Job services. Account totals come from directory pagination metadata, verified/pending companies from Company metadata, searchable jobs from Job Search's eligibility-filtered total, and pending jobs from the capped moderation list. The two report queues are counted in Admin's own schema. It does not query another service's tables. Each metric exposes `value`, `available`, `lowerBound`; an unavailable source yields null, never a fabricated zero. `PENDING_JOBS` becomes a lower bound at 50 because the owning API caps its list. `capturedAt` identifies observation time; the sources are not an atomic cross-service snapshot.
+
+`GET /stats/activity?period=7d|30d|month|all|custom` uses completed UTC days through yesterday. Default `30d` covers the last 30 complete days. `custom` requires inclusive `from`/`to`, the existing 366-day difference bound and an end before today UTC. A preset month on its first day has no complete days and returns an empty period; it does not substitute the previous month. Bounded periods include a previous interval with the same number of days and its totals. Percent changes are calculated in the UI; a zero previous total is described without division by zero.
+
+`all` starts at the earliest recorded metric event, groups the daily materialization by month, and omits previous-period comparisons. It describes recorded history, not guaranteed lifetime business totals. The response includes first recorded date, nominal completed-day cutoff, and the number of dirty dates in the selected range. When a range contains dirty dates, dashboard totals/series and bounded daily exports read first occurrences directly from recorded events instead of showing a stale materialization. `liveRecalculated` indicates that source and the UI explains it. Previous-period totals independently use the same fallback if needed. These reads do not alter history or clear the scheduler's dirty queue. Dashboard activity and export reads use a repeatable-read transaction to avoid observing mixed aggregation commits. Funnel counts retain the existing first-application cohort and end-of-range semantics, with one application counted once per stage.
+
+The existing daily export contract stays bounded. Original overview/funnel/export and current-day export APIs remain available to existing clients. The dashboard buttons use the complete report endpoint described below; all-time reports retain monthly detail instead of applying the legacy daily-export limit.
+
+`period=today` is a separate in-progress window in `Asia/Ho_Chi_Minh` (GMT+7): local midnight inclusive through the request's `observedAt` exclusive. It always reads recorded events, retains first-occurrence deduplication, and groups counts by hour. No future event or later hour is included. The prior comparison uses yesterday's midnight through the same elapsed duration, rather than yesterday's entire day. The response sets `partial=true`, `bucket=HOUR`, includes `hourly` and exact current/prior instant boundaries, and leaves `aggregatedThrough` null. The completed-day UTC presets retain their existing semantics. The UI refresh button requests a new observation; it does not claim automatic streaming updates.
+
+Current-day CSV/XLSX uses `/stats/today/export`, not the UTC daily export. It reuses the same live-window service, emits hour starts and observation times with explicit `+07:00` offsets, and preserves numeric metric counts. It represents the observation time of the export request, which may be later than an already-open dashboard.
+
+### Complete dashboard reports
+
+The dashboard UI exports through `/stats/report?type=xlsx|csv&period=today|7d|30d|month|all|custom`, with `from`/`to` only for custom. `DashboardReportService` fetches authorized activity and current-state snapshots; `DashboardReportWriter` only formats their values. Each part retains its observation time; the export is not claimed to be an atomic cross-service snapshot. Data is refreshed on export, so the file can be newer than the open page.
+
+XLSX contains five sheets: `Tong quan` (period, source, current/prior totals, differences and percentage changes), `Hien trang` (all current counts and queues with availability/lower-bound status), `Pheu tuyen dung` (cohort conversion), `Chi tiet` (one row per day/hour/month with five metric columns, zero buckets and an evaluated SUM total), and `Huong dan` (definitions/timezones/limitations). It uses numeric/date cells, percentage formats, styled headers, filters, frozen panes, repeated print headers and A4 landscape setup.
+
+CSV is UTF-8 with BOM and one rectangular ten-column schema for all groups: group, period/time, timezone, Vietnamese metric label, count, prior count, difference, percentage, explanatory note and observation timestamp. Missing values and lower bounds remain explicit; numeric negative differences stay numeric. Text cells are escaped for commas/quotes/newlines and protected against formula prefixes. Complete reports cap detail at 9,000 buckets, keeping CSV below 50,000 data rows; oversized exports fail with `EXPORT_RANGE_TOO_LARGE` rather than silently truncating. Legacy daily endpoints retain their original raw-column formats.
+
+### Audit display identities
+
+`GET /audit-logs` retains the original action, reason, actor/target IDs, operation ID and outcome. It additionally returns optional `target_label`, `target_role` and `admin_label` for display. After checking the current Admin account, `AuditIdentityResolver` batches account and actor IDs through Auth's Admin-only `/auth/users/identities` endpoint (maximum 100 per call). Company names and job titles use their owning services' public detail APIs with deduplicated requests. Unavailable/deleted/nonpublic identities remain absent; audit rows are still returned. Labels reflect current information, not historical snapshots. No audit rows or schemas are modified.
 
 ## Run and test
 

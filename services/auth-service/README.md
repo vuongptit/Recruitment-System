@@ -227,6 +227,10 @@ The endpoint is an idempotent set-state command and currently uses last-commit-w
 
 Previously issued stateless access JWTs used by other services can remain valid for at most their 15-minute lifetime. Auth does not publish `user-events` because that topic remains an unapproved proposal. Admin Service must record the acting Admin and operation in its append-only AuditLog; production must also provide a controlled Admin provisioning/bootstrap process.
 
+### Admin identity lookup
+
+`GET /auth/users/identities?ids=<uuid>,<uuid>` returns `{data:[{id,email,role}],meta:{}}` for existing requested accounts only. It accepts 1–100 IDs, deduplicates them, and rejects invalid UUIDs or oversized batches. It requires both an Admin JWT and a current verified, unlocked Admin account. Candidate/Recruiter cannot use it. No password/session/account-control fields are exposed. Admin audit uses this bounded lookup rather than scanning the user directory.
+
 ## Google OIDC login
 
 1. Candidate pages use `GET /auth/google` (defaults to Candidate) or `?role=CANDIDATE`; Recruiter pages use `?role=RECRUITER`. ADMIN/unknown values are rejected.

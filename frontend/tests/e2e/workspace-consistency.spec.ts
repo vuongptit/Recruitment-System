@@ -1,4 +1,5 @@
 import { openWorkspaceMenu } from "./helpers/workspace";
+import { activityFixture, snapshotFixture } from "./helpers/adminDashboard";
 import { expect, test, type Page, type Route, type TestInfo } from "@playwright/test";
 
 const origin = "http://127.0.0.1:4173";
@@ -49,6 +50,8 @@ async function fixtureSession(page: Page, role: Role, destination: string) {
     daily: [{ metric: "APPLIED", stat_date: "2026-10-01", value: 10 }, { metric: "APPLIED", stat_date: "2026-10-02", value: 16 }, { metric: "APPLIED", stat_date: "2026-10-03", value: 12 }],
   }));
   await page.route(api + "/admin/stats/funnel**", route => reply(route, [{ stage: "APPLIED", count: 120, rate: 100 }, { stage: "INTERVIEW", count: 32, rate: 26.7 }, { stage: "HIRED", count: 8, rate: 6.7 }]));
+  await page.route(api + "/admin/stats/snapshot", route => reply(route, snapshotFixture));
+  await page.route(api + "/admin/stats/activity**", route => reply(route, activityFixture()));
   for (const endpoint of ["users", "jobs/pending", "companies/pending", "reports", "audit-logs"]) {
     await page.route(api + "/admin/" + endpoint + "**", route => reply(route, []));
   }
@@ -86,7 +89,8 @@ async function consistentWorkspace(page: Page, destination: string) {
     return { titleSize: heading.fontSize, titleWeight: heading.fontWeight, titleFont: heading.fontFamily,
       selectedColor: selected.backgroundColor, selectedMinHeight: selected.minHeight,
       controlRadius: control.borderRadius, controlMinHeight: control.minHeight, controlSize: control.fontSize,
-      shellWidth: shell.width, headerWidth: header.width, sidebarWidth: nav.width, viewport: window.innerWidth };
+      shellWidth: shell.width, headerWidth: header.width, sidebarWidth: nav.width, viewport: window.innerWidth,
+      admin: document.querySelector('.workspace-shell')?.getAttribute('data-portal') === 'admin' };
   });
   expect(parseFloat(styles.titleSize)).toBeGreaterThanOrEqual(22);
   expect(parseFloat(styles.titleSize)).toBeLessThanOrEqual(30);
@@ -94,11 +98,16 @@ async function consistentWorkspace(page: Page, destination: string) {
   expect(styles.titleFont).toContain("Segoe UI");
   expect(styles.selectedColor).not.toBe("rgba(0, 0, 0, 0)");
   expect(parseFloat(styles.selectedMinHeight)).toBeGreaterThanOrEqual(43);
-  expect(styles.controlRadius).toBe("8px");
-  expect(styles.controlMinHeight).toBe("46px");
-  expect(styles.controlSize).toBe("14px");
+  if (styles.admin) {
+    expect(parseFloat(styles.controlMinHeight)).toBeGreaterThanOrEqual(40);
+    expect(parseFloat(styles.controlSize)).toBeGreaterThanOrEqual(12);
+  } else {
+    expect(styles.controlRadius).toBe("8px");
+    expect(styles.controlMinHeight).toBe("46px");
+    expect(styles.controlSize).toBe("14px");
+  }
   expect(Math.abs(styles.headerWidth - styles.shellWidth)).toBeLessThanOrEqual(1);
-  if (styles.viewport > 980) expect(styles.sidebarWidth).toBe(236);
+  if (styles.viewport > 980) expect(styles.sidebarWidth).toBe(styles.admin ? 244 : 236);
   else expect(styles.sidebarWidth).toBeLessThan(styles.shellWidth);
 }
 
@@ -114,7 +123,7 @@ for (const role of ["CANDIDATE", "RECRUITER", "ADMIN"] as const) {
     test(`${role} ${view} shares shell, typography, controls and keyboard navigation`, async ({ page }, testInfo) => {
       const destination = view === "overview" ? dashboards[role] : `/${role.toLowerCase()}/notifications`;
       await fixtureSession(page, role, destination);
-      if (view === "overview") await expect(page.locator(".metric").first()).toBeVisible();
+      if (view === "overview") await expect(page.locator(role === "ADMIN" ? ".admin-metric" : ".metric").first()).toBeVisible();
       else await expect(page.getByRole("heading", { name: "Hồ sơ ứng tuyển đã được cập nhật", exact: true })).toBeVisible();
       await consistentWorkspace(page, destination);
       await saveScreenshot(page, role.toLowerCase() + (view === "notifications" ? "-notifications" : ""), testInfo);
@@ -123,7 +132,7 @@ for (const role of ["CANDIDATE", "RECRUITER", "ADMIN"] as const) {
       await link.focus();
       await expect(link).toBeFocused();
       await page.keyboard.press("Enter");
-      await expect(page).toHaveURL(origin + target);
+      await expect.poll(() => new URL(page.url()).pathname).toBe(target);
       await consistentWorkspace(page, target);
     });
   }
@@ -146,29 +155,29 @@ for (const [name, destination, heading] of [
 
 test("admin section controls update canonical navigation and survive reload", async ({ page }) => {
   await fixtureSession(page, "ADMIN", "/admin/users");
-  await expect(page.getByRole("heading", { name: "Người dùng", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quản lý người dùng", exact: true })).toBeVisible();
   await page.route(api + "/auth/me", route => reply(route, { id: accountId, email: "workspace@example.test", role: "ADMIN" }));
   const controls = page.getByRole("navigation", { name: "Chức năng quản trị" });
   await openWorkspaceMenu(page);
   await controls.getByRole("link", { name: "Duyệt tin tuyển dụng", exact: true }).click();
   await expect(page).toHaveURL(origin + "/admin/jobs");
-  await expect(page.getByRole("heading", { name: "Duyệt tin", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Duyệt tin tuyển dụng", exact: true })).toBeVisible();
   await expect(page.locator('.workspace-navigation [aria-current="page"]')).toHaveAttribute("href", "/admin/jobs");
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Duyệt tin", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Duyệt tin tuyển dụng", exact: true })).toBeVisible();
   await openWorkspaceMenu(page);
   await expect(page.locator(".workspace-navigation").getByRole("link", { name: "Duyệt tin tuyển dụng", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.locator('.workspace-navigation [aria-current="page"]')).toHaveAttribute("href", "/admin/jobs");
   await openWorkspaceMenu(page);
   await controls.getByRole("link", { name: "Nhật ký hoạt động", exact: true }).click();
   await expect(page).toHaveURL(origin + "/admin/audit");
-  await expect(page.getByRole("heading", { name: "Nhật ký", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nhật ký hoạt động", exact: true })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Nhật ký", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Nhật ký hoạt động", exact: true })).toBeVisible();
   await openWorkspaceMenu(page);
   await expect(page.locator(".workspace-navigation").getByRole("link", { name: "Nhật ký hoạt động", exact: true })).toHaveAttribute("aria-current", "page");
   await openWorkspaceMenu(page);
   await controls.getByRole("link", { name: "Tổng quan", exact: true }).click();
-  await expect(page).toHaveURL(origin + "/admin");
+  await expect(page).toHaveURL(/\/admin(?:\?|$)/);
   await expect(page.getByRole("heading", { name: "Tổng quan hệ thống", exact: true })).toBeVisible();
 });

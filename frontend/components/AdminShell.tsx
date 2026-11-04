@@ -8,7 +8,7 @@ const links: WorkspaceLink[] = [
   { href: "/admin", label: "Tổng quan", icon: LayoutDashboard, exact: true },
   { href: "/admin/users", label: "Quản lý người dùng", icon: UsersRound },
   { href: "/admin/jobs", label: "Duyệt tin tuyển dụng", icon: BriefcaseBusiness },
-  { href: "/admin/companies", label: "Duyệt công ty", icon: Building2 },
+  { href: "/admin/companies", label: "Xác minh công ty", icon: Building2 },
   { href: "/admin/reports", label: "Báo cáo vi phạm", icon: Flag },
   { href: "/admin/audit", label: "Nhật ký hoạt động", icon: ClipboardList },
   { href: "/admin/notifications", label: "Thông báo", icon: Bell },

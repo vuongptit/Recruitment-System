@@ -225,6 +225,9 @@ class AdminPostgresIT {
       );
       assertEquals(200, docs.statusCode());
       assertTrue(docs.body().contains("/stats/export"));
+      assertTrue(docs.body().contains("/stats/snapshot"));
+      assertTrue(docs.body().contains("/stats/activity"));
+      assertTrue(docs.body().contains("/stats/report"));
       assertTrue(docs.body().contains("/reports/{id}"));
       var protectedRoute = client.send(
         java.net.http.HttpRequest.newBuilder(
@@ -241,5 +244,86 @@ class AdminPostgresIT {
           .contains("no-store")
       );
     }
+  }
+
+  @Test
+  void dashboardQueriesPreserveBoundariesAndAggregateHistoryByMonth() {
+    var stats = new StatisticsRepository(db);
+    assertNull(stats.firstRecordedDate());
+    db.update("INSERT INTO admin.stat_events VALUES(?, 'application-events', ?, 'APPLIED', '2020-01-31T23:00:00Z', '{}'::jsonb)", UUID.randomUUID(), UUID.randomUUID());
+    db.update("INSERT INTO admin.daily_stats VALUES ('2020-01-31','APPLIED',2),('2020-02-01','APPLIED',3),('2020-02-02','APPLIED',4),('2020-02-02','HIRED',1),('2020-03-01','APPLIED',100)");
+    db.update("INSERT INTO admin.dirty_stat_dates VALUES ('2020-02-01'),('2020-03-01')");
+    var from = LocalDate.parse("2020-01-31");
+    var to = LocalDate.parse("2020-02-02");
+    assertEquals(from, stats.firstRecordedDate());
+    assertEquals(9L, stats.totals(from, to).get("APPLIED"));
+    assertEquals(1L, stats.totals(from, to).get("HIRED"));
+    var monthly = stats.trend(from, to, true);
+    assertEquals(3, monthly.size());
+    assertEquals(LocalDate.parse("2020-01-01"), monthly.getFirst().date());
+    assertEquals(7L, monthly.get(1).value());
+    assertEquals(1, stats.pendingDays(from, to));
+    assertEquals(4, stats.trend(from, to, false).size());
+  }
+
+  @Test
+  void dashboardQueuesCountOnlyTheRequestedReportState() {
+    var store = new ModerationRepository(db);
+    UUID reporter = UUID.randomUUID();
+    store.createReport(reporter, "USER", UUID.randomUUID(), "Spam", "Spam");
+    store.createReport(reporter, "USER", UUID.randomUUID(), "Spam", "Spam");
+    assertEquals(2, store.countReports("OPEN"));
+    assertEquals(0, store.countReports("PROCESSING"));
+    assertEquals(0, store.countReports("RESOLVED"));
+  }
+
+  @Test
+  void dirtyStatisticsAndExportsReadFirstOccurrencesWithoutChangingHistory() throws Exception {
+    var stats = new StatisticsRepository(db);
+    var gateway = org.mockito.Mockito.mock(ServiceGateway.class);
+    var service = new StatisticsService(stats, new ObjectMapper(), gateway);
+    UUID entity = UUID.randomUUID();
+    tx.executeWithoutResult(s -> {
+      service.consume(record(UUID.randomUUID(), entity, "2020-02-02", "APPLIED"));
+      service.consume(record(UUID.randomUUID(), entity, "2020-02-02", "APPLIED"));
+      service.consume(record(UUID.randomUUID(), entity, "2020-02-01", "APPLIED"));
+      service.consume(record(UUID.randomUUID(), entity, "2020-02-02", "INTERVIEW"));
+    });
+    var from = LocalDate.parse("2020-02-01");
+    var to = LocalDate.parse("2020-02-02");
+    assertTrue(stats.pendingDays(from, to) > 0);
+    assertTrue(stats.daily(from, to).isEmpty());
+    var fresh = service.daily(from, to);
+    assertEquals(2, fresh.size());
+    assertEquals(from, fresh.getFirst().date());
+    assertEquals(1L, fresh.getFirst().value());
+    var monthly = stats.recordedActivity(from, to, true);
+    assertEquals(from, monthly.getFirst().date());
+    assertEquals(1L, monthly.getFirst().value());
+    var jwt = org.springframework.security.oauth2.jwt.Jwt.withTokenValue("test").header("alg", "RS256").subject(UUID.randomUUID().toString()).build();
+    var file = new com.recruitment.admin.service.StatisticsExportService(service, gateway).export(jwt, "csv", from, to);
+    assertTrue(new String(file.content(), java.nio.charset.StandardCharsets.UTF_8).contains("2020-02-01,APPLIED,1"));
+    assertTrue(stats.daily(from, to).isEmpty());
+    assertEquals(4, db.queryForObject("SELECT count(*) FROM admin.stat_events", Integer.class));
+  }
+
+  @Test
+  void todayWindowRespectsVietnamMidnightDeduplicationAndFutureCutoff() {
+    var stats = new StatisticsRepository(db);
+    var start = java.time.Instant.parse("2026-11-03T17:00:00Z");
+    var end = java.time.Instant.parse("2026-11-03T18:00:00Z");
+    UUID existing = UUID.randomUUID(), current = UUID.randomUUID();
+    db.update("INSERT INTO admin.stat_events VALUES(?, 'application-events', ?, 'APPLIED', ?, '{}'::jsonb)", UUID.randomUUID(), existing, java.sql.Timestamp.from(start.minusSeconds(1)));
+    db.update("INSERT INTO admin.stat_events VALUES(?, 'application-events', ?, 'APPLIED', ?, '{}'::jsonb)", UUID.randomUUID(), existing, java.sql.Timestamp.from(start.plusSeconds(1)));
+    db.update("INSERT INTO admin.stat_events VALUES(?, 'application-events', ?, 'APPLIED', ?, '{}'::jsonb)", UUID.randomUUID(), current, java.sql.Timestamp.from(start));
+    db.update("INSERT INTO admin.stat_events VALUES(?, 'application-events', ?, 'INTERVIEW', ?, '{}'::jsonb)", UUID.randomUUID(), current, java.sql.Timestamp.from(end));
+    db.update("INSERT INTO admin.stat_events VALUES(?, 'application-events', ?, 'APPLIED', ?, '{}'::jsonb)", UUID.randomUUID(), UUID.randomUUID(), java.sql.Timestamp.from(end.plusSeconds(1)));
+    var rows = stats.recordedHourly(start, end);
+    assertEquals(1, rows.size());
+    assertEquals(start, rows.getFirst().bucketStart());
+    assertEquals(1L, rows.getFirst().value());
+    assertEquals(1L, stats.recordedTotals(start, end).get("APPLIED"));
+    assertEquals(1L, stats.funnel(start, end).get("APPLIED"));
+    assertEquals(0L, stats.funnel(start, end).get("INTERVIEW"));
   }
 }

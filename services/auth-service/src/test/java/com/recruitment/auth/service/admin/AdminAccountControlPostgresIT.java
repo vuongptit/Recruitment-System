@@ -163,6 +163,26 @@ class AdminAccountControlPostgresIT {
   }
 
   @Test
+  void batchIdentityDirectoryIsAdminOnlyAndSelectsOnlyRequestedUsers() throws Exception {
+    AuthUser admin = insertAdmin("identity-admin@example.com");
+    AuthUser target = verifiedCandidate("identity-candidate@example.com");
+    verifiedCandidate("identity-unrequested@example.com");
+    String token = tokenSessions.issueForVerifiedUser(admin.getId()).accessToken();
+    mvc.perform(get("/auth/users/identities").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+        .param("ids", target.getId().toString() + "," + target.getId() + "," + UUID.randomUUID()))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1))
+        .andExpect(jsonPath("$.data[0].id").value(target.getId().toString()))
+        .andExpect(jsonPath("$.data[0].email").value("identity-candidate@example.com"))
+        .andExpect(jsonPath("$.data[0].password_hash").doesNotExist())
+        .andExpect(jsonPath("$.data[0].locked_reason").doesNotExist());
+    String candidate = tokenSessions.issueForVerifiedUser(target.getId()).accessToken();
+    mvc.perform(get("/auth/users/identities").header(HttpHeaders.AUTHORIZATION, "Bearer " + candidate)
+        .param("ids", admin.getId().toString())).andExpect(status().isForbidden());
+    mvc.perform(get("/auth/users/identities").header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+        .param("ids", "not-a-uuid")).andExpect(status().isBadRequest());
+  }
+
+  @Test
   void directoryRejectsInvalidPaginationAndRechecksDemotedAdmin() throws Exception {
     AuthUser admin = insertAdmin("directory-demoted-admin@example.com");
     String token = tokenSessions.issueForVerifiedUser(admin.getId()).accessToken();

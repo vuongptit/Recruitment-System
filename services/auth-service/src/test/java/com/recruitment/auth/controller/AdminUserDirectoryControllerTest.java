@@ -48,4 +48,11 @@ class AdminUserDirectoryControllerTest {
     assertThat(json.get("is_verified").asBoolean()).isTrue();
     assertThat(json.get("is_locked").asBoolean()).isFalse();
   }
+
+  @Test
+  void identityDtoOnlyContainsIdEmailAndRole() throws Exception {
+    var value = new com.recruitment.auth.dto.accountcontrol.AdminUserIdentityResponse(UUID.randomUUID(), "candidate@example.com", UserRole.CANDIDATE);
+    var json = new com.fasterxml.jackson.databind.ObjectMapper().valueToTree(value);
+    assertThat(json.properties()).extracting(java.util.Map.Entry::getKey).containsExactlyInAnyOrder("id", "email", "role");
+  }
 }

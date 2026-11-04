@@ -75,6 +75,9 @@ export function person1Error(error: unknown): string {
       UPSTREAM_REJECTED:
         "Thao tác không được chấp nhận. Tải lại dữ liệu để kiểm tra quyền và trạng thái.",
       INVALID_DATE_RANGE: "Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.",
+      STATISTICS_DAY_NOT_COMPLETE: "Số liệu chỉ có đến hết ngày hôm qua theo UTC. Chọn lại khoảng thời gian.",
+      INVALID_STATISTICS_PERIOD: "Khoảng thống kê không hợp lệ. Chọn lại kỳ báo cáo.",
+      EXPORT_RANGE_TOO_LARGE: "Báo cáo vượt giới hạn xuất đồng bộ. Chọn khoảng thời gian ngắn hơn để xuất đầy đủ.",
       CURRENT_EXPERIENCE_END_DATE: "Công việc hiện tại không có ngày kết thúc.",
       EXPERIENCE_END_DATE_REQUIRED: "Bổ sung ngày kết thúc hoặc chọn Đang làm việc.",
     };

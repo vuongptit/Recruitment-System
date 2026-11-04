@@ -11,6 +11,8 @@ import java.util.Set;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StatisticsExportService {
@@ -22,6 +24,7 @@ public class StatisticsExportService {
     this.gateway = gateway;
   }
 
+  @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public StatisticsExport export(Jwt actor, String type, LocalDate from, LocalDate to) throws IOException {
     gateway.requireCurrentAdmin(actor);
     if (!Set.of("csv", "xlsx").contains(type)) throw new AdminFailure(400, "EXPORT_TYPE_INVALID");
