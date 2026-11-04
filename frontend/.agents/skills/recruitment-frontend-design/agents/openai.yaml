@@ -1,0 +1,4 @@
+interface:
+  display_name: "CareerHub Frontend Design"
+  short_description: "Giao diện tuyển dụng theo vai trò của CareerHub"
+  default_prompt: "Dùng $recruitment-frontend-design để cập nhật giao diện CareerHub theo đúng portal, thiết kế và nghiệp vụ tuyển dụng trong repo."
