@@ -1,4 +1,5 @@
 import { ApiClientError } from "./apiClientCore";
+import { sendSignedFile } from "./signedFileUpload";
 
 export type CompanyMediaAssetType = "COMPANY_LOGO" | "COMPANY_IMAGE" | "COMPANY_VIDEO";
 
@@ -70,24 +71,5 @@ export async function uploadToSignedProvider(
   file: File,
   signal?: AbortSignal,
 ): Promise<void> {
-  const form = new FormData();
-  form.append("file", file, file.name);
-  Object.entries(capability.params).forEach(([name, value]) => form.append(name, String(value)));
-  form.append("api_key", capability.apiKey);
-  form.append("signature", capability.signature);
-
-  let response: Response;
-  try {
-    response = await fetch(capability.uploadUrl, {
-      method: "POST",
-      body: form,
-      credentials: "omit",
-      redirect: "error",
-      signal,
-    });
-  } catch (error) {
-    if (signal?.aborted) throw new ApiClientError({ code: "REQUEST_CANCELLED" });
-    throw new ApiClientError({ code: "NETWORK_ERROR" });
-  }
-  if (!response.ok) throw new ApiClientError({ code: "MEDIA_PROVIDER_UPLOAD_FAILED", status: response.status });
+  await sendSignedFile(capability, file, signal);
 }

@@ -759,6 +759,12 @@ body:has(.auth-page) .content-wrap > * { width: 100%; }
 .candidate-profile-avatar { display:block; width:112px; height:112px; border:4px solid #fff; border-radius:50%; background:#eef2ff; box-shadow:0 3px 8px rgba(20,40,70,.16); object-fit:cover; }
 .candidate-avatar-upload { position:absolute; right:3px; bottom:4px; display:grid; width:30px; height:30px; place-items:center; border:2px solid #fff; border-radius:50%; background:#00783e; color:#fff; font-size:14px; cursor:pointer; }
 .candidate-avatar-upload input { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+.candidate-avatar-upload:focus-within { outline:3px solid var(--primary); outline-offset:3px; }
+.candidate-avatar-upload[aria-disabled="true"] { opacity:.6; cursor:wait; }
+.candidate-avatar-feedback { padding:0 24px 20px; overflow-wrap:anywhere; }
+.candidate-avatar-feedback p { margin:8px 0 0; font-size:13px; line-height:1.6; }
+.upload-progress { display:grid; gap:8px; margin-top:12px; font-size:14px; line-height:1.5; color:var(--primary); }
+.upload-progress progress { display:block; width:100%; max-width:420px; height:6px; accent-color:var(--primary); }
 .candidate-profile-identity { align-self:center; padding-top:28px; }
 .candidate-profile-identity h2 { margin:0 0 3px; color:#151c27; font:700 20px/1.3 var(--font-sans); }
 .candidate-profile-identity p { margin:0 0 12px; }

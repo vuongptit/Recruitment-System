@@ -72,6 +72,116 @@ async function login(
   await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(path.replaceAll("/", "\\/") + "$"));
 }
+test("avatar optimizes a large PNG before signing and saving, and shows invalid image errors beside the avatar", async ({ page }) => {
+  await base(page);
+  let signatures = 0;
+  let uploaded: Buffer | undefined;
+  let uploadedType = "";
+  await page.route(api + "/files/signature", route => {
+    signatures++;
+    expect(route.request().postDataJSON()).toMatchObject({ type: "AVATAR", originalFilename: "portrait.webp" });
+    return reply(route, {
+      fileId, uploadUrl: "https://api.cloudinary.com/v1_1/test/image/upload", apiKey: "test-key", signature: "test-signature",
+      expiresAt: new Date(Date.now() + 60000).toISOString(), maxBytes: 2 * 1024 * 1024,
+      allowedFormats: ["jpg", "png", "webp"], params: {},
+    });
+  });
+  await page.route("https://api.cloudinary.com/**", async route => {
+    const request = route.request();
+    const form = await new Response(new Uint8Array(request.postDataBuffer()!), { headers: { "content-type": request.headers()["content-type"] } }).formData();
+    const file = form.get("file") as File;
+    uploaded = Buffer.from(await file.arrayBuffer());
+    uploadedType = file.type;
+    await route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*" }, body: "{}" });
+  });
+  await page.route(api + "/files/", route => reply(route, { fileId }));
+  await page.route(api + "/profile/" + userId + "/avatar", route => {
+    expect(route.request().postDataJSON()).toEqual({ fileId });
+    return reply(route, { ...profile, avatarUrl: "/icon.svg" });
+  });
+  await login(page);
+  const encoded = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200; canvas.height = 1600;
+    const context = canvas.getContext("2d")!;
+    const image = context.createImageData(canvas.width, canvas.height);
+    let state = 12345;
+    for (let i = 0; i < image.data.length; i++) {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      image.data[i] = i % 4 === 3 ? 255 : state >>> 24;
+    }
+    context.putImageData(image, 0, 0);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  const source = Buffer.from(encoded, "base64");
+  expect(source.length).toBeGreaterThan(2 * 1024 * 1024);
+  const input = page.getByLabel("Thay ảnh đại diện", { exact: true });
+  await input.setInputFiles({ name: "portrait.png", mimeType: "image/png", buffer: source });
+  const feedback = page.locator("#avatar-feedback");
+  await expect(feedback.getByRole("status")).toHaveText("Đã cập nhật ảnh đại diện.");
+  await expect(page.getByRole("img", { name: "Ảnh đại diện", exact: true })).toBeVisible();
+  await expect.poll(() => page.getByRole("img", { name: "Ảnh đại diện", exact: true }).evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  expect(signatures).toBe(1);
+  expect(uploadedType).toBe("image/webp");
+  expect(uploaded!.length).toBeLessThanOrEqual(128 * 1024);
+  expect(uploaded!.subarray(0, 4).toString()).toBe("RIFF");
+  expect(uploaded!.subarray(8, 12).toString()).toBe("WEBP");
+  const { width, height } = await page.evaluate(async encoded => {
+    const bitmap = await createImageBitmap(await (await fetch(`data:image/webp;base64,${encoded}`)).blob());
+    const size = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return size;
+  }, uploaded!.toString("base64"));
+  expect(Math.max(width, height)).toBeLessThanOrEqual(768);
+  expect(width / height).toBeCloseTo(1200 / 1600, 2);
+  await input.setInputFiles({ name: "corrupt.png", mimeType: "image/png", buffer: Buffer.from("invalid PNG") });
+  await expect(feedback.getByRole("alert")).toContainText("Không đọc được nội dung ảnh");
+  await expect(feedback.getByRole("status")).toHaveCount(0);
+  expect(signatures).toBe(1);
+  await expect(input).toBeEnabled();
+});
+
+test("CV retries resume confirmation and saving without sending the same PDF again", async ({ page }) => {
+  await base(page);
+  let signatures = 0, uploads = 0, confirms = 0, saves = 0;
+  const cv = { id: cvId, title: "CV tiếp tục", type: "UPLOAD", aggregateVersion: 1, createdAt: new Date().toISOString() };
+  await page.route(api + "/profile/cvs", route => {
+    if (route.request().method() === "GET") return reply(route, saves >= 2 ? [cv] : []);
+    saves++;
+    return saves === 1 ? reply(route, { code: "SERVICE_UNAVAILABLE" }, 503) : reply(route, cv);
+  });
+  await page.route(api + "/files/signature", route => {
+    signatures++;
+    return reply(route, { fileId, uploadUrl: "https://api.cloudinary.com/v1_1/test/raw/upload", apiKey: "key", signature: "signature",
+      expiresAt: new Date(Date.now() + 60000).toISOString(), maxBytes: 5 * 1024 * 1024, allowedFormats: ["pdf"], params: {} });
+  });
+  await page.route("https://api.cloudinary.com/**", async route => {
+    uploads++;
+    const request = route.request();
+    const form = await new Response(new Uint8Array(request.postDataBuffer()!), { headers: { "content-type": request.headers()["content-type"] } }).formData();
+    expect(await (form.get("file") as File).text()).toBe("%PDF-1.7\nunchanged-document");
+    await route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*" }, body: "{}" });
+  });
+  await page.route(api + "/files/", route => {
+    confirms++;
+    return confirms === 1 ? reply(route, { code: "SERVICE_UNAVAILABLE" }, 503) : reply(route, { fileId });
+  });
+  await login(page, "CANDIDATE", "/candidate/profile/cvs");
+  await page.getByLabel("Tên CV", { exact: true }).fill(cv.title);
+  await page.locator('input[type="file"]').setInputFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7\nunchanged-document") });
+  const submit = page.getByRole("button", { name: "Tải lên và lưu CV", exact: true });
+  await submit.click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  expect([signatures, uploads, confirms, saves]).toEqual([1, 1, 1, 0]);
+  await submit.click();
+  await expect.poll(() => saves).toBe(1);
+  await expect(submit).toBeEnabled();
+  expect([signatures, uploads, confirms, saves]).toEqual([1, 1, 2, 1]);
+  await submit.click();
+  await expect(page.getByRole("heading", { name: cv.title, exact: true })).toBeVisible();
+  expect([signatures, uploads, confirms, saves]).toEqual([1, 1, 2, 2]);
+  await expect(page.locator('input[type="file"]')).toHaveValue("");
+});
 test("password login waits for slow anonymous hydration instead of cancelling the new session", async ({ page }) => {
   await base(page);
   let release!: () => void;
@@ -310,6 +420,8 @@ test("CV Builder exports Vietnamese PDF then publishes a private snapshot", asyn
 }) => {
   await base(page);
   let stored: Record<string, unknown> | undefined;
+  let publishes = 0, uploads = 0;
+  let uploadedPdf: Buffer | undefined;
   await page.route(api + "/profile/cvs", (route) => reply(route, []));
   await page.route(api + "/files/signature", (route) =>
     reply(route, {
@@ -323,20 +435,25 @@ test("CV Builder exports Vietnamese PDF then publishes a private snapshot", asyn
       params: { timestamp: 1 },
     }),
   );
-  await page.route("https://api.cloudinary.com/**", (route) =>
-    route.fulfill({
+  await page.route("https://api.cloudinary.com/**", async (route) => {
+    uploads++;
+    const request = route.request();
+    const form = await new Response(new Uint8Array(request.postDataBuffer()!), { headers: { "content-type": request.headers()["content-type"] } }).formData();
+    uploadedPdf = Buffer.from(await (form.get("file") as File).arrayBuffer());
+    return route.fulfill({
       status: 200,
       headers: { "access-control-allow-origin": "*" },
       body: "{}",
-    }),
-  );
+    });
+  });
   await page.route(api + "/files/", (route) => {
     expect(route.request().postDataJSON()).toEqual({ fileId });
     return reply(route, { id: fileId, status: "ACTIVE" });
   });
   await page.route(api + "/profile/cvs/online", (route) => {
+    publishes++;
     stored = route.request().postDataJSON();
-    return reply(route, { id: cvId });
+    return publishes === 1 ? reply(route, { code: "SERVICE_UNAVAILABLE" }, 503) : reply(route, { id: cvId });
   });
   await login(page, "CANDIDATE", "/candidate/profile/cvs/builder");
   await expect(
@@ -351,7 +468,13 @@ test("CV Builder exports Vietnamese PDF then publishes a private snapshot", asyn
   expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
   expect(bytes.length).toBeGreaterThan(10000);
   await page.getByRole("button", { name: "Lưu CV", exact: true }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await page.getByLabel("Tên CV", { exact: true }).fill("CV đổi tên sau lỗi lưu");
+  await page.getByRole("button", { name: "Lưu CV", exact: true }).click();
   await expect(page).toHaveURL(/\/candidate\/profile\/cvs$/);
+  expect(uploads).toBe(1);
+  expect(uploadedPdf).toEqual(bytes);
+  expect(stored?.title).toBe("CV đổi tên sau lỗi lưu");
   expect(stored?.fileId).toBe(fileId);
   expect(stored?.contentSchemaVersion).toBe(1);
   expect((stored?.contentJson as Record<string, unknown>).fullName).toBe(

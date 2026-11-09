@@ -24,6 +24,9 @@ test("personal uploads reject extension spoof, empty files and size overflow", (
   assert.throws(() =>
     validatePersonalFile({ name: "avatar.pdf", size: 100 }, "AVATAR"),
   );
+  assert.doesNotThrow(() => validatePersonalFile({ name: "avatar.PNG", size: 2 * 1024 * 1024 }, "AVATAR"));
+  assert.throws(() => validatePersonalFile({ name: "avatar.png", size: 2 * 1024 * 1024 + 1 }, "AVATAR"), /2 MiB/);
+  assert.throws(() => validatePersonalFile({ name: "avatar.png", size: 0 }, "AVATAR"), /trống/);
 });
 test("builder rejects foreign shapes and oversized content", () => {
   assert.throws(() => validateBuilder({ sections: "unsafe" }));

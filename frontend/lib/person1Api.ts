@@ -1,4 +1,7 @@
 import { ApiClientError, requestApi, toUserMessage } from "./apiClient";
+import { AVATAR_MAX_BYTES, prepareAvatarImage } from "./avatarImage";
+import { sendSignedFile, type UploadStep } from "./signedFileUpload";
+export { storageUploadError as personalFileUploadError } from "./signedFileUpload";
 import { scopedDestination } from "./portalRoutes";
 import {
   awaitSessionHydration,
@@ -208,105 +211,81 @@ interface UploadCapability {
   allowedFormats: string[];
   params: Record<string, string | number>;
 }
-export function validatePersonalFile(
+/** In-memory checkpoint only: resume confirmation without sending the same file again. */
+export interface PersonalUploadCheckpoint {
+  source: File;
+  type: "CV" | "AVATAR";
+  file: File;
+  capability: UploadCapability;
+  uploaded: boolean;
+}
+export interface PersonalUploadOptions {
+  checkpoint?: PersonalUploadCheckpoint | null;
+  onCheckpoint?: (checkpoint: PersonalUploadCheckpoint | null) => void;
+  onStep?: (step: UploadStep) => void;
+}
+function validatePersonalFileFormat(
   file: Pick<File, "name" | "size">,
   type: "CV" | "AVATAR",
 ): void {
   const ext = file.name.split(".").pop()?.toLowerCase();
   const allowed = type === "CV" ? ["pdf"] : ["jpg", "jpeg", "png", "webp"];
-  if (
-    !ext ||
-    !allowed.includes(ext) ||
-    file.size <= 0 ||
-    file.size > (type === "CV" ? 5 : 2) * 1024 * 1024
-  )
-    throw new Error(
-      type === "CV"
-        ? "Chọn PDF không quá 5 MB."
-        : "Chọn ảnh JPG, PNG, WEBP không quá 2 MB.",
-    );
+  if (!ext || !allowed.includes(ext))
+    throw new Error(type === "CV" ? "Chọn tệp PDF." : "Chọn ảnh JPG, PNG hoặc WEBP.");
+  if (file.size <= 0) throw new Error("Tệp đang trống. Hãy chọn một tệp khác.");
 }
-export function personalFileUploadError(status: number, payload: unknown): Error {
-  const detail = payload && typeof payload === "object" && "error" in payload ? payload.error : null;
-  const message = detail && typeof detail === "object" && "message" in detail && typeof detail.message === "string"
-    ? detail.message.slice(0, 1000).toLowerCase() : "";
-  // Classify only known provider failures; never display its raw response,
-  // which can include account identifiers, URLs or signed parameters.
-  if (status === 401 || status === 403
-    || (/upload preset/.test(message) && /not found|does not exist|invalid|unknown/.test(message))
-    || /invalid signature|invalid api.?key|unknown api.?key/.test(message)) {
-    return new Error("Dịch vụ lưu trữ chưa được cấu hình đầy đủ. Vui lòng liên hệ quản trị viên để hoàn tất cấu hình tải tệp.");
-  }
-  if (status === 413 || /file size too large|maximum file size/.test(message)) {
-    return new Error("Kho lưu trữ từ chối vì tệp vượt quá dung lượng cho phép. Hãy chọn tệp nhỏ hơn.");
-  }
-  if (status === 429 || status >= 500) {
-    return new Error("Dịch vụ lưu trữ đang bận hoặc gián đoạn. Vui lòng thử tải tệp lại sau.");
-  }
-  return new Error("Kho lưu trữ từ chối tệp. Kiểm tra định dạng và dung lượng trước khi thử lại.");
+export function validatePersonalFile(file: Pick<File, "name" | "size">, type: "CV" | "AVATAR"): void {
+  validatePersonalFileFormat(file, type);
+  if (file.size > (type === "CV" ? 5 * 1024 * 1024 : AVATAR_MAX_BYTES))
+    throw new Error(type === "CV" ? "Chọn PDF không quá 5 MiB." : "Ảnh tải lên không được vượt quá 2 MiB.");
 }
 export async function uploadPersonalFile(
   file: File,
   type: "CV" | "AVATAR",
   signal?: AbortSignal,
+  options: PersonalUploadOptions = {},
 ): Promise<string> {
+  validatePersonalFileFormat(file, type);
+  const source = file;
+  const previous = options.checkpoint?.source === source && options.checkpoint.type === type ? options.checkpoint : null;
+  options.onStep?.("preparing");
+  if (previous) file = previous.file;
+  else if (type === "AVATAR") file = await prepareAvatarImage(file, signal);
   validatePersonalFile(file, type);
   if (
     type === "CV" &&
     new TextDecoder().decode(await file.slice(0, 5).arrayBuffer()) !== "%PDF-"
   )
     throw new Error("Nội dung tệp không phải PDF.");
-  const result = await requestApi<UploadCapability>("/api/files/signature", {
-    method: "POST",
-    privateData: true,
-    signal,
-    headers: { "Idempotency-Key": `personal-${crypto.randomUUID()}` },
-    body: { type, originalFilename: file.name },
-  });
-  const cap = result.data;
-  const url = new URL(cap.uploadUrl);
-  if (
-    url.protocol !== "https:" ||
-    url.hostname !== "api.cloudinary.com" ||
-    !Number.isFinite(Date.parse(cap.expiresAt)) ||
-    Date.parse(cap.expiresAt) <= Date.now() ||
-    file.size > cap.maxBytes
-  )
-    throw new Error("Thông tin tải tệp không hợp lệ hoặc đã hết hạn.");
-  const form = new FormData();
-  form.append("file", file, file.name);
-  Object.entries(cap.params).forEach(([key, value]) =>
-    form.append(key, String(value)),
-  );
-  form.append("api_key", cap.apiKey);
-  form.append("signature", cap.signature);
-  const abort = new AbortController();
-  const cancel = () => abort.abort();
-  signal?.addEventListener("abort", cancel, { once: true });
-  const timeout = setTimeout(cancel, 60_000);
-  try {
-    if (signal?.aborted) cancel();
-    const uploaded = await fetch(cap.uploadUrl, {
+  let checkpoint = previous;
+  if (!checkpoint || !checkpoint.uploaded && Date.parse(checkpoint.capability.expiresAt) <= Date.now()) {
+    options.onStep?.("signing");
+    const result = await requestApi<UploadCapability>("/api/files/signature", {
       method: "POST",
-      body: form,
-      credentials: "omit",
-      redirect: "error",
-      signal: abort.signal,
+      privateData: true,
+      signal,
+      headers: { "Idempotency-Key": `personal-${crypto.randomUUID()}` },
+      body: { type, originalFilename: file.name },
     });
-    if (!uploaded.ok) {
-      const payload: unknown = await uploaded.json().catch(() => null);
-      throw personalFileUploadError(uploaded.status, payload);
-    }
-  } finally {
-    clearTimeout(timeout);
-    signal?.removeEventListener("abort", cancel);
+    checkpoint = { source, type, file, capability: result.data, uploaded: false };
+    options.onCheckpoint?.(checkpoint);
   }
-  await requestApi("/api/files/", {
-    method: "POST",
-    privateData: true,
-    body: { fileId: cap.fileId },
-    signal,
-  });
+  const cap = checkpoint.capability;
+  if (!checkpoint.uploaded) {
+    options.onStep?.("uploading");
+    await sendSignedFile(cap, file, signal);
+    checkpoint = { ...checkpoint, uploaded: true };
+    options.onCheckpoint?.(checkpoint);
+  }
+  options.onStep?.("confirming");
+  try {
+    await requestApi("/api/files/", {
+      method: "POST", privateData: true, body: { fileId: cap.fileId }, signal, maxRetries: 0,
+    });
+  } catch (error) {
+    if (error instanceof ApiClientError && ["FILE_INTENT_EXPIRED", "FILE_REJECTED", "FILE_CONFIRMATION_NOT_ALLOWED"].includes(error.code)) options.onCheckpoint?.(null);
+    throw error;
+  }
   return cap.fileId;
 }
 export function saveBlob(blob: Blob, name: string): void {

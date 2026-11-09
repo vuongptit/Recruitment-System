@@ -1,7 +1,10 @@
 "use client";
 import Link from "next/link";
+import { Camera, LoaderCircle } from "lucide-react";
 import { LoadingState, PageHeader, StatusBadge } from "@/components/ui";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { UploadProgress } from "../../../components/UploadProgress";
+import type { UploadStep } from "../../../lib/signedFileUpload";
 import { useCurrentAccount } from "../../../components/SessionGate";
 import { ConfirmationDialog } from "../../../components/ConfirmationDialog";
 import { ApiClientError, requestApi } from "../../../lib/apiClient";
@@ -13,6 +16,7 @@ import {
   uploadPersonalFile,
   type CandidateProfile,
   type ProfileBlock,
+  type PersonalUploadCheckpoint,
 } from "../../../lib/person1Api";
 type Field = {
   name: string;
@@ -323,6 +327,11 @@ export default function ProfilePage() {
   const [notice, setNotice] = useState("");
   const [reload, setReload] = useState(0);
   const [editingGeneral, setEditingGeneral] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const [avatarNotice, setAvatarNotice] = useState("");
+  const [avatarStep, setAvatarStep] = useState<UploadStep | null>(null);
+  const avatarAttempt = useRef<{ source: File; checkpoint: PersonalUploadCheckpoint | null; fileId?: string } | null>(null);
   useEffect(() => {
     if (!account) return;
     const controller = new AbortController();
@@ -380,19 +389,32 @@ export default function ProfilePage() {
   async function avatar(file?: File) {
     if (!file || !account || busy) return;
     setBusy(true);
-    setError("");
+    setAvatarBusy(true);
+    setAvatarError("");
+    setAvatarNotice("");
     try {
-      const fileId = await uploadPersonalFile(file, "AVATAR");
+      if (avatarAttempt.current?.source !== file) avatarAttempt.current = { source: file, checkpoint: null };
+      const attempt = avatarAttempt.current!;
+      const fileId = attempt.fileId ?? await uploadPersonalFile(file, "AVATAR", undefined, {
+        checkpoint: attempt.checkpoint,
+        onCheckpoint: value => { attempt.checkpoint = value; },
+        onStep: setAvatarStep,
+      });
+      attempt.fileId = fileId;
+      setAvatarStep("saving");
       const result = await requestApi<CandidateProfile>(
         `/api/profile/${account.id}/avatar`,
         { method: "PUT", privateData: true, body: { fileId } },
       );
       setProfile(result.data);
-      setNotice("Đã cập nhật ảnh đại diện.");
+      setAvatarNotice("Đã cập nhật ảnh đại diện.");
+      avatarAttempt.current = null;
     } catch (e) {
-      setError(person1Error(e));
+      setAvatarError(person1Error(e));
     } finally {
       setBusy(false);
+      setAvatarBusy(false);
+      setAvatarStep(null);
     }
   }
   return (
@@ -405,9 +427,9 @@ export default function ProfilePage() {
           <div className="candidate-profile-hero-body">
             <div className="candidate-profile-avatar-wrap">
               {profile?.avatarUrl ? <img className="candidate-profile-avatar" src={profile.avatarUrl} alt="Ảnh đại diện" /> : <span className="candidate-profile-avatar candidate-profile-initials" aria-label="Chưa có ảnh đại diện">{(profile?.fullName || account?.email || "UV").slice(0, 1).toUpperCase()}</span>}
-              <label className="candidate-avatar-upload" title="Thay ảnh đại diện">
-                <span aria-hidden="true">▣</span><span className="sr-only">Thay ảnh đại diện</span>
-                <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={(e) => { void avatar(e.target.files?.[0]); e.currentTarget.value = ""; }} />
+              <label className="candidate-avatar-upload" title="Thay ảnh đại diện" aria-disabled={busy}>
+                {avatarBusy ? <LoaderCircle size={16} aria-hidden="true" /> : <Camera size={16} aria-hidden="true" />}<span className="sr-only">Thay ảnh đại diện</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} aria-describedby="avatar-feedback" onChange={(e) => { void avatar(e.target.files?.[0]); e.currentTarget.value = ""; }} />
               </label>
             </div>
             <div className="candidate-profile-identity">
@@ -424,6 +446,13 @@ export default function ProfilePage() {
               <progress max={100} value={profile?.completionPercent ?? 0} aria-label="Mức độ hoàn thiện hồ sơ" />
               <p>{profile?.missingSections?.length ? `Còn thiếu: ${profile.missingSections.map((section) => profileSectionLabels[section] ?? "Thông tin bổ sung").join(", ")}` : profile ? "Hồ sơ đã sẵn sàng để nhà tuyển dụng xem." : "Bắt đầu bằng cách bổ sung thông tin cá nhân."}</p>
             </div>
+          </div>
+          <div className="candidate-avatar-feedback" id="avatar-feedback" aria-busy={avatarBusy}>
+            <p className="muted">JPG, PNG hoặc WEBP · Ảnh gốc tối đa 20 MiB, 25 triệu điểm ảnh. Ảnh được tự động tối ưu trước khi tải lên.</p>
+            <UploadProgress step={avatarStep} />
+            {avatarError ? <p className="notice notice-danger" role="alert">{avatarError} Bạn có thể chọn lại ảnh bằng nút máy ảnh.</p> : null}
+            {avatarError && !busy && (avatarAttempt.current?.checkpoint || avatarAttempt.current?.fileId) ? <button className="btn" type="button" onClick={() => void avatar(avatarAttempt.current?.source)}>Thử lưu lại ảnh</button> : null}
+            {avatarNotice ? <p className="notice" role="status">{avatarNotice}</p> : null}
           </div>
         </section>
         <div className="candidate-profile-grid">

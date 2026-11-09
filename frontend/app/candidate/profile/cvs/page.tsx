@@ -1,12 +1,15 @@
 "use client";
 import Link from "next/link";
 import { EmptyState, LoadingState, PageHeader, StatusBadge } from "@/components/ui";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { UploadProgress } from "../../../../components/UploadProgress";
+import type { UploadStep } from "../../../../lib/signedFileUpload";
 import { requestApi } from "../../../../lib/apiClient";
 import {
   person1Error,
   person1FormError,
   uploadPersonalFile,
+  type PersonalUploadCheckpoint,
   type CandidateCv,
 } from "../../../../lib/person1Api";
 import { ConfirmationDialog } from "../../../../components/ConfirmationDialog";
@@ -20,6 +23,9 @@ export default function CvsPage() {
   const [title, setTitle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploaded, setUploaded] = useState<string | null>(null);
+  const checkpoint = useRef<PersonalUploadCheckpoint | null>(null);
+  const [uploadStep, setUploadStep] = useState<UploadStep | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [rename, setRename] = useState<CandidateCv | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const [deleting, setDeleting] = useState<CandidateCv | null>(null);
@@ -49,8 +55,13 @@ export default function CvsPage() {
     setError("");
     setNotice("");
     try {
-      const fileId = uploaded ?? (await uploadPersonalFile(file, "CV"));
+      const fileId = uploaded ?? await uploadPersonalFile(file, "CV", undefined, {
+        checkpoint: checkpoint.current,
+        onCheckpoint: value => { checkpoint.current = value; },
+        onStep: setUploadStep,
+      });
       setUploaded(fileId);
+      setUploadStep("saving");
       await requestApi("/api/profile/cvs", {
         method: "POST",
         privateData: true,
@@ -58,6 +69,8 @@ export default function CvsPage() {
       });
       setFile(null);
       setUploaded(null);
+      checkpoint.current = null;
+      if (fileInput.current) fileInput.current.value = "";
       setTitle("");
       setNotice("Đã lưu CV.");
       setReload((n) => n + 1);
@@ -65,6 +78,7 @@ export default function CvsPage() {
       setError(person1Error(e));
     } finally {
       setPending(false);
+      setUploadStep(null);
     }
   }
   async function mutate(
@@ -148,10 +162,12 @@ export default function CvsPage() {
             <input
               className="input"
               type="file"
+              ref={fileInput}
               accept="application/pdf,.pdf"
               onChange={(e) => {
                 setFile(e.target.files?.[0] ?? null);
                 setUploaded(null);
+                checkpoint.current = null;
               }}
             />
           </label>
@@ -159,6 +175,7 @@ export default function CvsPage() {
             {pending ? "Đang lưu…" : "Tải lên và lưu CV"}
           </button></div>
         </fieldset>
+        <UploadProgress step={uploadStep} />
         {cvs.length >= 5 ? (
           <p className="notice notice-warning">
             Bạn đã có 5 CV. Xóa bớt trước khi thêm mới.

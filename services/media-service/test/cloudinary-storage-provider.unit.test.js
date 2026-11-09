@@ -129,6 +129,38 @@ test('Cloudinary signed intent contains only controlled exact-format parameters'
   );
 });
 
+test('Cloudinary inspection starts all sibling scans while metadata is still pending', async (t) => {
+  const originalResource = cloudinary.api.resource;
+  const originalFetch = global.fetch;
+  let releaseMetadata;
+  const heldMetadata = new Promise(resolve => { releaseMetadata = resolve; });
+  t.after(() => { releaseMetadata(); cloudinary.api.resource = originalResource; global.fetch = originalFetch; });
+  const publicId = 'recruitment/avatar/' + CONTEXT_FILE_ID;
+  let metadataStarted = false;
+  const scans = new Set();
+  cloudinary.api.resource = async () => {
+    metadataStarted = true;
+    await heldMetadata;
+    return { asset_id: 'asset-1', public_id: publicId, resource_type: 'image', type: 'upload', version: 1800000000,
+      secure_url: 'https://res.cloudinary.com/test-cloud/image/upload/avatar.png', format: 'png', bytes: 100,
+      created_at: '2027-01-15T08:00:00.000Z', width: 64, height: 64, context: { custom: { file_id: CONTEXT_FILE_ID } } };
+  };
+  global.fetch = async (url, options) => fetchContextPage(url, options, async (_key, _value, scan) => {
+    assert.equal(metadataStarted, true);
+    scans.add(scan.resource_type);
+    if (scans.size === 3) releaseMetadata();
+    return { resources: [] };
+  });
+  const running = createProvider().inspectAsset({ publicId, resourceType: StorageResourceType.IMAGE,
+    deliveryType: StorageDeliveryType.UPLOAD, expectedFormat: 'png', contextFileId: CONTEXT_FILE_ID });
+  let timer;
+  try {
+    const result = await Promise.race([running, new Promise((_resolve, reject) => { timer = setTimeout(() => reject(new Error('metadata blocked sibling scans')), 2000); })]);
+    assert.equal(result.assetId, 'asset-1');
+    assert.deepEqual(scans, new Set(['image', 'video', 'raw']));
+  } finally { clearTimeout(timer); releaseMetadata(); await running; }
+});
+
 test('Cloudinary canonical inspection uses Admin metadata and bounded range bytes', async (t) => {
   const originalResource = cloudinary.api.resource;
   const originalUrl = cloudinary.url;
@@ -186,6 +218,7 @@ test('Cloudinary canonical inspection uses Admin metadata and bounded range byte
     );
   };
   let fetchOptions;
+  let sampleCancelled = false;
   global.fetch = async (url, options) => {
     const parsed = url instanceof URL ? url : new URL(url);
     if (parsed.hostname === 'api.cloudinary.com' && parsed.pathname.endsWith('/context')) {
@@ -195,7 +228,12 @@ test('Cloudinary canonical inspection uses Admin metadata and bounded range byte
     assert.equal(parsed.searchParams.get('public_id'), publicId);
     assert.ok(Number(parsed.searchParams.get('expires_at')) > Date.now() / 1000);
     fetchOptions = options;
-    return new Response(Buffer.from('%PDF-1.7\n'), { status: 206 });
+    const prefix = Buffer.alloc(8192);
+    prefix.write('%PDF-1.7\n');
+    return new Response(new ReadableStream({
+      start(controller) { controller.enqueue(prefix); },
+      cancel() { sampleCancelled = true; },
+    }), { status: 200 });
   };
 
   const provider = createProvider();
@@ -214,7 +252,9 @@ test('Cloudinary canonical inspection uses Admin metadata and bounded range byte
   assert.equal(fetchOptions.redirect, 'error');
   assert.equal(inspected.contextFileId, CONTEXT_FILE_ID);
   assert.equal(inspected.format, 'pdf');
-  assert.equal(inspected.sample.toString(), '%PDF-1.7\n');
+  assert.equal(inspected.sample.length, 8192);
+  assert.equal(inspected.sample.subarray(0, 9).toString(), '%PDF-1.7\n');
+  assert.equal(sampleCancelled, true, 'cancel unread bytes even when Range is ignored');
   assert.deepEqual(
     new Set(contextLookups.map((options) => options.resource_type)),
     new Set(['image', 'video', 'raw']),

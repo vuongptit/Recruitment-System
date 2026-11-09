@@ -175,3 +175,87 @@ test("closing a dirty company form asks before discarding the full draft", async
   await expect(page.getByLabel("Địa chỉ", { exact: true })).toHaveValue(baseCompany.address);
   expect(state.writes).toHaveLength(0);
 });
+
+test("company logo uploads in one action, preserves transparency and resumes without re-uploading", async ({ page }) => {
+  await openCompany(page);
+  const fileId = "8795c0de-7908-4ab5-9bed-4c4f1cf9c217";
+  let signatures = 0, uploads = 0, confirms = 0, saves = 0;
+  let sent: Buffer | undefined;
+  await page.route(`${gateway}/companies/${companyId}/media/signature`, route => {
+    signatures++;
+    expect(route.request().postDataJSON()).toEqual({ type: "COMPANY_LOGO", originalFilename: "logo.webp" });
+    return reply(route, { fileId, uploadUrl: "https://api.cloudinary.com/v1_1/test/image/upload", apiKey: "test-key", signature: "test-signature",
+      expiresAt: new Date(Date.now() + 60000).toISOString(), maxBytes: 2 * 1024 * 1024, allowedFormats: ["webp"], params: {} });
+  });
+  await page.route("https://api.cloudinary.com/**", async route => {
+    uploads++;
+    const request = route.request();
+    const form = await new Response(new Uint8Array(request.postDataBuffer()!), { headers: { "content-type": request.headers()["content-type"] } }).formData();
+    const file = form.get("file") as File;
+    expect(file.type).toBe("image/webp");
+    sent = Buffer.from(await file.arrayBuffer());
+    await route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*" }, body: "{}" });
+  });
+  await page.route(`${gateway}/companies/${companyId}/media/confirm`, route => {
+    confirms++;
+    return confirms === 1 ? reply(route, { code: "SERVICE_UNAVAILABLE" }, 503) : reply(route, { fileId, type: "COMPANY_LOGO", url: "/icon.svg" });
+  });
+  await page.route(`${gateway}/companies/${companyId}`, route => {
+    saves++;
+    expect(route.request().postDataJSON()).toMatchObject({ expectedVersion: 7, logo: { fileId } });
+    return saves === 1 ? reply(route, { code: "SERVICE_UNAVAILABLE" }, 503)
+      : reply(route, { ...baseCompany, aggregateVersion: 8, logo: { fileId, url: "/icon.svg" } });
+  });
+  const encoded = await page.evaluate(() => {
+    const canvas = document.createElement("canvas"); canvas.width = 1200; canvas.height = 800;
+    const ctx = canvas.getContext("2d")!; ctx.fillStyle = "#087f46"; ctx.fillRect(600, 400, 600, 400);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await page.getByLabel("File cần tải", { exact: true }).setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: Buffer.from(encoded, "base64") });
+  const uploader = page.locator(".company-media-uploader");
+  await uploader.getByRole("button", { name: "Tải lên và lưu", exact: true }).click();
+  await expect(uploader.getByRole("alert")).toContainText("Tệp đã được gửi");
+  expect([signatures, uploads, confirms, saves]).toEqual([1, 1, 1, 0]);
+  await uploader.getByRole("button", { name: "Tiếp tục tải và lưu" }).click();
+  await expect.poll(() => saves).toBe(1);
+  await expect(uploader.getByRole("button", { name: "Tiếp tục tải và lưu" })).toBeEnabled();
+  expect([signatures, uploads, confirms, saves]).toEqual([1, 1, 2, 1]);
+  await uploader.getByRole("button", { name: "Tiếp tục tải và lưu" }).click();
+  await expect(uploader.getByRole("status")).toHaveText("Đã lưu tệp vào hồ sơ công ty.");
+  expect([signatures, uploads, confirms, saves]).toEqual([1, 1, 2, 2]);
+  expect(sent!.length).toBeLessThanOrEqual(192 * 1024);
+  const alpha = await page.evaluate(async encoded => {
+    const bitmap = await createImageBitmap(await (await fetch(`data:image/webp;base64,${encoded}`)).blob());
+    const canvas = document.createElement("canvas"); canvas.width = bitmap.width; canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d")!; ctx.drawImage(bitmap, 0, 0); bitmap.close();
+    return [ctx.getImageData(0, 0, 1, 1).data[3], ctx.getImageData(canvas.width - 1, canvas.height - 1, 1, 1).data[3]];
+  }, sent!.toString("base64"));
+  expect(alpha).toEqual([0, 255]);
+  await expect(page.getByLabel("File cần tải", { exact: true })).toHaveValue("");
+});
+
+test("company video keeps original bytes throughout the automatic upload flow", async ({ page }) => {
+  await openCompany(page);
+  const fileId = "8795c0de-7908-4ab5-9bed-4c4f1cf9c217";
+  const source = Buffer.from([0, 0, 0, 24, 102, 116, 121, 112, 109, 112, 52, 50]);
+  await page.route(`${gateway}/companies/${companyId}/media/signature`, route => {
+    expect(route.request().postDataJSON()).toEqual({ type: "COMPANY_VIDEO", originalFilename: "intro.mp4" });
+    return reply(route, { fileId, uploadUrl: "https://api.cloudinary.com/v1_1/test/video/upload", apiKey: "key", signature: "sig",
+      expiresAt: new Date(Date.now() + 60000).toISOString(), maxBytes: 50 * 1024 * 1024, allowedFormats: ["mp4"], params: {} });
+  });
+  await page.route("https://api.cloudinary.com/**", async route => {
+    const request = route.request();
+    const form = await new Response(new Uint8Array(request.postDataBuffer()!), { headers: { "content-type": request.headers()["content-type"] } }).formData();
+    expect(Buffer.from(await (form.get("file") as File).arrayBuffer())).toEqual(source);
+    await route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*" }, body: "{}" });
+  });
+  await page.route(`${gateway}/companies/${companyId}/media/confirm`, route => reply(route, { fileId, type: "COMPANY_VIDEO", url: "https://example.vn/video.mp4" }));
+  await page.route(`${gateway}/companies/${companyId}`, route => {
+    expect(route.request().postDataJSON()).toMatchObject({ expectedVersion: 7, media: [{ fileId, type: "VIDEO", sortOrder: 0 }] });
+    return reply(route, { ...baseCompany, aggregateVersion: 8, media: [{ fileId, type: "VIDEO", sortOrder: 0, url: "https://example.vn/video.mp4" }] });
+  });
+  await page.getByLabel("Loại tệp", { exact: true }).selectOption("COMPANY_VIDEO");
+  await page.getByLabel("File cần tải", { exact: true }).setInputFiles({ name: "intro.mp4", mimeType: "video/mp4", buffer: source });
+  await page.locator(".company-media-uploader").getByRole("button", { name: "Tải lên và lưu", exact: true }).click();
+  await expect(page.locator(".company-media-uploader").getByRole("status")).toHaveText("Đã lưu tệp vào hồ sơ công ty.");
+});

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { LoadingState, PageHeader } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { UploadProgress } from "../../../../../components/UploadProgress";
+import type { UploadStep } from "../../../../../lib/signedFileUpload";
 import { ApiClientError, requestApi } from "../../../../../lib/apiClient";
 import { useCurrentAccount } from "../../../../../components/SessionGate";
 import {
@@ -18,6 +20,7 @@ import {
   type BuilderContent,
   type CandidateCv,
   type CandidateProfile,
+  type PersonalUploadCheckpoint,
 } from "../../../../../lib/person1Api";
 const empty: BuilderContent = {
   fullName: "",
@@ -42,8 +45,10 @@ export default function BuilderPage() {
   const [error, setError] = useState("");
   const [preview, setPreview] = useState("");
   const lastPreview = useRef("");
+  const pdfCache = useRef<{ fingerprint: string; blob: Blob } | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const staged = useRef<{ fingerprint: string; fileId: string } | null>(null);
+  const staged = useRef<{ fingerprint: string; file: File; fileId?: string; checkpoint: PersonalUploadCheckpoint | null } | null>(null);
+  const [uploadStep, setUploadStep] = useState<UploadStep | null>(null);
   useEffect(() => {
     if (!account) return;
     const controller = new AbortController();
@@ -88,12 +93,19 @@ export default function BuilderPage() {
   function change(name: keyof Omit<BuilderContent, "sections">, value: string) {
     setContent((c) => ({ ...c, [name]: value }));
   }
+  async function currentPdf(): Promise<Blob> {
+    const fingerprint = JSON.stringify({ content, template });
+    if (pdfCache.current?.fingerprint === fingerprint) return pdfCache.current.blob;
+    const blob = await renderCvPdf(content, template);
+    pdfCache.current = { fingerprint, blob };
+    return blob;
+  }
   async function pdf(download = false) {
     if (pending) return;
     setPending(true);
     setError("");
     try {
-      const blob = await renderCvPdf(content, template);
+      const blob = await currentPdf();
       if (download) saveBlob(blob, "cv.pdf");
       else {
         if (lastPreview.current) URL.revokeObjectURL(lastPreview.current);
@@ -114,19 +126,21 @@ export default function BuilderPage() {
     setPending(true);
     setError("");
     try {
-      const fingerprint = JSON.stringify({ content, template, title });
-      let fileId =
-        staged.current?.fingerprint === fingerprint
-          ? staged.current.fileId
-          : null;
-      if (!fileId) {
-        const blob = await renderCvPdf(content, template);
-        fileId = await uploadPersonalFile(
-          new File([blob], "cv.pdf", { type: "application/pdf" }),
-          "CV",
-        );
-        staged.current = { fingerprint, fileId };
+      // The title is metadata: renaming must not regenerate or resend the PDF.
+      const fingerprint = JSON.stringify({ content, template });
+      if (staged.current?.fingerprint !== fingerprint) {
+        setUploadStep("preparing");
+        const blob = await currentPdf();
+        staged.current = { fingerprint, file: new File([blob], "cv.pdf", { type: "application/pdf" }), checkpoint: null };
       }
+      const attempt = staged.current!;
+      const fileId = attempt.fileId ?? await uploadPersonalFile(attempt.file, "CV", undefined, {
+        checkpoint: attempt.checkpoint,
+        onCheckpoint: value => { attempt.checkpoint = value; },
+        onStep: setUploadStep,
+      });
+      attempt.fileId = fileId;
+      setUploadStep("saving");
       const body = {
         title: title.trim(),
         templateId: template,
@@ -148,6 +162,7 @@ export default function BuilderPage() {
       setError(person1Error(e));
     } finally {
       setPending(false);
+      setUploadStep(null);
     }
   }
   function move(index: number, delta: number) {
@@ -168,6 +183,7 @@ export default function BuilderPage() {
         <LoadingState label="Đang tải nội dung…" />
       ) : (
         <form className="card form-stack" noValidate onSubmit={save}>
+          <UploadProgress step={uploadStep} />
           <fieldset
             disabled={pending || loadFailed}
             className="person1-fieldset form-grid"

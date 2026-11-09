@@ -153,23 +153,24 @@ export class CloudinaryStorageProvider extends StorageProvider {
     const resourceType = RESOURCE_VALUES[locator.resourceType];
     const deliveryType = DELIVERY_VALUES[locator.deliveryType];
 
-    let value: CloudinaryResource | undefined;
-    try {
-      value = (await cloudinary.api.resource(locator.publicId, {
-        resource_type: resourceType,
-        type: deliveryType,
-      })) as unknown as CloudinaryResource;
-    } catch (error) {
-      if (!this.isNotFound(error)) {
-        throw new StorageUnavailableError(
-          'Cloudinary metadata lookup failed',
-        );
-      }
-    }
-
-    const intentAssets = await this.listIntentAssets(
-      locator.contextFileId,
-    );
+    // Independent canonical metadata and sibling scans must both pass, but do
+    // not need to wait for one another over the external network.
+    const [value, intentAssets] = await Promise.all([
+      (async (): Promise<CloudinaryResource | undefined> => {
+        try {
+          return (await cloudinary.api.resource(locator.publicId, {
+            resource_type: resourceType,
+            type: deliveryType,
+          })) as unknown as CloudinaryResource;
+        } catch (error) {
+          if (!this.isNotFound(error)) {
+            throw new StorageUnavailableError('Cloudinary metadata lookup failed');
+          }
+          return undefined;
+        }
+      })(),
+      this.listIntentAssets(locator.contextFileId),
+    ]);
     const hasUnexpectedAsset = intentAssets.some(
       (asset) =>
         this.requiredString(asset.public_id) !== locator.publicId ||
@@ -722,11 +723,13 @@ export class CloudinaryStorageProvider extends StorageProvider {
         chunks.push(chunk);
         size += chunk.length;
         if (chunk.length < next.value.length) {
-          await reader.cancel();
           break;
         }
       }
     } finally {
+      // Some providers ignore Range. Stop the remaining PDF/document body as
+      // soon as the bounded magic sample is available; do not drain megabytes.
+      await reader.cancel().catch(() => undefined);
       reader.releaseLock();
     }
     return Buffer.concat(chunks);
