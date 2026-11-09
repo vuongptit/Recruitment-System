@@ -1,20 +1,4 @@
 
-:root {
-  --surface: #f9f9ff;
-  --surface-1: #ffffff;
-  --surface-2: #f0f3ff;
-  --surface-3: #e7eefe;
-  --line: #dce2f3;
-  --text: #151c27;
-  --muted: #3d4a3d;
-  --primary: #006e2e;
-  --primary-2: #00b14f;
-  --primary-soft: #eaf5ee;
-  --warning: #f59e0b;
-  --danger: #d32f2f;
-  --shadow: 0 4px 18px rgba(21, 28, 39, .04);
-}
-
 * {
   box-sizing: border-box;
 }
@@ -319,12 +303,6 @@ a {
 
 /* CareerHub design layer — mirrors DESIGN.md and the supplied Stitch system. */
 :root {
-  --focus: #00b14f;
-  --info: #2563eb;
-  --warning-soft: #fff7dd;
-  --danger-soft: #fff0ed;
-  --radius-control: 8px;
-  --radius-card: 16px;
   --scroll-track: #eef2f8;
   --scroll-thumb: #a8b8aa;
   --scroll-thumb-hover: #6d7b6c;
@@ -1071,14 +1049,6 @@ body:has(.auth-admin-page) .content-wrap>* { width:100%; }
 @media(max-width:680px) { .auth-recruiter-register-card { padding:26px 22px; } .auth-recruiter-portal .auth-portal-card { padding:26px 22px; } }
 
 /* Workspace geometry and product primitives are shared across every role. */
-:root {
-  --primary-tint: #eaf5ee;
-  --control-height: 46px;
-  --radius-control: 8px;
-  --radius-card: 16px;
-  --workspace-sidebar-width: 248px;
-  --page-gutter: 32px;
-}
 body { background: var(--surface); line-height: 1.6; }
 button, input, select, textarea { font-family: inherit; }
 .topbar { background: var(--surface-1); backdrop-filter: none; }

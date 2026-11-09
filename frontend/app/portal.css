@@ -1,26 +1,48 @@
 /* Portal foundations: local system fonts avoid a blocking third-party request. */
 :root {
   --font-sans: "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --surface: #f5f7f6;
+  --surface: #f4f7f5;
   --surface-1: #fff;
-  --surface-2: #f0f5f2;
-  --surface-3: #e8f0eb;
-  --line: #e2e9e5;
+  --surface-2: #edf3ef;
+  --surface-3: #e3ece6;
+  --line: #d9e4dd;
   --text: #1d3028;
-  --muted: #68796f;
+  --muted: #52645a;
   --primary: #087f46;
-  --primary-2: #06a65a;
+  --primary-2: #087f46;
   --primary-tint: #eaf6ef;
   --primary-soft: #eaf6ef;
-  --radius-card: 14px;
+  --focus: #146c43;
+  --danger: #b42318;
+  --danger-soft: #fff0ee;
+  --warning: #9a6700;
+  --warning-soft: #fff7df;
+  --info: #175cd3;
+  --scroll-track: #eef2f8;
+  --scroll-thumb: #a8b8aa;
+  --scroll-thumb-hover: #6d7b6c;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --control-height: 46px;
+  --control-height-compact: 40px;
+  --radius-control: 8px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --shadow-raised: 0 8px 24px rgb(27 55 39 / 8%);
   --workspace-sidebar-width: 236px;
+  --page-gutter: 32px;
   --shadow: 0 3px 14px rgb(27 55 39 / 3%);
 }
 html { scrollbar-gutter: stable; scroll-padding-top: 88px; }
 body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button, a { touch-action: manipulation; }
-a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #74be96; outline-offset: 3px; }
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .skip-link { position: fixed; left: 16px; top: -100px; z-index: 100; padding: 12px 20px; border-radius: 8px; background: var(--text); color: white; text-decoration: none; }
 .skip-link:focus { top: 12px; }
@@ -91,6 +113,60 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 .portal-boot { display: grid; min-height: 60vh; place-items: center; background: var(--surface); }
 .portal-boot .loading-state { min-height: 140px; }
 .route-error { max-width: 680px; margin: 8vh auto; padding: 36px; }
+
+/* Keep the three portals on one control scale with role-scoped color tokens. */
+:where(button, input, select, textarea) { font: inherit; }
+.btn { min-height: var(--control-height); border-radius: var(--radius-control); font-size: 14px; line-height: 1.4; transition: color .16s ease, background-color .16s ease, border-color .16s ease, box-shadow .16s ease; }
+.btn-primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #066b3b; border-color: #066b3b; }
+.btn-secondary { color: var(--primary); border-color: var(--primary); background: var(--surface-1); }
+.btn-secondary:hover:not(:disabled) { background: var(--primary-tint); }
+.btn:disabled, .btn[aria-disabled="true"] { cursor: not-allowed; opacity: .62; box-shadow: none; }
+.input, .select, .textarea { min-height: var(--control-height); border: 1px solid #aebdb3; border-radius: var(--radius-control); color: var(--text); background: var(--surface-1); }
+.input:hover:not(:disabled), .select:hover:not(:disabled), .textarea:hover:not(:disabled) { border-color: #74877a; }
+.input:focus-visible, .select:focus-visible, .textarea:focus-visible { border-color: var(--focus); box-shadow: 0 0 0 3px rgb(20 108 67 / 16%); outline: 0; }
+.input[aria-invalid="true"], .select[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--danger); }
+.input:disabled, .select:disabled, .textarea:disabled { color: #66766c; background: var(--surface-2); cursor: not-allowed; }
+.label, label.field { color: var(--text); font-size: 14px; font-weight: 600; }
+.help, .status-line, .filter-note, .page-description { color: var(--muted); }
+.card, .panel, .page-section, .toolbar, .metric { border-color: var(--line); background-color: var(--surface-1); box-shadow: var(--shadow); }
+.metric strong { font-variant-numeric: tabular-nums; }
+.table-wrap { border-color: var(--line); border-radius: var(--radius-card); }
+.table-wrap th, .data-table th { color: #43554a; }
+.table-wrap tbody tr:hover, .data-table tbody tr:hover { background: #f7faf8; }
+.workspace-nav-link, .top-nav a, .notification-bell, .company-search-card, .company-job-card { transition-duration: .16s; }
+.company-search-card:hover, .company-job-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-raised); }
+.top-nav a[aria-current="page"] { font-weight: 650; }
+::selection { color: #123a25; background: #ccebd8; }
+.candidate-job-search { display: grid; gap: var(--space-4); }
+.candidate-job-search-primary { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(190px, 1fr) auto; gap: var(--space-3); align-items: end; }
+.candidate-job-search-primary .btn { min-width: 132px; }
+.candidate-job-search-advanced, .job-results-options { border-top: 1px solid var(--line); padding-top: var(--space-3); }
+.candidate-job-search-advanced > summary, .job-results-options > summary { display: flex; min-height: 40px; align-items: center; width: fit-content; color: var(--primary); font-size: 14px; font-weight: 650; cursor: pointer; }
+.candidate-job-search-advanced[open] > summary, .job-results-options[open] > summary { margin-bottom: var(--space-3); }
+.candidate-job-search-advanced .form-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.candidate-job-search-actions { margin-top: var(--space-4); }
+.job-results-options { margin-bottom: var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 4px 16px; background: var(--surface-1); }
+.job-results-options[open] { padding-bottom: 16px; }
+.job-results-options .toolbar { padding: 8px 0 0; border: 0; box-shadow: none; }
+.job-results-options .field { flex: 0 1 220px; }
+
+@media (max-width: 680px) {
+  .btn { min-height: 44px; }
+  .input, .select, .textarea { min-height: 44px; }
+  .page-header { gap: var(--space-3); }
+  .page-action { width: 100%; }
+  .page-action > .btn, .page-action > a { flex: 1 1 auto; }
+  .form-grid, .grid-2 { grid-template-columns: minmax(0, 1fr); }
+  .form-grid > .span-2 { grid-column: auto; }
+  .candidate-job-search-primary, .candidate-job-search-advanced .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .candidate-job-search-primary .btn { width: 100%; }
+  .job-results-options .toolbar { padding-top: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .company-search-card:hover, .company-job-card:hover { transform: none; }
+}
 
 /* Public candidate and employer entries deliberately have separate content. */
 .public-shell { background: #fff; }

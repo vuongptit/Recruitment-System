@@ -8,7 +8,7 @@
   --muted: #627087;
   --line: #e1e7f0;
   --workspace-sidebar-width: 244px;
-  --control-height: 40px;
+  --control-height: 44px;
 }
 .admin-shell .workspace-header {
   position: sticky;
@@ -143,15 +143,15 @@
   font-size: 13px;
 }
 .admin-workspace .btn {
-  min-height: 40px;
-  padding: 8px 13px;
-  font-size: 12px;
-  border-radius: 7px;
+  min-height: 44px;
+  padding: 9px 14px;
+  font-size: 13px;
+  border-radius: 8px;
 }
 .admin-workspace :is(.input, .select, .textarea) {
-  min-height: 40px;
-  border-radius: 7px;
-  font-size: 13px;
+  min-height: 44px;
+  border-radius: 8px;
+  font-size: 14px;
   background: #fff;
   color: var(--text);
 }
@@ -605,7 +605,7 @@
   min-width: 760px;
   border-collapse: collapse;
   text-align: left;
-  font-size: 12px;
+  font-size: 13px;
 }
 .admin-table th {
   background: #f7f9fc;

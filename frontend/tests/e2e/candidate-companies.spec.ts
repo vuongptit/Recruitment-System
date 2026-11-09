@@ -27,7 +27,7 @@ test.beforeAll(async () => {
   // Company profile is rendered on the server. Browser routes cover the client API calls.
   server = createServer((req, res) => {
     res.setHeader("Content-Type", "application/json");
-    if (req.url === `/companies/${companyId}`) res.end(JSON.stringify({ data: company, meta: null }));
+    if (req.url === `/api/companies/${companyId}`) res.end(JSON.stringify({ data: company, meta: null }));
     else res.writeHead(404).end(JSON.stringify({ code: "COMPANY_NOT_FOUND" }));
   });
   await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(4174, "127.0.0.1", resolve); });
