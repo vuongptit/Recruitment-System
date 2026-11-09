@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { LayoutDashboard, Search, Building2, Heart, Files, CalendarDays, UserRound, FileText, Sparkles, MessageSquare, Bell, Settings, WandSparkles } from "lucide-react";
 import { useCurrentAccount } from "./SessionGate";
 import { requestApi } from "../lib/apiClient";
@@ -32,6 +33,8 @@ export function CandidateWorkspace({ children }: { children: ReactNode }) {
 }
 function CandidateWorkspaceContent({ children }: { children: ReactNode }) {
   const account = useCurrentAccount();
+  const pathname = usePathname();
+  const discovery = pathname.startsWith("/candidate/jobs") || pathname.startsWith("/candidate/companies");
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
   useEffect(() => {
     if (account?.role !== "CANDIDATE") { setProfile(null); return; }
@@ -42,5 +45,5 @@ function CandidateWorkspaceContent({ children }: { children: ReactNode }) {
     return () => controller.abort();
   }, [account?.id, account?.role]);
   if (!isDemoPerson2Api && account?.role !== "CANDIDATE") return <PublicShell>{children}</PublicShell>;
-  return <WorkspaceShell role="candidate" title="Ứng viên" navigationLabel="Khu vực ứng viên" links={links} showNavigation name={profile?.fullName || account?.email} avatarUrl={profile?.avatarUrl}>{children}</WorkspaceShell>;
+  return <WorkspaceShell role="candidate" title="Ứng viên" navigationLabel="Khu vực ứng viên" links={links} showNavigation variant={discovery ? "discovery" : "workspace"} name={profile?.fullName || account?.email} avatarUrl={profile?.avatarUrl}>{children}</WorkspaceShell>;
 }

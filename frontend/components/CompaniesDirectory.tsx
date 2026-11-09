@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, BadgeCheck } from "lucide-react";
+import { ArrowRight, BadgeCheck, Building2, MapPin, Search, UsersRound, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { EmptyState, ErrorState, LoadingState, PageHeader } from "@/components/ui";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
+import { CompanyMark } from "./discovery/CompanyMark";
+import styles from "./discovery/Discovery.module.css";
 import { toUserMessage } from "@/lib/apiClient";
 import { mergePublicCompanyPage, shouldLockCompanySearch } from "@/lib/companyPublicSearch";
 import { type PublicCompanySummary, searchPublicCompanies } from "@/lib/person2Api";
@@ -90,36 +92,31 @@ export function CompaniesDirectory({ basePath = "/companies" }: { basePath?: str
   }
 
   return (
-    <main>
-      <PageHeader eyebrow="DOANH NGHIỆP" title="Khám phá doanh nghiệp" description="Tìm các công ty đã được xác minh và xem nơi phù hợp với định hướng của bạn." />
-      <section className="panel">
-        <div className="toolbar">
-          <div className="field search-field">
-            <label className="label" htmlFor="company-search">Tên công ty</label>
-            <input ref={searchRef} id="company-search" className="input" type="search" value={draftQuery} disabled={locked} placeholder="Ví dụ: công nghệ, CareerHub" onCompositionStart={() => setComposing(true)} onCompositionEnd={(event) => { setComposing(false); setDraftQuery(event.currentTarget.value); }} onChange={(event) => setDraftQuery(event.target.value)} />
-            {draftQuery && !locked ? <button className="clear-search" type="button" aria-label="Xóa từ khóa công ty" onClick={() => { setDraftQuery(""); searchRef.current?.focus(); }}>×</button> : null}
-          </div>
-          <div className="field">
-            <label className="label" htmlFor="company-limit">Số kết quả mỗi lần</label>
-            <select id="company-limit" className="select" value={draftLimit} disabled={locked} onChange={(event) => setDraftLimit(Number(event.target.value))}>
-              <option value={10}>10</option><option value={20}>20</option><option value={50}>50</option>
-            </select>
-          </div>
-          {locked ? <button className="btn" type="button" onClick={startNewSearch}>Tìm kiếm mới</button> : null}
+    <main className={styles.page}>
+      <nav className={styles.breadcrumb} aria-label="Đường dẫn"><Link href="/">Trang chủ</Link><span aria-hidden="true">/</span><span>Công ty</span></nav>
+      <section className={styles.directoryHero}>
+        <div><span className={styles.verified}><BadgeCheck size={16} aria-hidden="true" />Kết nối với doanh nghiệp đã xác minh</span><h1>Khám phá doanh nghiệp</h1><p>Tìm hiểu môi trường làm việc, khám phá cơ hội nghề nghiệp và chọn nơi bạn muốn gắn bó.</p>
+          <form className={styles.directorySearch} onSubmit={event => { event.preventDefault(); if (!locked) { setQuery(draftQuery.trim()); setCursor(null); setReloadKey(value => value + 1); } }}>
+            <Search size={20} aria-hidden="true" /><label className="sr-only" htmlFor="company-search">Tên công ty</label>
+            <input ref={searchRef} id="company-search" type="search" value={draftQuery} disabled={locked} placeholder="Nhập tên công ty bạn muốn tìm" onCompositionStart={() => setComposing(true)} onCompositionEnd={(event) => { setComposing(false); setDraftQuery(event.currentTarget.value); }} onChange={(event) => setDraftQuery(event.target.value)} />
+            {draftQuery && !locked ? <button className={styles.clearButton} type="button" aria-label="Xóa từ khóa công ty" onClick={() => { setDraftQuery(""); searchRef.current?.focus(); }}><X size={18} /></button> : null}
+            <button className="btn btn-primary" type="submit" disabled={locked}>Tìm công ty</button>
+          </form>
+          {locked ? <p>Bạn đang xem danh sách đã tải. <button className="btn" type="button" onClick={startNewSearch}>Tìm kiếm mới</button></p> : null}
         </div>
-        <p className="filter-note">Để đổi từ khóa hoặc số lượng sau khi tải thêm, hãy chọn “Tìm kiếm mới”.</p>
+        <Building2 aria-hidden="true" />
       </section>
 
-      <section className="panel company-search-results" aria-busy={loading}>
-        <div className="section-head"><h2>Doanh nghiệp đã xác minh</h2><span className="badge">{companies.length} đã tải</span></div>
+      <section className={`${styles.directoryResults} company-search-results`} aria-busy={loading}>
+        <div className={styles.resultHeader}><div><h2>Doanh nghiệp đã xác minh</h2><p>{query ? `Kết quả cho “${query}” · ` : ""}{companies.length.toLocaleString("vi-VN")} doanh nghiệp đã hiển thị</p></div><div className={styles.sortControl}><label htmlFor="company-limit">Số kết quả mỗi lần</label><select id="company-limit" value={draftLimit} disabled={locked} onChange={(event) => setDraftLimit(Number(event.target.value))}><option value={10}>10 công ty</option><option value={20}>20 công ty</option><option value={50}>50 công ty</option></select></div></div>
         {error ? <ErrorState message={toUserMessage(error)} onRetry={() => setReloadKey((value) => value + 1)} /> : null}
         {loading && companies.length === 0 ? <LoadingState label="Đang tìm công ty" /> : null}
         {!loading && !error && companies.length === 0 ? <EmptyState title="Chưa có công ty phù hợp" description="Thử từ khóa ngắn hơn hoặc xóa bộ lọc để xem tất cả doanh nghiệp." /> : null}
-        <div className="grid-3">
+        <div className={styles.directoryGrid}>
           {companies.map((company) => (
-            <Link className="card company-search-card" href={`${basePath}/${company.id}`} prefetch={false} key={company.id} aria-label={`Xem hồ sơ ${company.name}`}>
-              <div className="company-logo-placeholder" aria-hidden="true">{company.logoUrl ? <img src={company.logoUrl} alt="" width={64} height={64} loading="lazy" decoding="async" /> : company.name.slice(0, 1).toUpperCase()}</div>
-              <div><p className="company-verified"><BadgeCheck size={15} aria-hidden="true" />ĐÃ XÁC MINH</p><h3>{company.name}</h3><p className="help">{company.industry} · {company.size}</p><p>{company.address}</p><span className="text-link">Hồ sơ & việc đang tuyển <ArrowRight size={15} aria-hidden="true" /></span></div>
+            <Link className={`${styles.directoryCard} company-search-card`} href={`${basePath}/${company.id}`} prefetch={false} key={company.id} aria-label={`Xem hồ sơ ${company.name}`}>
+              <div className={styles.directoryCardCover} aria-hidden="true" />
+              <div className={styles.directoryCardBody}><div className={styles.directoryCardIdentity}><CompanyMark name={company.name} src={company.logoUrl} /><span className={styles.verified}><BadgeCheck size={14} aria-hidden="true" />Đã xác minh</span></div><h3>{company.name}</h3><p>{company.industry || "Chưa cập nhật lĩnh vực"}</p><p><UsersRound size={14} aria-hidden="true" />{company.size || "Chưa cập nhật quy mô"}</p><p><MapPin size={14} aria-hidden="true" />{company.address || "Chưa cập nhật địa chỉ"}</p><div className={styles.directoryCardFooter}>Hồ sơ & việc đang tuyển <ArrowRight size={17} aria-hidden="true" /></div></div>
             </Link>
           ))}
         </div>

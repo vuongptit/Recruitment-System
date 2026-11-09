@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { EmptyState, PageHeader } from "@/components/ui";
+import { BadgeCheck, Building2, ExternalLink, Globe, MapPin, ShieldCheck, UsersRound, FileText, CalendarDays } from "lucide-react";
+import { EmptyState } from "@/components/ui";
 import { ApiClientError, toUserMessage } from "@/lib/apiClient";
-import { companyLogoFallback, orderPublicCompanyMedia } from "@/lib/companyPublicProfile";
+import { orderPublicCompanyMedia } from "@/lib/companyPublicProfile";
 import { getPublicCompany } from "@/lib/person2Api";
 import { CompanyJobs } from "./CompanyJobs";
 import { PortalReportLink } from "@/components/PortalReportLink";
+import { CompanyMark } from "./discovery/CompanyMark";
+import styles from "./discovery/Discovery.module.css";
 
 function CompanyNotFound({ basePath }: { basePath: string }) {
   return (
@@ -49,41 +52,32 @@ export async function CompanyProfile({ companyId, basePath = "/companies" }: { c
 
   const website = safeWebsite(company.website);
   const media = orderPublicCompanyMedia(company.media);
+  const cover = media.find(item => item.type === "IMAGE");
+  const updatedDate = new Date(company.updatedAt);
+  const updatedLabel = Number.isNaN(updatedDate.getTime()) ? "Chưa cập nhật" : new Intl.DateTimeFormat("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" }).format(updatedDate);
 
   return (
-    <main>
-      <PageHeader eyebrow="DOANH NGHIỆP" title={company.name} description={company.description} action={<PortalReportLink targetId={company.id} />} />
-
-      <section className="panel company-public-hero">
-        <div className="company-public-logo">
-          {company.logoUrl ? <img src={company.logoUrl} decoding="async" width={96} height={96} alt={`Logo ${company.name}`} /> : <span aria-hidden="true">{companyLogoFallback(company.name)}</span>}
+    <main className={styles.page}>
+      <nav className={styles.breadcrumb} aria-label="Đường dẫn"><Link href="/">Trang chủ</Link><span aria-hidden="true">/</span><Link href={basePath}>Công ty</Link><span aria-hidden="true">/</span><span>{company.name}</span></nav>
+      <section className={styles.companyHero}>
+        <div className={`${styles.companyCover} ${cover ? "" : styles.companyCoverFallback}`} aria-hidden="true">{cover ? <img src={cover.url} alt="" width={1240} height={300} decoding="async" /> : <Building2 />}</div>
+        <div className={styles.companyHeroBody}>
+          <CompanyMark name={company.name} src={company.logoUrl} large />
+          <div className={styles.companyHeroText}><span className={styles.verified}><BadgeCheck size={16} aria-hidden="true" />Doanh nghiệp đã xác minh</span><h1>{company.name}</h1><div className={styles.meta}>{company.industry ? <span><Building2 size={15} />{company.industry}</span> : null}{company.size ? <span><UsersRound size={15} />{company.size} nhân sự</span> : null}</div></div>
+          <div className={styles.companyHeroActions}><a className="btn btn-primary" href="#company-jobs">Xem việc đang tuyển</a>{website ? <a className="btn" href={website} target="_blank" rel="noreferrer">Mở website <ExternalLink size={15} aria-hidden="true" /></a> : null}</div>
         </div>
-        <div>
-          <p className="eyebrow">DOANH NGHIỆP ĐÃ XÁC MINH</p>
-          <h2>{company.industry}</h2>
-          <p>{company.address}</p>
-          <div className="btn-group">
-            <a className="btn btn-primary" href="#company-jobs">Xem việc đang tuyển</a>
-            {website ? <a className="btn btn-secondary" href={website} target="_blank" rel="noreferrer">Mở website</a> : null}
-            <Link className="btn" href={basePath}>Quay về danh sách</Link>
-          </div>
-        </div>
+        <nav className={styles.sectionNav} aria-label="Nội dung hồ sơ công ty"><a href="#company-introduction">Giới thiệu</a><a href="#company-jobs">Tuyển dụng</a><a href="#company-gallery">Hình ảnh</a></nav>
       </section>
-
-      <section className="grid-3 company-public-facts" aria-label="Thông tin doanh nghiệp">
-        <div className="stat"><strong>Quy mô</strong><p>{company.size}</p></div>
-        <div className="stat"><strong>Mã số thuế</strong><p>{company.taxCode}</p></div>
-        <div className="stat"><strong>Cập nhật</strong><p>{new Date(company.updatedAt).toLocaleDateString("vi-VN")}</p></div>
-      </section>
-
-      <CompanyJobs key={company.id} companyId={company.id} companyName={company.name} />
-
-      <section className="panel">
-        <div className="section-head"><div><p className="eyebrow">KHÔNG GIAN LÀM VIỆC</p><h2>Hình ảnh doanh nghiệp</h2></div><span className="badge">{media.length} ảnh và video</span></div>
+      <div className={styles.contentColumns}>
+        <div className={styles.mainColumn}>
+          <section className={styles.section} id="company-introduction"><h2 className={styles.sectionTitle}>Giới thiệu công ty</h2><div className={styles.prose}><p>{company.description || "Doanh nghiệp chưa cập nhật phần giới thiệu."}</p></div></section>
+          <CompanyJobs key={company.id} companyId={company.id} companyName={company.name} />
+      <section className={styles.section} id="company-gallery">
+        <div className={styles.sectionTitle}><h2>Hình ảnh doanh nghiệp</h2><span>{media.length} ảnh và video</span></div>
         {media.length === 0 ? (
           <EmptyState title="Chưa có hình ảnh công khai" description="Doanh nghiệp chưa bổ sung hình ảnh. Hãy quay lại sau để khám phá môi trường làm việc." />
         ) : (
-          <div className="company-public-media">
+          <div className={styles.mediaGrid}>
             {media.map((item, index) => item.type === "VIDEO" ? (
               <video key={`${item.url}-${index}`} controls preload="metadata" aria-label={`Video giới thiệu ${company.name}`}><source src={item.url} /></video>
             ) : (
@@ -91,8 +85,21 @@ export async function CompanyProfile({ companyId, basePath = "/companies" }: { c
             ))}
           </div>
         )}
-        <p className="filter-note">Hình ảnh và video mới có thể cần một chút thời gian xử lý trước khi xuất hiện.</p>
       </section>
+        </div>
+        <aside className={styles.sideColumn} aria-label="Thông tin doanh nghiệp">
+          <section className={styles.section}><h2>Thông tin chung</h2><dl className={styles.factsList}>
+            <div className={styles.fact}><Building2 size={19} aria-hidden="true" /><div><dt>Lĩnh vực hoạt động</dt><dd>{company.industry || "Chưa cập nhật"}</dd></div></div>
+            <div className={styles.fact}><UsersRound size={19} aria-hidden="true" /><div><dt>Quy mô công ty</dt><dd>{company.size || "Chưa cập nhật"}</dd></div></div>
+            <div className={styles.fact}><FileText size={19} aria-hidden="true" /><div><dt>Mã số thuế</dt><dd>{company.taxCode || "Chưa cập nhật"}</dd></div></div>
+            {website ? <div className={styles.fact}><Globe size={19} aria-hidden="true" /><div><dt>Website</dt><dd><a href={website} target="_blank" rel="noreferrer">{new URL(website).hostname}</a></dd></div></div> : null}
+            <div className={styles.fact}><CalendarDays size={19} aria-hidden="true" /><div><dt>Cập nhật hồ sơ</dt><dd>{updatedLabel}</dd></div></div>
+          </dl></section>
+          <section className={styles.section}><h2>Địa chỉ công ty</h2><div className={styles.fact}><MapPin size={20} aria-hidden="true" /><span>{company.address || "Doanh nghiệp chưa cập nhật địa chỉ."}</span></div></section>
+          <div className={styles.sideHint}><ShieldCheck size={23} aria-hidden="true" /><strong>Thông tin minh bạch, tìm việc an tâm</strong><p>Hồ sơ doanh nghiệp đã được xác minh trên CareerHub. Hãy kiểm tra kỹ nội dung tin trước khi ứng tuyển.</p><PortalReportLink targetId={company.id} /></div>
+          <Link className="btn" href={basePath}>Quay về danh sách</Link>
+        </aside>
+      </div>
     </main>
   );
 }

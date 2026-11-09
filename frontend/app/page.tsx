@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, Search, MapPin, FileText, BriefcaseBusiness, Building2, Compass, Check, Code2, ChartNoAxesCombined, Palette, Headphones } from "lucide-react";
+import { ArrowRight, Search, FileText, BriefcaseBusiness, Building2, Compass, Check, Code2, ChartNoAxesCombined, Palette, Headphones } from "lucide-react";
+import { HomeJobSearch } from "@/components/discovery/HomeJobSearch";
 import { PublicShell } from "@/components/PublicShell";
 import { PortalEntry } from "@/components/PortalEntry";
 import { FeaturedJobs } from "@/components/FeaturedJobs";
@@ -22,11 +23,7 @@ export default function HomePage() {
       <div className="discovery-copy"><span className="hero-pill"><span />Mỗi bước đi, gần hơn với cơ hội phù hợp</span>
         <h1 id="discovery-title">Công việc phù hợp.<br /><em>Tương lai bạn chọn.</em></h1>
         <p>Khám phá cơ hội mới, tạo hồ sơ ấn tượng và kết nối với nơi bạn thuộc về.</p>
-        <form action="/candidate/jobs" className="hero-search" role="search" aria-label="Tìm kiếm việc làm">
-          <label><Search size={20} aria-hidden="true" /><span className="sr-only">Vị trí hoặc kỹ năng</span><input name="q" placeholder="Vị trí, kỹ năng hoặc từ khóa…" maxLength={200} /></label>
-          <label className="hero-location"><MapPin size={19} aria-hidden="true" /><span className="sr-only">Địa điểm làm việc</span><select name="location" defaultValue=""><option value="">Tất cả địa điểm</option><option>Hà Nội</option><option>Hồ Chí Minh</option><option>Đà Nẵng</option></select></label>
-          <button className="btn btn-primary" type="submit">Tìm việc <ArrowRight size={17} aria-hidden="true" /></button>
-        </form>
+        <HomeJobSearch />
         <div className="popular-searches"><span>Thử tìm:</span>{["Developer", "Marketing", "Kế toán"].map(q => <Link prefetch={false} key={q} href={`/candidate/jobs?q=${encodeURIComponent(q)}`}>{q}</Link>)}</div>
       </div>
       <aside className="career-preview" aria-label="Hành trình nghề nghiệp">

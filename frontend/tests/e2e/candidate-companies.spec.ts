@@ -45,6 +45,9 @@ async function setup(page: Page, role: "CANDIDATE" | "RECRUITER" | null = "CANDI
   await page.route(api + "/profile/" + userId, route => reply(route, { userId, fullName: "Ứng viên thử nghiệm" }));
   await page.route(api + "/notifications/unread-count", route => reply(route, { unread_count: 0 }));
   await page.route(api + "/companies/search**", route => reply(route, [company], 200, { hasMore: false, nextCursor: null }));
+  await page.route(api + "/companies/" + companyId, route => reply(route, company));
+  await page.route(api + "/applications/bookmarks", route => reply(route, []));
+  await page.route(api + "/profile/cvs", route => reply(route, []));
   await page.route(api + "/jobs/search**", route => reply(route, jobsPage()));
   await page.route(api + "/jobs/" + jobId, route => reply(route, job));
   await page.route(api + "/jobs/recommended**", route => reply(route, { items: [], hasMore: false, nextCursor: null }));
@@ -63,6 +66,7 @@ test("candidate directory opens verified profile, its jobs and back without leav
   await expect(page.locator(".workspace-navigation").getByRole("link", { name: "Công ty", exact: true })).toHaveAttribute("aria-current", "page");
   const close = page.getByRole("button", { name: "Đóng menu", exact: true });
   if (await close.isVisible()) await close.click();
+  await page.screenshot({ path: info.outputPath("company-directory.png"), fullPage: true, animations: "disabled" });
   await page.getByRole("link", { name: `Xem hồ sơ ${company.name}` }).click();
   await expect(page).toHaveURL(new RegExp(`/candidate/companies/${companyId}$`));
   await expect(page.getByRole("heading", { level: 1, name: company.name })).toBeVisible();
@@ -79,6 +83,8 @@ test("candidate directory opens verified profile, its jobs and back without leav
   await expect(page).toHaveURL(new RegExp(`/candidate/jobs/${jobId}\\?source=COMPANY_PAGE$`));
   await expect(page.getByRole("heading", { level: 1, name: job.title })).toBeVisible();
   await expect(page.locator(".workspace-header")).toHaveCount(1);
+  await fits(page);
+  await page.screenshot({ path: info.outputPath("job-detail.png"), fullPage: true, animations: "disabled" });
   await page.getByRole("link", { name: "Xem công ty", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: company.name })).toBeVisible();
   await page.getByRole("link", { name: "Quay về danh sách", exact: true }).click();

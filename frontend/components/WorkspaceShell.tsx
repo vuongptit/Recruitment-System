@@ -14,6 +14,7 @@ const WorkspaceContext = createContext(false);
 export function WorkspaceShell(props: {
   children: ReactNode; role: "candidate" | "recruiter" | "admin"; title: string;
   navigationLabel: string; links: WorkspaceLink[]; showNavigation: boolean;
+  variant?: "workspace" | "discovery";
   name?: string; avatarUrl?: string | null;
 }) {
   const nested = useContext(WorkspaceContext);
@@ -21,7 +22,7 @@ export function WorkspaceShell(props: {
   return <WorkspaceContext.Provider value={true}><WorkspaceContent {...props} /></WorkspaceContext.Provider>;
 }
 
-function WorkspaceContent({ children, role, title, navigationLabel, links, showNavigation, name, avatarUrl }: Parameters<typeof WorkspaceShell>[0]) {
+function WorkspaceContent({ children, role, title, navigationLabel, links, showNavigation, name, avatarUrl, variant = "workspace" }: Parameters<typeof WorkspaceShell>[0]) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -50,7 +51,7 @@ function WorkspaceContent({ children, role, title, navigationLabel, links, showN
     return () => { window.removeEventListener("keydown", close); document.body.style.overflow = previousOverflow; };
   }, [menuOpen]);
   const initials = (name || title).split(/[\s@.]+/).filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join("");
-  return <div data-portal={role} className={`app-shell workspace-shell ${role === "candidate" ? "candidate-workspace" : `${role}-shell`} ${menuOpen ? "workspace-menu-open" : ""}`}>
+  return <div data-portal={role} className={`app-shell workspace-shell ${role === "candidate" ? "candidate-workspace" : `${role}-shell`} ${variant === "discovery" ? "workspace-discovery" : ""} ${menuOpen ? "workspace-menu-open" : ""}`}>
     <a className="skip-link" href="#workspace-content">Bỏ qua điều hướng</a>
     <header className="topbar workspace-header"><div className="topbar-inner">
       {showNavigation && <button ref={menuButton} type="button" className="workspace-menu-button notification-bell" aria-label={menuOpen ? "Đóng menu" : "Mở menu"} aria-expanded={menuOpen} aria-controls="workspace-sidebar" onClick={() => setMenuOpen(open => !open)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>}

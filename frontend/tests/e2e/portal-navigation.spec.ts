@@ -54,7 +54,7 @@ for (const role of ["CANDIDATE","RECRUITER","ADMIN"] as const) {
     await expect(page.getByRole('heading',{name:'Thông báo',exact:true})).toBeVisible();
     await expect(page.locator('.workspace-header')).toHaveCount(1);
     await page.getByRole('link',{name:'CareerHub - Trang chủ'}).click();
-    await expect(page).toHaveURL(origin+homes[role]);
+    await expect.poll(() => new URL(page.url()).pathname).toBe(homes[role]);
     await fits(page);
     await page.screenshot({path:info.outputPath('portal-'+role.toLowerCase()+'.png'),fullPage:true,animations:'disabled'});
   });

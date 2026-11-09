@@ -9,6 +9,7 @@
     "outDir": ".test-dist"
   },
   "include": [
+    "lib/locations.test.ts",
     "lib/apiRoutes.test.ts",
     "lib/chatIdentity.test.ts",
     "types/pdfmake.d.ts",

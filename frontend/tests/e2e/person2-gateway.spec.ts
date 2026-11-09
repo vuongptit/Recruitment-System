@@ -27,11 +27,15 @@ function json(route: Route, body: unknown, status = 200) {
 
 
 async function login(page: Page, role: "CANDIDATE" | "RECRUITER", returnTo: string) {
-  await page.route(`${gatewayOrigin}/auth-cookie/login`, (route) => json(route, {
+  let signedIn = false;
+  const account = { id: "5795c0de-7908-4ab5-9bed-4c4f1cf9c214", email: "test@example.test", role };
+  await page.route(`${gatewayOrigin}/profile/${account.id}`, route => json(route, { data: { userId: account.id, fullName: "Ứng viên kiểm thử" }, meta: null }));
+  await page.route(`${gatewayOrigin}/auth/me`, route => signedIn ? json(route, { data: account, meta: null }) : json(route, { code: "AUTH_INVALID" }, 401));
+  await page.route(`${gatewayOrigin}/auth-cookie/login`, (route) => { signedIn = true; return json(route, {
     data: {
       user: { id: "5795c0de-7908-4ab5-9bed-4c4f1cf9c214", email: "test@example.test", role },
     }, meta: null,
-  }));
+  }); });
   await page.goto(`${role === "RECRUITER" ? "/recruiter/login" : "/login"}?returnTo=${encodeURIComponent(returnTo)}`);
   await page.getByLabel(role === "RECRUITER" ? "Email công việc" : "Email", { exact: true }).fill("test@example.test");
   await page.getByLabel("Mật khẩu", { exact: true }).fill("fixture-password");
@@ -149,9 +153,9 @@ test("Job search and recommendations preserve their distinct Gateway contracts",
 
   await login(page, "CANDIDATE", "/candidate/jobs");
 
-  await expect(page.getByRole("heading", { name: "Việc làm công khai" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tìm việc làm phù hợp với bạn" })).toBeVisible();
   await expect(page.getByText("Backend Engineer", { exact: true })).toHaveCount(2);
-  await expect(page.getByText(/Nguồn dữ liệu: Chỉ mục tìm kiếm —/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Danh sách việc làm" })).toBeVisible();
   await expect(page.getByText("AI theo CV", { exact: true })).toBeVisible();
   expect(searchQueries.length).toBeGreaterThanOrEqual(1);
   expect(recommendationQueries.length).toBeGreaterThanOrEqual(1);

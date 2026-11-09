@@ -50,9 +50,10 @@ test("anonymous public job detail loads without any private recommendation reque
   let privateReads = 0;
   await page.route(`${gateway}/jobs/recommended**`, (route) => { privateReads += 1; return reply(route, { code: "UNAUTHORIZED" }, 401); });
   await page.route(`${gateway}/jobs/${jobId}`, (route) => reply(route, job));
+  await page.route(`${gateway}/companies/${companyId}`, (route) => reply(route, { code: "COMPANY_NOT_FOUND" }, 404));
   await page.goto(`/candidate/jobs/${jobId}`);
   await expect(page.getByRole("heading", { name: job.title, exact: true })).toBeVisible();
-  await expect(page.getByText("1.200 USD – 2.400 USD", { exact: true })).toBeVisible();
+  await expect(page.getByText("1.200 – 2.400 USD", { exact: true }).first()).toBeVisible();
   await expect(page.getByText("Làm việc từ xa", { exact: true })).toBeVisible();
   expect(privateReads).toBe(0);
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);

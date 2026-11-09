@@ -1,0 +1,7 @@
+{
+  "source": "https://provinces.open-api.vn/api/v2/?depth=2",
+  "retrievedAt": "2026-11-09T14:03:08.818Z",
+  "model": "province-ward",
+  "provinceCount": 34,
+  "wardCount": 3321
+}

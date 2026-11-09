@@ -93,9 +93,9 @@ test("Homepage directs visitors into job discovery and the recruiter portal", as
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Công việc phù hợp");
   await noPageOverflow(page);
   await page.evaluate(() => document.fonts.ready);
-  await page.screenshot({ path: `/tmp/recruitment-ui-after-home-${info.project.name}.png`, fullPage: true });
+  await page.screenshot({ path: info.outputPath("home.png"), fullPage: true });
   await page.getByRole("button", { name: "Tìm việc", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Việc làm công khai" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tìm việc làm phù hợp với bạn" })).toBeVisible();
   await expect(page.locator(".workspace-sidebar")).toHaveCount(0);
   await page.getByRole("link", { name: "CareerHub - Trang chủ" }).click();
   await page.locator(".public-footer").getByRole("link", { name: "Nhà tuyển dụng", exact: true }).click();
