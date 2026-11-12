@@ -100,13 +100,47 @@ func mapApplicationEvent(event model.ApplicationEvent) *notificationDraft {
 // mapInterviewEvent converts an InterviewEvent into notification drafts.
 // Returns nil when no notification should be created.
 func mapInterviewEvent(event model.InterviewEvent) *notificationDraft {
-	// Don't notify if the actor is the candidate
+	var recipientIDStr string
 	if event.ActorID == event.CandidateID {
+		recipientIDStr = event.InterviewerID
+	} else {
+		recipientIDStr = event.CandidateID
+	}
+
+	if recipientIDStr == "" || recipientIDStr == event.ActorID {
 		return nil
 	}
 
-	candidateID, err := uuid.Parse(event.CandidateID)
+	recipientID, err := uuid.Parse(recipientIDStr)
 	if err != nil {
+		return nil
+	}
+
+	title := "Interview scheduled"
+	body := "A new interview has been scheduled. Open the app for details."
+	switch event.Action {
+	case "CONFIRMED":
+		title = "Ứng viên đã xác nhận lịch phỏng vấn"
+		body = fmt.Sprintf("Ứng viên đã xác nhận tham gia phỏng vấn vòng %d.", event.RoundNumber)
+	case "RESCHEDULE_REQUESTED":
+		title = "Ứng viên đề nghị dời lịch phỏng vấn"
+		body = fmt.Sprintf("Ứng viên đã gửi yêu cầu xin dời lịch phỏng vấn vòng %d.", event.RoundNumber)
+	case "RESCHEDULED":
+		title = "Lịch phỏng vấn đã được cập nhật"
+		body = fmt.Sprintf("Nhà tuyển dụng đã cập nhật thời gian mới cho phỏng vấn vòng %d.", event.RoundNumber)
+	case "CANCELLED":
+		title = "Lịch phỏng vấn đã bị hủy"
+		body = fmt.Sprintf("Buổi phỏng vấn vòng %d đã bị hủy.", event.RoundNumber)
+	case "REMINDER":
+		title = "Nhắc lịch phỏng vấn sắp diễn ra"
+		body = fmt.Sprintf("Bạn có lịch phỏng vấn vòng %d trong 24 giờ tới. Vui lòng xác nhận tham gia.", event.RoundNumber)
+	case "COMPLETED":
+		title = "Hoàn thành phỏng vấn"
+		body = fmt.Sprintf("Buổi phỏng vấn vòng %d đã hoàn tất.", event.RoundNumber)
+	case "NO_SHOW":
+		title = "Vắng mặt buổi phỏng vấn"
+		body = fmt.Sprintf("Buổi phỏng vấn vòng %d được ghi nhận vắng mặt.", event.RoundNumber)
+	case "IN_PROGRESS":
 		return nil
 	}
 
@@ -121,10 +155,10 @@ func mapInterviewEvent(event model.InterviewEvent) *notificationDraft {
 	metadataJSON, _ := json.Marshal(metadata)
 
 	return &notificationDraft{
-		UserID:   candidateID,
+		UserID:   recipientID,
 		Type:     model.TypeInterviewScheduled,
-		Title:    "Interview scheduled",
-		Body:     "A new interview has been scheduled. Open the app for details.",
+		Title:    title,
+		Body:     body,
 		Metadata: metadataJSON,
 	}
 }

@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { interviewStartGmt7, scheduleInterview } from "./interviewApi";
+import {
+  confirmInterview,
+  interviewStartGmt7,
+  joinInterviewRoom,
+  requestRescheduleInterview,
+  scheduleInterview,
+  schedulingRequestIdentity,
+  submitInterviewFeedback,
+} from "./interviewApi";
+import { listChatMessages, mergeConversationMessages, parseCallMessage, sendChatMessage, type ChatMessage } from "./chatApi";
+import { mergeNotifications, notificationDestination } from "./notificationState";
 
 test("interview local time preserves GMT+7 regardless of browser or host timezone", () => {
   assert.equal(interviewStartGmt7("2027-01-15T09:30"), "2027-01-15T09:30:00+07:00");
@@ -23,23 +33,104 @@ test("an ambiguous scheduling failure sends one mutation with its stable request
   };
   try {
     await assert.rejects(scheduleInterview({
-      applicationId: "2795c0de-7908-4ab5-9bed-4c4f1cf9c211", requestId: "1795c0de-7908-4ab5-9bed-4c4f1cf9c211",
-      roundNumber: 1, scheduledStart: "2027-01-15T09:30:00+07:00", timeZone: "Asia/Ho_Chi_Minh",
-      durationMinutes: 45, mode: "OFFLINE", location: "Office", notes: null,
+      applicationId: "2795c0de-7908-4ab5-9bed-4c4f1cf9c211",
+      requestId: "1795c0de-7908-4ab5-9bed-4c4f1cf9c211",
+      roundNumber: 1,
+      scheduledStart: "2027-01-15T09:30:00+07:00",
+      timeZone: "Asia/Ho_Chi_Minh",
+      durationMinutes: 45,
+      mode: "OFFLINE",
+      location: "Office",
+      notes: null,
     }));
     assert.equal(writes, 1);
-  } finally { globalThis.fetch = previousFetch; delete process.env.NEXT_PUBLIC_API_BASE_URL; }
+  } finally {
+    globalThis.fetch = previousFetch;
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
 });
 
-import { schedulingRequestIdentity } from "./interviewApi";
-import { listChatMessages, mergeConversationMessages, parseCallMessage, sendChatMessage, type ChatMessage } from "./chatApi";
-import { mergeNotifications, notificationDestination } from "./notificationState";
-
 test("a changed interview draft gets a new request identity while an unchanged retry retains its id", () => {
-  const payload = { applicationId: "application", roundNumber: 1, scheduledStart: "2027-01-15T09:30:00+07:00", timeZone: "Asia/Ho_Chi_Minh" as const, durationMinutes: 45, mode: "OFFLINE" as const, location: "Room A", notes: null };
+  const payload = {
+    applicationId: "application",
+    roundNumber: 1,
+    scheduledStart: "2027-01-15T09:30:00+07:00",
+    timeZone: "Asia/Ho_Chi_Minh" as const,
+    durationMinutes: 45,
+    mode: "OFFLINE" as const,
+    location: "Room A",
+    notes: null,
+  };
   const first = schedulingRequestIdentity(null, payload, () => "request-one");
   assert.equal(schedulingRequestIdentity(first, { ...payload }, () => "unused"), first);
   assert.equal(schedulingRequestIdentity(first, { ...payload, location: "Room B" }, () => "request-two").id, "request-two");
+});
+
+test("interview lifecycle endpoints call confirm, reschedule, join, and feedback routes", async () => {
+  process.env.NEXT_PUBLIC_API_BASE_URL = "http://gateway.test";
+  const previousFetch = globalThis.fetch;
+  const calls: { method: string; url: string }[] = [];
+  globalThis.fetch = async (url, options) => {
+    const method = String(options?.method ?? "GET");
+    const urlStr = String(url);
+    calls.push({ method, url: urlStr });
+    if (urlStr.endsWith("/join")) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            token: "lk-token",
+            livekit_url: "ws://localhost:7880",
+            room_name: "interview-room",
+            room_url: "/interviews/iv-1/room",
+            interview: { id: "iv-1", status: "IN_PROGRESS" },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    if (urlStr.endsWith("/feedback")) {
+      return new Response(
+        JSON.stringify({
+          data: {
+            id: "fb-1",
+            interviewId: "iv-1",
+            overallScore: 8.5,
+            conclusion: "PASS",
+            suggestedApplicationAction: "OFFER",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    return new Response(
+      JSON.stringify({ data: { id: "iv-1", status: "CONFIRMED" } }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  };
+  try {
+    const cRes = await confirmInterview("iv-1");
+    assert.equal(cRes.data.status, "CONFIRMED");
+
+    await requestRescheduleInterview("iv-1", {
+      reason: "Busy",
+      preferredSlots: ["2027-01-16T09:00:00+07:00", "2027-01-16T14:00:00+07:00"],
+    });
+
+    const jRes = await joinInterviewRoom("iv-1", { display_name: "Test User" });
+    assert.equal(jRes.data.token, "lk-token");
+
+    const fRes = await submitInterviewFeedback("iv-1", {
+      criteriaScores: { technical: 9, communication: 8, attitude: 9, cultureFit: 8 },
+      overallScore: 8.5,
+      comment: "Great",
+      conclusion: "PASS",
+    });
+    assert.equal(fRes.data.conclusion, "PASS");
+    assert.equal(calls.length, 4);
+  } finally {
+    globalThis.fetch = previousFetch;
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
 });
 
 test("chat messages remain conversation-scoped and deduplicate a repeated HTTP/socket delivery", () => {

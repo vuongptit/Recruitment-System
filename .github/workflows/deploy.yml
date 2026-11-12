@@ -5,6 +5,7 @@ on:
     tags:
       - 'v*'
       - 'go-v*'
+      - 'interview-v*'
       - 'chat-v*'
       - 'notification-v*'
       - 'video-v*'
@@ -68,6 +69,8 @@ jobs:
           if [ -z "$TARGET" ]; then
             if [[ "$REF_NAME" =~ ^go-v ]]; then
               TARGET="go-services"
+            elif [[ "$REF_NAME" =~ ^interview-v ]]; then
+              TARGET="interview-service"
             elif [[ "$REF_NAME" =~ ^chat-v ]]; then
               TARGET="chat-service"
             elif [[ "$REF_NAME" =~ ^notification-v ]]; then
@@ -135,8 +138,11 @@ jobs:
             FILTERED="$CATALOG"
             SERVICES=""
           elif [ "$TARGET" = "go-services" ]; then
-            FILTERED=$(echo "$CATALOG" | jq -c '[.[] | select(.name == "chat-service" or .name == "notification-service" or .name == "video-service")]')
-            SERVICES="chat-service notification-service video-service"
+            FILTERED=$(echo "$CATALOG" | jq -c '[.[] | select(.name == "chat-service" or .name == "notification-service" or .name == "video-service" or .name == "interview-service")]')
+            SERVICES="chat-service notification-service video-service interview-service"
+          elif [ "$TARGET" = "interview-service" ]; then
+            FILTERED=$(echo "$CATALOG" | jq -c '[.[] | select(.name == "interview-service" or .name == "notification-service" or .name == "frontend")]')
+            SERVICES="interview-service notification-service frontend"
           else
             FILTERED=$(echo "$CATALOG" | jq -c --arg tgt "$TARGET" '[.[] | select(.group == $tgt)]')
             SERVICES=$(echo "$FILTERED" | jq -r '.[].compose' | tr '\n' ' ' | xargs)

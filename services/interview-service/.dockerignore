@@ -1,3 +1,6 @@
+.git
 .env
-target
-*.log
+*.test
+*.out
+coverage.txt
+README.md
