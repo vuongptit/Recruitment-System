@@ -135,4 +135,3 @@ func TestCanonicalAccessToken(t *testing.T) {
 		})
 	}
 }
-

@@ -789,13 +789,12 @@ func (r *InterviewRepository) MarkNoShowsBatch(ctx context.Context, topic string
 			LIMIT $2
 			FOR UPDATE SKIP LOCKED
 		)
-		UPDATE interviews target
+		UPDATE interviews
 		SET status = 'NO_SHOW',
-		    updated_at = GREATEST($1, target.created_at),
-		    version = target.version + 1
-		FROM due
-		WHERE target.id = due.id
-		RETURNING ` + prefixColumns("target", interviewSelectColumns)
+		    updated_at = GREATEST($1, created_at),
+		    version = version + 1
+		WHERE id IN (SELECT id FROM due)
+		RETURNING ` + interviewSelectColumns
 
 	rows, err := tx.Query(ctx, sql, nowUTC, batchSize)
 	if err != nil {
@@ -849,13 +848,12 @@ func (r *InterviewRepository) SendRemindersBatch(ctx context.Context, topic stri
 			LIMIT $3
 			FOR UPDATE SKIP LOCKED
 		)
-		UPDATE interviews target
+		UPDATE interviews
 		SET reminder_sent_at = $1,
-		    updated_at = GREATEST($1, target.created_at),
-		    version = target.version + 1
-		FROM due
-		WHERE target.id = due.id
-		RETURNING ` + prefixColumns("target", interviewSelectColumns)
+		    updated_at = GREATEST($1, created_at),
+		    version = version + 1
+		WHERE id IN (SELECT id FROM due)
+		RETURNING ` + interviewSelectColumns
 
 	rows, err := tx.Query(ctx, sql, nowUTC, horizonUTC, batchSize)
 	if err != nil {
@@ -919,20 +917,6 @@ func suggestedActionForConclusion(c model.FeedbackConclusion) string {
 	default:
 		return "REVIEWING"
 	}
-}
-
-func prefixColumns(alias, cols string) string {
-	parts := strings.Split(cols, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		trimmed := strings.TrimSpace(p)
-		if strings.HasPrefix(trimmed, "COALESCE(") {
-			out = append(out, strings.Replace(trimmed, "reschedule_preferred_slots", alias+".reschedule_preferred_slots", 1))
-		} else {
-			out = append(out, alias+"."+trimmed)
-		}
-	}
-	return strings.Join(out, ", ")
 }
 
 func isRequestUniqueConflict(pgErr *pgconn.PgError) bool {

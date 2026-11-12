@@ -167,4 +167,3 @@ func parsePathUUID(r *http.Request, param string) (uuid.UUID, error) {
 	}
 	return parsed, nil
 }
-

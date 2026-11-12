@@ -229,4 +229,3 @@ func sanitizeIdentifier(s string, maxLen int) string {
 	}
 	return res
 }
-

@@ -100,7 +100,7 @@ jobs:
           if [ -n "$CUSTOM_TAG" ]; then
             TAG="$CUSTOM_TAG"
           elif [[ "$REF_NAME" =~ v[0-9] ]]; then
-            TAG="v${REF_NAME#*v}"
+            TAG="v${REF_NAME##*v}"
           else
             TAG="v2.0.3"
           fi

@@ -208,4 +208,3 @@ func (r *OutboxRepository) OldestUnpublishedCreatedAt(ctx context.Context) (*tim
 	}
 	return t, nil
 }
-

@@ -23,4 +23,3 @@ func TestTokenIssuerGenerateJoinToken(t *testing.T) {
 		t.Fatal("expected error when roomName is empty")
 	}
 }
-

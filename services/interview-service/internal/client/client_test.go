@@ -95,4 +95,3 @@ func TestCompanyClientResolveMembership(t *testing.T) {
 	}
 	_ = bizErr
 }
-

@@ -88,4 +88,3 @@ func NewInterviewEventV1(eventID uuid.UUID, action EventAction, iv *Interview, a
 	}
 	return ev, payloadBytes, nil
 }
-

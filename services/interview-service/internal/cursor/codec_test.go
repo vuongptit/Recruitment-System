@@ -63,4 +63,3 @@ func TestCursorCodecInvalidKey(t *testing.T) {
 		t.Fatal("expected untrimmed key to be rejected")
 	}
 }
-

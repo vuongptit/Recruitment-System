@@ -76,4 +76,3 @@ func (s *LifecycleScheduler) runReminderSweep(ctx context.Context, now time.Time
 		slog.Info("queued 24h unconfirmed interview reminders", "count", count)
 	}
 }
-

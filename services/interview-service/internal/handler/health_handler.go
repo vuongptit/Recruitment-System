@@ -100,4 +100,3 @@ func writeHealthJSON(w http.ResponseWriter, code int, body any) {
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(body)
 }
-

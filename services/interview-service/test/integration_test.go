@@ -293,4 +293,12 @@ func TestFullInterviewLifecycleDatabaseIntegration(t *testing.T) {
 	if fbResp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 OK on feedback, got %d", fbResp.StatusCode)
 	}
+
+	// 6. Verify background batch queries (MarkNoShowsBatch & SendRemindersBatch)
+	if _, err := ivRepo.MarkNoShowsBatch(ctx, "interview-events", time.Now().UTC(), 10); err != nil {
+		t.Fatalf("MarkNoShowsBatch failed: %v", err)
+	}
+	if _, err := ivRepo.SendRemindersBatch(ctx, "interview-events", time.Now().UTC(), 10); err != nil {
+		t.Fatalf("SendRemindersBatch failed: %v", err)
+	}
 }

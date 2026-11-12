@@ -235,4 +235,3 @@ func (r *QueryRepository) FindBusyIntervals(
 	}
 	return intervals, nil
 }
-

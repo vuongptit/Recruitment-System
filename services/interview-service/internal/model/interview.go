@@ -324,4 +324,3 @@ type InterviewFeedback struct {
 	SuggestedApplicationAction string                 `json:"suggestedApplicationAction"`
 	CreatedAt                  string                 `json:"createdAt"`
 }
-
