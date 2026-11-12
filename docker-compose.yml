@@ -218,22 +218,33 @@ services:
     env_file:
       - ./services/interview-service/.env
     environment:
-      <<: *java-environment
+      DATABASE_URL: postgres://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?sslmode=disable&search_path=interview,public
+      PORT: "8080"
       APPLICATION_SERVICE_URL: http://application-service:8080
       APPLICATION_SERVICE_ALLOWED_HOSTS: application-service
       APPLICATION_REQUEST_TIMEOUT_MS: ${INTERVIEW_APPLICATION_REQUEST_TIMEOUT_MS:-2000}
-      APPLICATION_INTERNAL_API_KEY: ${APPLICATION_INTERNAL_API_KEY_INTERVIEW:?APPLICATION_INTERNAL_API_KEY_INTERVIEW is required}
+      APPLICATION_INTERNAL_API_KEY: ${APPLICATION_INTERNAL_API_KEY_INTERVIEW:?APPLICATION_INTERNAL_API_KEY is required}
       COMPANY_SERVICE_URL: http://company-service:3000
       COMPANY_SERVICE_ALLOWED_HOSTS: company-service
       COMPANY_REQUEST_TIMEOUT_MS: ${INTERVIEW_COMPANY_REQUEST_TIMEOUT_MS:-2000}
       INTERVIEW_CURSOR_HMAC_KEY: ${INTERVIEW_CURSOR_HMAC_KEY:?INTERVIEW_CURSOR_HMAC_KEY is required}
+      JWT_JWKS_URI: http://auth-service:8080/auth/.well-known/jwks.json
+      JWT_PUBLIC_KEY_PATH: /run/secrets/jwt-public.pem
       JWT_ISSUER: ${JWT_ISSUER:-https://auth.recruitment.local}
       JWT_AUDIENCE: ${JWT_AUDIENCE:-recruitment-api}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret}
+      LIVEKIT_URL: ${LIVEKIT_URL:-http://localhost:7880}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       KAFKA_BROKERS: kafka:9092
       KAFKA_INTERVIEW_TOPIC: ${KAFKA_INTERVIEW_TOPIC:-interview-events}
       INTERVIEW_EVENT_PUBLISHER_ENABLED: ${INTERVIEW_EVENT_PUBLISHER_ENABLED:-true}
-    healthcheck: *java-healthcheck
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health/ready" ]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
     secrets:
       - source: jwt-public-key
         target: jwt-public.pem

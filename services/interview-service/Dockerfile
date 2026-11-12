@@ -1,16 +1,13 @@
-FROM maven:3.9-eclipse-temurin-21 AS build
+FROM golang:1.26-alpine AS builder
 WORKDIR /app
-COPY pom.xml .
-RUN mvn -q -DskipTests dependency:go-offline
-COPY src src
-RUN mvn -q -DskipTests package
+RUN apk add --no-cache git
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./cmd/server
 
-FROM eclipse-temurin:21-jre-alpine
-RUN addgroup -S interview && adduser -S interview -G interview
-WORKDIR /app
-COPY --from=build --chown=interview:interview /app/target/*.jar app.jar
-USER interview
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates tzdata wget
+COPY --from=builder /app/server /server
 EXPOSE 8080
-HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=6 \
-    CMD wget -q -O /dev/null http://127.0.0.1:8080/actuator/health/readiness || exit 1
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["/server"]
