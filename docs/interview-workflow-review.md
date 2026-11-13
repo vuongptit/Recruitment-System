@@ -1,56 +1,45 @@
-# Rà soát lịch phỏng vấn và xác nhận — 13/11/2026
+# Quy trình phỏng vấn một vòng — 13/11/2026
 
-## Căn cứ và định hướng
+## Quy trình hiện hành
 
-Đối chiếu [Scheduling overview của Greenhouse](https://support.greenhouse.io/hc/en-us/articles/36307427046555-Scheduling-overview) và [Reschedule or cancel an interview](https://support.greenhouse.io/hc/en-us/articles/200241969-Reschedule-or-cancel-an-interview): lịch được tạo theo giai đoạn tuyển dụng, cần thông tin tham dự rõ ràng, cập nhật lịch phải đi kèm xác nhận mới cho ứng viên. Không coi một sản phẩm ATS là tiêu chuẩn bắt buộc cho mọi doanh nghiệp.
+Theo yêu cầu mới, việc đặt lịch chỉ gồm hai thao tác:
 
-CareerHub giữ quy trình hiện có, phân biệt **đơn ứng tuyển**, **lời mời/lịch hẹn**, **ghi nhận tham dự** và **đánh giá**. Không tự quyết định tuyển/từ chối khi tạo lịch hoặc lưu phiếu đánh giá.
+1. Nhà tuyển dụng chọn **một ngày giờ**, thời lượng, hình thức trực tuyến/trực tiếp và địa điểm nếu trực tiếp; bấm **Gửi lịch phỏng vấn**.
+2. Ứng viên xem thông tin và bấm **Xác nhận tham gia**. Việc đặt lịch hoàn tất; nhà tuyển dụng thấy **Đã xác nhận** khi làm mới.
 
-## Các vấn đề đã sửa
-
-| Vấn đề trước rà soát | Xử lý |
-| --- | --- |
-| API cho xác nhận lịch đang xin dời; UI không cho | Chỉ SCHEDULED được xác nhận. CONFIRMED gửi lại là idempotent; RESCHEDULE_REQUESTED phải được xử lý bằng lịch mới |
-| Nhà tuyển dụng vào phòng trước làm lịch IN_PROGRESS | Chỉ ứng viên vào phòng mới ghi nhận bắt đầu/tham dự; phòng chuẩn bị của nhà tuyển dụng không thay thế xác nhận |
-| OFFLINE bị đánh vắng mặt do không vào video | Worker chỉ đánh dấu ONLINE quá cửa sổ tham gia; không suy luận tham dự trực tiếp từ video |
-| NO_SHOW sớm hơn cửa sổ vào phòng cho phép | Chỉ xử lý sau scheduledEnd + 60 phút; nhãn UI “Chưa ghi nhận tham gia” |
-| Đánh giá được lưu trước buổi hẹn | API chặn trước scheduledStart và khi đang xin đổi lịch; UI ẩn hành động chưa hợp lệ |
-| Giờ đề xuất là chuỗi tùy ý, có thể trùng hoặc đã qua | API và UI kiểm tra 2–3 thời điểm ISO-8601 khác nhau, ở tương lai |
-| Đổi lịch có thể tạo requestId mới sau lỗi mạng | Giữ requestId theo nội dung; backend trả cùng revision cho retry tương ứng và từ chối payload khác |
-| Lịch cũ vẫn có thể dùng khi đơn ra khỏi vòng phỏng vấn | Xác nhận, xin dời, vào phòng kiểm tra lại quyền qua API tracking Application bằng JWT của người tham gia. Đổi lịch phía tuyển dụng kiểm tra lại scheduling context hiện hành |
-| Hủy lịch bằng window.prompt; nhiều form dàn trải | Hộp thoại native có lý do, focus/Escape, khóa khi gửi. Workspace tuyển dụng chia danh sách lịch và vùng xử lý; chỉ mở một form chính |
-| Chờ tải tuần tự tất cả phiếu đánh giá trước khi hiện trang | Chỉ lấy phiếu đánh giá cũ khi mở xem/sửa; lỗi tải giữ nguyên form và không tạo dữ liệu giả |
-| Khung giờ gợi ý cũ xuất hiện khi đổi ngày/thời lượng | Xóa kết quả cũ và bỏ qua phản hồi lỗi thời theo sequence |
-
-## Quy tắc hai phía
-
-| Bước | Nhà tuyển dụng | Ứng viên | Kết quả |
-| --- | --- | --- | --- |
-| Tạo lời mời | Application phải ở INTERVIEW; chọn vòng, giờ, thời lượng, hình thức, địa điểm nếu trực tiếp | Chờ lời mời | SCHEDULED — Chờ ứng viên xác nhận |
-| Chốt lịch | Theo dõi phản hồi | Xác nhận trước giờ bắt đầu | CONFIRMED và confirmedAt |
-| Đề nghị đổi | Xem lý do và các khung giờ; có thể chọn giờ khác | Đề xuất 2–3 giờ tương lai, kèm lý do | RESCHEDULE_REQUESTED; chưa phải lịch mới |
-| Gửi lịch mới | Tạo revision mới; hủy revision cũ trong cùng transaction | Cần xác nhận lại | Lịch mới SCHEDULED, không kế thừa confirmedAt |
-| Xử lý yêu cầu đổi còn tồn đọng | Nếu yêu cầu được gửi trước giờ cũ, có thể xử lý sau giờ cũ với giờ mới ở tương lai | Theo dõi phản hồi | Không mắc kẹt chỉ vì nhà tuyển dụng phản hồi muộn |
-| Hủy | Hủy trước giờ hẹn ít nhất 2 giờ và có lý do | Cùng quy tắc | CANCELLED; không rút hoặc kết thúc Application |
-| Phòng trực tuyến | Chuẩn bị trong cửa sổ tham gia | Vào trong cửa sổ; nếu chưa xác nhận, nút nói rõ “Xác nhận và vào phòng” | Cửa sổ start−15 phút đến end+60 phút; candidate join ghi nhận tham dự |
-| Phỏng vấn trực tiếp | Xác minh tham dự bằng quy trình thực tế và lưu đánh giá sau giờ bắt đầu | Đến đúng địa điểm/giờ | Không tự suy luận vắng mặt từ thiếu dấu vết video |
-| Đánh giá | Chấm đủ tiêu chí, nhận xét, chọn kết luận | Chỉ theo dõi trạng thái, không đọc phiếu nội bộ | COMPLETED; gợi ý PASS/FAIL/NEXT_ROUND không tự đổi Application |
+Mỗi hồ sơ chỉ có một vòng phỏng vấn. Xác nhận lịch không tự chuyển đơn sang đã tuyển, không tạo offer và không giả định buổi phỏng vấn đã diễn ra.
 
 ## Giao diện
 
-- Ứng viên: thẻ lịch có ngày/giờ, GMT+7, địa điểm/hình thức, lời nhắn, trạng thái và bước tiếp theo; lọc Tất cả/Cần xác nhận/Sắp diễn ra/Lịch sử. Bộ lọc nói rõ chỉ áp dụng trên số lịch đã tải, hỗ trợ tải thêm.
-- Nhà tuyển dụng: danh sách các vòng/revision ở trái, vùng tạo/đổi lịch/đánh giá ở phải; trên mobile chuyển một cột. Thêm lý do đổi lịch, mô tả lịch mới cần xác nhận lại, tải thêm lịch cũ và nút làm mới.
-- Dùng cùng InterviewSummary, interviewWorkflow và token giao diện hiện có; không thêm UI dependency. Nút không phù hợp được ẩn/khóa, nhưng backend luôn kiểm tra lại.
-- Modal dùng dialog native để giữ focus và hỗ trợ Escape; dữ liệu nhập giữ khi API lỗi; không retry mutation mù. Thời điểm khả dụng của các hành động được cập nhật trên UI mỗi 30 giây; không đồng nghĩa polling API.
+- Bỏ chọn số vòng, tạo vòng tiếp, kiểm tra/gợi ý nhiều khung giờ, xin dời lịch và hủy lịch phía ứng viên.
+- Bỏ form chấm điểm khỏi trang đặt lịch. Đánh giá hồ sơ và quyết định tuyển dụng tiếp tục ở màn hình hồ sơ hiện có.
+- Nhà tuyển dụng: một form gọn; sau khi gửi chỉ còn thẻ lịch và trạng thái phản hồi. Có thể sửa lịch hẹn nếu nhập nhầm; sử dụng cùng form, không tạo vòng mới.
+- Ứng viên: một thẻ lịch hiện tại cho mỗi hồ sơ và một nút xác nhận. Phỏng vấn trực tuyến vẫn có nút vào phòng đúng cửa sổ thời gian, sau khi đã xác nhận.
+- Thời gian hiển thị GMT+7; có pending, lỗi giữ nguyên input, nút làm mới, phân trang và giao diện desktop/mobile.
+- Lịch cũ và các vòng đã tồn tại không bị xóa hoặc đổi số vòng. Bản hiện tại được chọn theo lịch chưa hủy và thời điểm tạo; nhà tuyển dụng mở mục lịch sử để xem các bản cũ.
 
-## Kiểm chứng và giới hạn
+## Backend
 
-- TypeScript và 179 kiểm thử helper/API frontend đạt; các package unit test Go đạt.
-- Kiểm thử HTTP + PostgreSQL trên container database riêng: gửi/xác nhận/đề nghị đổi/tạo revision mới; quyền sở hữu; không kế thừa xác nhận; retry; recruiter preparation; candidate attendance; offline không tự NO_SHOW; thời gian ân hạn; chặn feedback quá sớm.
-- Playwright: 20 ca của bộ interview-flows trên desktop/mobile đạt; có luồng hai phiên cùng nguồn fixture từ tạo lịch tới xác nhận lại revision mới. Đã xem ảnh thực tế và kiểm tra tràn ngang.
-- Build Docker Frontend và Interview Service thành công; hai container đã cập nhật và healthy trên localhost. Smoke bằng tài khoản thử ứng viên/tuyển dụng: đăng nhập 200, cookie HttpOnly, API lịch 200 và màn hình tương ứng tải được. Hai tài khoản này hiện không có lịch; thao tác ghi hai phía được kiểm chứng bằng fixture và PostgreSQL riêng như trên.
-- Các thao tác ghi thử dùng fixture/DB riêng. Không tạo lịch giả cho tài khoản người dùng và không gửi email ra ngoài để chụp màn hình.
-- Quy tắc tự hủy trước 2 giờ là chính sách hiện có của CareerHub, không phải chuẩn chung cho mọi ATS. Trường hợp sát giờ cần liên hệ trực tiếp; chưa có cấu hình chính sách theo công ty.
-- Availability chỉ biết lịch CareerHub; chưa đồng bộ Google/Outlook, chưa có self-scheduling qua lịch cá nhân. Không trình bày khung giờ trống như cam kết ứng viên không có việc riêng.
-- Application và Interview là hai dịch vụ: kiểm tra trạng thái hiện hành giúp từ chối thao tác trên lịch không còn hợp lệ, nhưng không phải distributed transaction. Chưa có cơ chế tự đồng loạt CANCELLED mọi lịch khi Application kết thúc; dữ liệu lịch vẫn giữ để đối chiếu.
-- Phiếu đánh giá hiện dùng cơ chế cập nhật bản hiện hành, chưa có lịch sử phiên bản nhận xét. Không khẳng định đã chứng nhận WCAG toàn hệ thống; đã dùng labels, focus native, keyboard/Escape và responsive cho các màn thay đổi.
+- Tạo lịch chấp nhận roundNumber=1; bỏ trống/0 mặc định 1. Các giá trị khác bị từ chối.
+- Transaction khóa theo applicationId bằng PostgreSQL advisory lock, kiểm tra requestId rồi kiểm tra lịch đã có: hai người tạo đồng thời không tạo thành hai lịch/vòng.
+- Lịch COMPLETED hoặc NO_SHOW vẫn chiếm vòng duy nhất, không thể tạo vòng hai bằng requestId khác. Nếu tất cả lịch cũ đã CANCELLED thì có thể gửi lại một lịch vòng 1.
+- API ứng viên đề xuất nhiều giờ trả 409 INTERVIEW_RESCHEDULE_DISABLED. Các bản RESCHEDULE_REQUESTED cũ giữ nguyên; tuyển dụng có thể sửa một thời gian mới để ứng viên xác nhận.
+- Sửa lịch dùng API recruiter hiện có: thay bản cũ bằng revision mới trong transaction, lịch mới SCHEDULED và không kế thừa confirmedAt. Retry cùng nội dung/requestId trả cùng bản.
+- Xác nhận vẫn kiểm tra đúng ứng viên, thời gian, trạng thái lịch và Application đang INTERVIEW. Các kiểm tra quyền và chống trùng giờ được giữ.
+- API feedback tương thích dữ liệu cũ, nhận PASS/FAIL; không tạo mới NEXT_ROUND. Không cần feedback để hoàn tất đặt lịch.
+- Không đổi schema, chạy migration dữ liệu, xóa lịch hoặc gửi email thử trong database người dùng.
+
+## Kiểm chứng
+
+- Type-check và 180 kiểm thử helper/API frontend đạt.
+- 20 ca Playwright desktop/mobile đạt, gồm hai phiên recruiter/candidate tạo, xác nhận, sửa thời gian và xác nhận lại; input/khóa gửi, retry cùng requestId và không tràn ngang.
+- Unit test Go đạt. Kiểm thử HTTP + PostgreSQL riêng đạt: một vòng, candidate không đề xuất nhiều giờ, xác nhận đúng chủ sở hữu, sửa lịch cần xác nhận lại, hai recruiter tạo đồng thời chỉ nhận một lịch, hoàn tất không mở thêm vòng.
+- Các thao tác ghi thử dùng fixture/DB riêng; không tạo lịch giả hoặc gửi thư ra ngoài cho tài khoản người dùng.
+- Đã build và cập nhật Docker local cho Frontend/Interview Service; cả hai healthy. Smoke tài khoản thử của hai vai trò: đăng nhập 200 với cookie HttpOnly, API lịch 200, trang ứng viên và danh sách hồ sơ tuyển dụng tải được. Hai tài khoản thử hiện không có lịch; luồng ghi được kiểm chứng trên PostgreSQL riêng và trình duyệt dùng fixture như trên.
+
+## Giới hạn
+
+- Đây là xác nhận lịch, không phải tự động đánh giá hoặc kết thúc tuyển dụng. Tham dự và kết quả tuyển dụng là bước riêng.
+- Danh sách có phân trang: trang ứng viên thể hiện lịch hiện tại trong dữ liệu đã tải. Có nút tải thêm; không trình bày số tải về như tổng toàn hệ thống.
+- Thay đổi trạng thái phía bên kia hiển thị sau khi làm mới; không có polling tự động trong trang đặt lịch.
+- Availability cá nhân Google/Outlook chưa được đồng bộ. Quyền Application/Interview vẫn qua hai dịch vụ riêng, không phải distributed transaction.

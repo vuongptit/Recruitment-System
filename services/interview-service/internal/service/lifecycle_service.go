@@ -90,47 +90,7 @@ func (s *LifecycleService) RescheduleInterview(
 	nowUTC := s.nowFunc().UTC().Truncate(time.Millisecond)
 
 	if principal.Role == "CANDIDATE" {
-		fieldErrors := make(map[string]any)
-		reason := ""
-		if req.Reason != nil {
-			reason = strings.TrimSpace(*req.Reason)
-		}
-		if reason == "" {
-			fieldErrors["reason"] = "reason is required when requesting a reschedule"
-		} else if utf8.RuneCountInString(reason) > 500 || containsControlChars(reason) {
-			fieldErrors["reason"] = "reason must be at most 500 printable characters"
-		}
-
-		var slots []string
-		seenSlots := make(map[int64]bool)
-		for _, rawSlot := range req.PreferredSlots {
-			trimmed := strings.TrimSpace(rawSlot)
-			if trimmed == "" {
-				continue
-			}
-			parsed, parseErr := time.Parse(time.RFC3339, trimmed)
-			if parseErr != nil || !parsed.After(nowUTC) || seenSlots[parsed.UnixMilli()] {
-				fieldErrors["preferredSlots"] = "preferred slots must be distinct future ISO-8601 timestamps"
-				break
-			}
-			seenSlots[parsed.UnixMilli()] = true
-			slots = append(slots, model.FormatMillisUTC(parsed))
-		}
-		if len(slots) < 2 || len(slots) > 3 {
-			fieldErrors["preferredSlots"] = "preferredSlots must contain between 2 and 3 suggested time slots"
-		}
-		if len(fieldErrors) > 0 {
-			return model.InterviewResponse{}, apierror.ValidationFailed(fieldErrors)
-		}
-
-		if err := s.ensureActiveApplication(ctx, interviewID, authorizationHeader); err != nil {
-			return model.InterviewResponse{}, err
-		}
-		updated, err := s.repo.RequestReschedule(ctx, interviewID, principal.Subject, reason, slots, s.topic, nowUTC)
-		if err != nil {
-			return model.InterviewResponse{}, err
-		}
-		return model.ToInterviewResponse(updated), nil
+		return model.InterviewResponse{}, apierror.NewStatus(http.StatusConflict, "INTERVIEW_RESCHEDULE_DISABLED", "Candidates confirm the recruiter-selected appointment; contact the recruiter for changes", nil)
 	}
 
 	if principal.Role == "RECRUITER" {
@@ -380,10 +340,10 @@ func (s *LifecycleService) SubmitFeedback(
 
 	conclusion := strings.ToUpper(strings.TrimSpace(req.Conclusion))
 	switch model.FeedbackConclusion(conclusion) {
-	case model.ConclusionPass, model.ConclusionFail, model.ConclusionNextRound:
+	case model.ConclusionPass, model.ConclusionFail:
 		req.Conclusion = conclusion
 	default:
-		fieldErrors["conclusion"] = "conclusion must be PASS, FAIL, or NEXT_ROUND"
+		fieldErrors["conclusion"] = "conclusion must be PASS or FAIL; only one interview round is supported"
 	}
 
 	if len(fieldErrors) > 0 {

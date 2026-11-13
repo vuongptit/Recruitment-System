@@ -157,6 +157,27 @@ func (r *InterviewRepository) CreateWithOutbox(ctx context.Context, iv *model.In
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
+	// Serialize scheduling across recruiters for the same application. Cancelled
+	// appointments may be replaced; completed/no-show appointments are still the
+	// single interview round. Existing historical rounds remain untouched.
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", "interview-application:"+iv.ApplicationID.String()); err != nil {
+		return nil, false, fmt.Errorf("lock application schedule: %w", err)
+	}
+	existing, err := scanInterview(tx.QueryRow(ctx, "SELECT "+interviewSelectColumns+" FROM interviews WHERE scheduled_by = $1 AND request_id = $2", iv.ScheduledBy, iv.RequestID))
+	if err == nil {
+		return existing, false, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, false, fmt.Errorf("check scheduling retry: %w", err)
+	}
+	var alreadyScheduled bool
+	if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM interviews WHERE application_id = $1 AND status <> 'CANCELLED')", iv.ApplicationID).Scan(&alreadyScheduled); err != nil {
+		return nil, false, fmt.Errorf("check application interview: %w", err)
+	}
+	if alreadyScheduled {
+		return nil, false, apierror.NewStatus(http.StatusConflict, "INTERVIEW_ALREADY_SCHEDULED", "This application already has its interview; update the existing appointment instead", nil)
+	}
+
 	saved, err := insertInterviewTx(ctx, tx, iv)
 	if err != nil {
 		var pgErr *pgconn.PgError

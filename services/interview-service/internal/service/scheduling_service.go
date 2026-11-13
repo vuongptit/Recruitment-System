@@ -198,8 +198,11 @@ func normalizeCreateRequest(req model.CreateInterviewRequest, callerID uuid.UUID
 		interviewerID = *req.InterviewerID
 	}
 
-	if req.RoundNumber < 1 || req.RoundNumber > 20 {
-		fieldErrors["roundNumber"] = "roundNumber must be between 1 and 20"
+	if req.RoundNumber == 0 {
+		req.RoundNumber = 1
+	}
+	if req.RoundNumber != 1 {
+		fieldErrors["roundNumber"] = "Only one interview round is supported (roundNumber must be 1)"
 	}
 
 	if req.DurationMinutes != 30 && req.DurationMinutes != 45 && req.DurationMinutes != 60 {

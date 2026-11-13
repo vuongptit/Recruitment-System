@@ -28,6 +28,7 @@ func TestApplicationClientAuthorizeScheduling(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{
+			"meta": nil, // Spring ApiResponse always serializes this envelope field.
 			"data": map[string]any{
 				"applicationId":      appID.String(),
 				"jobId":              jobID.String(),

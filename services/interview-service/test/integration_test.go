@@ -227,7 +227,7 @@ func TestFullInterviewLifecycleDatabaseIntegration(t *testing.T) {
 		t.Fatalf("expected 200 OK on confirm, got %d", confResp.StatusCode)
 	}
 
-	// 3. Candidate requests reschedule with 2 preferred slots
+	// 3. The simplified workflow rejects candidate slot negotiation, even via API.
 	reschedBody, _ := json.Marshal(map[string]any{
 		"reason":         "Need to shift by 1 day",
 		"preferredSlots": []string{start1.Add(24 * time.Hour).Format(time.RFC3339), start1.Add(26 * time.Hour).Format(time.RFC3339)},
@@ -240,8 +240,8 @@ func TestFullInterviewLifecycleDatabaseIntegration(t *testing.T) {
 		t.Fatalf("PATCH /reschedule by candidate failed: %v", err)
 	}
 	defer reschedResp.Body.Close()
-	if reschedResp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 OK on candidate reschedule, got %d", reschedResp.StatusCode)
+	if reschedResp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected 409 on disabled candidate reschedule, got %d", reschedResp.StatusCode)
 	}
 
 	// 4. Recruiter reschedules to a new slot (creates revision 2)

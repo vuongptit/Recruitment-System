@@ -37,3 +37,9 @@
 
 .calendarList { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); gap: 20px; align-items: start; }
 .calendarList > :global(.help) { grid-column: 1 / -1; }
+.singleWorkspace { width: 100%; max-width: 940px; }
+.sectionTitle { margin: 0; font-size: 19px; line-height: 1.4; overflow-wrap: anywhere; }
+.archived { padding-top: 20px; border-top: 1px solid var(--line, #d9e4dd); display: grid; gap: 14px; }
+.card > summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.card > summary:focus-visible { outline: 2px solid #087f46; outline-offset: 4px; }
+.card[open] > summary { margin-bottom: 18px; }

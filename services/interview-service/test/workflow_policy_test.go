@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"github.com/google/uuid"
+	"interview-service/internal/apierror"
 	"interview-service/internal/config"
 	"interview-service/internal/db"
 	"interview-service/internal/model"
@@ -114,6 +115,58 @@ func TestInterviewConsentAndAttendancePolicies(t *testing.T) {
 		iv := create(now.Add(24*time.Hour), model.ModeOffline)
 		if _, _, err := repo.SubmitFeedback(ctx, iv.ID, iv.CompanyID, iv.InterviewerID, model.SubmitFeedbackRequest{}, "interview-events", now); err == nil {
 			t.Fatal("future interview was completed")
+		}
+	})
+	t.Run("parallel recruiters cannot schedule two appointments and completion does not unlock another round", func(t *testing.T) {
+		base := create(now.Add(96*time.Hour), model.ModeOffline)
+		applicationID := uuid.New()
+		type result struct {
+			iv  *model.Interview
+			err error
+		}
+		results := make(chan result, 2)
+		for i := 0; i < 2; i++ {
+			next := *base
+			next.ID, next.RequestID, next.ScheduledBy = uuid.New(), uuid.New(), uuid.New()
+			next.ApplicationID = applicationID
+			next.ScheduledStartAt = now.Add(time.Duration(120+i*24) * time.Hour)
+			next.ScheduledEndAt = next.ScheduledStartAt.Add(45 * time.Minute)
+			go func(iv model.Interview) {
+				saved, _, err := repo.CreateWithOutbox(ctx, &iv, "interview-events", now)
+				results <- result{saved, err}
+			}(next)
+		}
+		var winner *model.Interview
+		success, conflicts := 0, 0
+		for i := 0; i < 2; i++ {
+			r := <-results
+			if r.err == nil {
+				success++
+				winner = r.iv
+			} else if apiErr, ok := r.err.(*apierror.Error); ok && apiErr.Code == "INTERVIEW_ALREADY_SCHEDULED" {
+				conflicts++
+			} else {
+				t.Fatal(r.err)
+			}
+		}
+		if success != 1 || conflicts != 1 {
+			t.Fatalf("wanted one schedule and one conflict: %d, %d", success, conflicts)
+		}
+		// Mark the single round completed: another request must still be refused,
+		// even though completed appointments no longer participate in time conflicts.
+		_, _, err := repo.SubmitFeedback(ctx, winner.ID, winner.CompanyID, winner.InterviewerID, model.SubmitFeedbackRequest{
+			CriteriaScores: model.FeedbackCriteriaScores{Technical: 8, Communication: 8, Attitude: 8, CultureFit: 8}, OverallScore: 8, Comment: "Fixture evaluation", Conclusion: "PASS",
+		}, "interview-events", winner.ScheduledEndAt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		next := *winner
+		next.ID, next.RequestID = uuid.New(), uuid.New()
+		next.ScheduledStartAt = winner.ScheduledStartAt.Add(72 * time.Hour)
+		next.ScheduledEndAt = next.ScheduledStartAt.Add(45 * time.Minute)
+		_, _, err = repo.CreateWithOutbox(ctx, &next, "interview-events", now)
+		if apiErr, ok := err.(*apierror.Error); !ok || apiErr.Code != "INTERVIEW_ALREADY_SCHEDULED" {
+			t.Fatalf("completed round allowed a new appointment: %v", err)
 		}
 	})
 }

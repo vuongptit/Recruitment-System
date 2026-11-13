@@ -195,6 +195,7 @@ func (c *ApplicationClient) AuthorizeScheduling(ctx context.Context, application
 
 	var envelope struct {
 		Data *ApplicationAuthContext `json:"data"`
+		Meta json.RawMessage         `json:"meta"`
 	}
 	dec := json.NewDecoder(bytes.NewReader(body))
 	dec.DisallowUnknownFields()

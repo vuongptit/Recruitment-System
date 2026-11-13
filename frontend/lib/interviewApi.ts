@@ -341,14 +341,18 @@ export function schedulingRequestIdentity(
 export function interviewScheduleError(error: unknown): string {
   if (error instanceof ApiClientError) {
     const messages: Record<string, string> = {
+      APPLICATION_AUTHORIZATION_UNAVAILABLE: "Chưa xác minh được hồ sơ ứng tuyển. Hãy thử lại sau hoặc tải lại hồ sơ.",
+      COMPANY_MEMBERSHIP_UNAVAILABLE: "Chưa xác minh được quyền tuyển dụng tại công ty. Hãy thử lại sau.",
       INTERVIEW_CANDIDATE_CONFLICT:
         "Ứng viên đã có lịch trùng giờ. Hãy chọn thời gian khác.",
       INTERVIEW_INTERVIEWER_CONFLICT:
         "Bạn đã có lịch phỏng vấn trùng giờ. Hãy chọn thời gian khác.",
       INTERVIEW_SCHEDULE_CONFLICT:
         "Khung giờ vừa được sử dụng. Hãy kiểm tra lịch và chọn thời gian khác.",
+      INTERVIEW_ALREADY_SCHEDULED: "Hồ sơ đã có lịch phỏng vấn. Tải lại và cập nhật lịch hiện tại nếu cần.",
+      INTERVIEW_RESCHEDULE_DISABLED: "Bạn chỉ cần xác nhận lịch. Nếu cần đổi giờ, hãy liên hệ nhà tuyển dụng.",
       INTERVIEW_ROUND_ALREADY_SCHEDULED:
-        "Vòng phỏng vấn này đã có lịch. Hãy kiểm tra trước khi tạo vòng tiếp theo.",
+        "Hồ sơ đã có lịch phỏng vấn. Hãy tải lại để xem lịch hiện tại.",
       IDEMPOTENCY_CONFLICT:
         "Nội dung lịch đã thay đổi. Hãy kiểm tra thông tin rồi gửi lại.",
       INTERVIEW_IDEMPOTENCY_CONFLICT:

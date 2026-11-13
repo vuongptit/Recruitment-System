@@ -8,9 +8,11 @@ const interviewId = "4795c0de-7908-4ab5-9bed-4c4f1cf9c211";
 const application = { id: applicationId, jobId, companyId: jobId, candidateId: userId,
   jobTitle: "Backend Engineer live fixture", status: "INTERVIEW", version: 4,
   appliedAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z", matchScore: null };
-const interview = { id: interviewId, applicationId, roundNumber: 2,
+const interview = { id: interviewId, applicationId, roundNumber: 1,
   scheduledStart: "2030-01-15T02:30:00Z", scheduledEnd: "2030-01-15T03:15:00Z",
   timeZone: "Asia/Ho_Chi_Minh", durationMinutes: 45, mode: "OFFLINE", location: "Fixture office", status: "SCHEDULED" };
+const appointmentLocal = new Date(Date.now() + 2 * 86400000 + 7 * 3600000).toISOString().slice(0,16);
+const updatedLocal = new Date(Date.now() + 3 * 86400000 + 7 * 3600000).toISOString().slice(0,16);
 const reply = (route: Route, data: unknown, status = 200) => route.fulfill({ status, contentType: "application/json",
   body: JSON.stringify(status < 400 ? { data, meta: null } : data) });
 
@@ -71,7 +73,7 @@ test("Candidate calendar reads actual scoped API rows and presents GMT+7 without
     return reply(route, { items: [interview], nextCursor: null });
   });
   await login(page, "CANDIDATE", "/candidate/interviews");
-  await expect(page.getByRole("heading", { name: "Phỏng vấn vòng 2" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Lời mời phỏng vấn" })).toBeVisible();
   await expect(page.getByText(/09:30/)).toBeVisible();
   await expect(page.getByText(/Fixture office/)).toBeVisible();
   await expect(page.getByRole("link", { name: "Xem đơn ứng tuyển" })).toHaveAttribute("href", "/candidate/applications/" + applicationId);
@@ -112,7 +114,7 @@ test("recruiter interview options use Vietnamese labels and preserve mode values
   await expect(page.locator("main")).not.toContainText(/Video Room|LiveKit|WebRTC/);
 });
 
-test("both parties confirm a new schedule again after a candidate reschedule request", async ({ page, context }, testInfo) => {
+test("single appointment is confirmed by the candidate and a recruiter correction needs new consent", async ({ page, context }, testInfo) => {
   test.setTimeout(120_000);
   let records: (typeof interview & { confirmedAt?: string | null; scheduleRevision?: number; rescheduleReason?: string; reschedulePreferredSlots?: string[] })[] = [];
   const revisionId = "5795c0de-7908-4ab5-9bed-4c4f1cf9c211";
@@ -127,6 +129,8 @@ test("both parties confirm a new schedule again after a candidate reschedule req
       if (pathname === "/api/interviews" && request.method() === "POST") {
         const body = request.postDataJSON();
         expect(body.timeZone).toBe("Asia/Ho_Chi_Minh");
+        expect(body.roundNumber).toBe(1);
+        expect(records).toHaveLength(0);
         records = [{ ...interview, mode: body.mode, location: body.location, roundNumber: body.roundNumber, scheduledStart: body.scheduledStart, scheduledEnd: new Date(Date.parse(body.scheduledStart) + body.durationMinutes * 60000).toISOString(), scheduleRevision: 1 }];
         return reply(route, records[0], 201);
       }
@@ -138,14 +142,9 @@ test("both parties confirm a new schedule again after a candidate reschedule req
         return reply(route, current);
       }
       const body = request.postDataJSON();
-      if (pathname.endsWith("/reschedule") && body.preferredSlots) {
-        current.status = "RESCHEDULE_REQUESTED";
-        current.rescheduleReason = body.reason;
-        current.reschedulePreferredSlots = body.preferredSlots;
-        return reply(route, current);
-      }
       if (pathname.endsWith("/reschedule")) {
-        expect(current.status).toBe("RESCHEDULE_REQUESTED");
+        expect(current.status).toBe("CONFIRMED");
+        expect(body.preferredSlots).toBeUndefined();
         current.status = "CANCELLED";
         const next = { ...interview, id: revisionId, roundNumber: current.roundNumber, mode: body.mode, location: body.location, scheduleRevision: 2, confirmedAt: null, scheduledStart: body.scheduledStart, scheduledEnd: new Date(Date.parse(body.scheduledStart) + body.durationMinutes * 60000).toISOString() };
         records.push(next);
@@ -158,26 +157,24 @@ test("both parties confirm a new schedule again after a candidate reschedule req
     await mock(page); await mock(candidate);
     await login(page, "RECRUITER", `/recruiter/applications/${applicationId}/interview`);
     await page.getByRole("combobox", { name: "Hình thức phỏng vấn", exact: true }).selectOption("OFFLINE");
-    await page.getByLabel("Thời gian dự kiến (GMT+7)", { exact: true }).fill("2030-01-15T09:30");
+    await page.getByLabel("Ngày giờ phỏng vấn (GMT+7)", { exact: true }).fill(appointmentLocal);
     await page.getByLabel("Địa điểm phỏng vấn", { exact: true }).fill("Văn phòng CareerHub, tầng 3");
     await page.getByRole("button", { name: "Gửi lịch phỏng vấn", exact: true }).click();
-    await expect(page.getByText("Đã gửi lịch phỏng vấn thành công.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Đã gửi lịch phỏng vấn. Đang chờ ứng viên xác nhận.", { exact: true })).toBeVisible();
     await login(candidate, "CANDIDATE", "/candidate/interviews");
     await candidate.getByRole("button", { name: "Xác nhận tham gia", exact: true }).click();
     await expect(candidate.getByRole("article")).toContainText("Đã xác nhận");
-    await candidate.getByRole("button", { name: "Xin dời lịch", exact: true }).click();
-    const modal = candidate.getByRole("dialog");
-    await modal.getByLabel("Lý do xin dời lịch").fill("Trùng lịch học");
-    await modal.getByLabel("Khung giờ đề xuất 1 (bắt buộc)", { exact: true }).fill("2030-01-16T09:30");
-    await modal.getByLabel("Khung giờ đề xuất 2 (bắt buộc)", { exact: true }).fill("2030-01-16T14:00");
-    await modal.getByRole("button", { name: "Gửi yêu cầu dời lịch", exact: true }).click();
-    await expect(candidate.getByRole("article")).toContainText("Đề nghị đổi lịch");
+    await expect(candidate.getByRole("button", { name: "Xin dời lịch", exact: true })).toHaveCount(0);
+    await expect(candidate.getByRole("button", { name: "Hủy lịch", exact: true })).toHaveCount(0);
     await expect(candidate.getByRole("button", { name: "Xác nhận tham gia", exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Làm mới", exact: true }).click();
-    await page.getByRole("button", { name: /Chọn giờ ứng viên đề xuất/ }).first().click();
-    await expect(page.getByLabel("Thời gian mới (GMT+7)", { exact: true })).toHaveValue("2030-01-16T09:30");
-    await page.getByRole("button", { name: "Xác nhận lịch mới", exact: true }).click();
-    await expect(page.getByText(/Đã gửi lịch mới cho vòng/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Gửi lịch phỏng vấn", exact: true })).toHaveCount(0);
+    await expect(page.getByLabel("Vòng phỏng vấn", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Chấm điểm|Tạo vòng|Tạo lịch mới/ })).toHaveCount(0);
+    await page.getByRole("button", { name: "Sửa lịch hẹn", exact: true }).click();
+    await page.getByLabel("Ngày giờ phỏng vấn (GMT+7)", { exact: true }).fill(updatedLocal);
+    await page.getByRole("button", { name: "Lưu và gửi lại lịch", exact: true }).click();
+    await expect(page.getByText("Đã gửi lịch phỏng vấn. Đang chờ ứng viên xác nhận.", { exact: true })).toBeVisible();
     await candidate.getByRole("button", { name: "Làm mới", exact: true }).click();
     await candidate.getByRole("button", { name: "Cần xác nhận", exact: true }).click();
     await expect(candidate.getByRole("article")).toHaveCount(1);
@@ -185,6 +182,8 @@ test("both parties confirm a new schedule again after a candidate reschedule req
     await candidate.getByRole("button", { name: "Xác nhận tham gia", exact: true }).click();
     await expect(candidate.getByRole("article")).toHaveCount(0);
     await candidate.getByRole("button", { name: "Tất cả", exact: true }).click();
+    await page.getByRole("button", { name: "Làm mới", exact: true }).click();
+    await expect(page.getByRole("region", { name: "Lịch phỏng vấn hiện tại" }).getByRole("article").first()).toContainText("Đã xác nhận");
     for (const [target, role] of [[page, "recruiter"], [candidate, "candidate"]] as const) {
       expect(await target.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await target.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); window.scrollTo(0, 0); });
@@ -202,8 +201,8 @@ test("Recruiter schedules via API, preserves GMT+7 and retries a failed request 
     return bodies.length === 1 ? reply(route, { code: "INTERVIEW_UNAVAILABLE" }, 503) : reply(route, interview, 201);
   });
   await login(page, "RECRUITER", "/recruiter/applications/" + applicationId + "/interview");
-  await page.getByLabel("Vòng phỏng vấn").fill("2");
-  await page.getByLabel("Thời gian dự kiến").fill("2030-01-15T09:30");
+  await expect(page.getByLabel("Vòng phỏng vấn")).toHaveCount(0);
+  await page.getByLabel("Ngày giờ phỏng vấn (GMT+7)").fill(appointmentLocal);
   await page.getByRole("combobox", { name: "Hình thức phỏng vấn", exact: true }).selectOption("OFFLINE");
   await page.getByLabel("Địa điểm").fill("Fixture office");
   await page.getByRole("button", { name: "Gửi lịch phỏng vấn" }).click();
@@ -211,10 +210,10 @@ test("Recruiter schedules via API, preserves GMT+7 and retries a failed request 
   expect(bodies).toHaveLength(1);
   await expect(page.getByLabel("Địa điểm")).toHaveValue("Fixture office");
   await page.getByRole("button", { name: "Gửi lịch phỏng vấn" }).click();
-  await expect(page.getByText("Đã gửi lịch phỏng vấn thành công.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Đã gửi lịch phỏng vấn. Đang chờ ứng viên xác nhận.", { exact: true })).toBeVisible();
   expect(bodies).toHaveLength(2);
   expect(bodies[1]).toEqual(bodies[0]);
-  expect(bodies[0]).toMatchObject({ applicationId, scheduledStart: "2030-01-15T09:30:00+07:00", timeZone: "Asia/Ho_Chi_Minh", durationMinutes: 45, mode: "OFFLINE", roundNumber: 2 });
+  expect(bodies[0]).toMatchObject({ applicationId, scheduledStart: appointmentLocal + ":00+07:00", timeZone: "Asia/Ho_Chi_Minh", durationMinutes: 45, mode: "OFFLINE", roundNumber: 1 });
 });
 
 test("Recruiter detail loads the stored application and hides scheduling for a terminal stage", async ({ page }) => {

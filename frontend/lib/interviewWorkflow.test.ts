@@ -1,18 +1,27 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { interviewActions, interviewDate, interviewGuidance, validatePreferredSlots } from "./interviewWorkflow";
+import { interviewActions, interviewDate, interviewGuidance, validatePreferredSlots, currentInterview, currentInterviews } from "./interviewWorkflow";
 import type { Interview } from "./interviewApi";
 const now = Date.parse("2030-01-01T02:00:00Z");
 const iv: Interview = { id:"fixture",applicationId:"application",roundNumber:1,scheduledStart:"2030-01-01T05:00:00Z",scheduledEnd:"2030-01-01T05:45:00Z",timeZone:"Asia/Ho_Chi_Minh",durationMinutes:45,mode:"ONLINE",location:null,status:"SCHEDULED" };
 
 test("candidate consent, reschedule and room availability have separate conditions", () => {
  assert.equal(interviewActions(iv, now).confirm, true);
+ assert.equal(interviewActions(iv, now).requestReschedule, false);
  assert.equal(interviewActions(iv, now).join, false);
  assert.equal(interviewActions({...iv,status:"RESCHEDULE_REQUESTED"},now).confirm,false);
  assert.equal(interviewActions({...iv,status:"RESCHEDULE_REQUESTED"},now).join,false);
  assert.equal(interviewActions({...iv,status:"CANCELLED"},now).cancel,false);
  assert.equal(interviewActions(iv,Date.parse(iv.scheduledStart)-15*60_000).join,true);
  assert.equal(interviewActions({...iv,mode:"OFFLINE"},Date.parse(iv.scheduledStart)).join,false);
+});
+test("only one current appointment is shown per application without deleting old revisions", () => {
+ const previous = {...iv, id: "previous", status: "CANCELLED", scheduledStart: "2031-01-01T00:00:00Z"};
+ const items = [previous, iv, {...iv, id: "another", applicationId: "another-application"}];
+ assert.equal(currentInterview([previous,iv])?.id,iv.id);
+ assert.equal(currentInterviews(items).length,2);
+ assert.equal(items.length,3);
+ assert.equal(currentInterview([]),null);
 });
 test("cancel cutoff matches backend and feedback cannot finish an interview in the future", () => {
  const start = Date.parse(iv.scheduledStart);

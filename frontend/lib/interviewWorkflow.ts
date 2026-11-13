@@ -1,5 +1,19 @@
 import type { Interview } from "./interviewApi";
 
+// Retain old records but present one current appointment for each application.
+export function currentInterview(items: readonly Interview[]): Interview | null {
+  return [...items].sort((a, b) => {
+    const active = Number(b.status !== "CANCELLED") - Number(a.status !== "CANCELLED");
+    return active || Date.parse(b.createdAt ?? b.scheduledStart) - Date.parse(a.createdAt ?? a.scheduledStart) || (b.scheduleRevision ?? 1) - (a.scheduleRevision ?? 1);
+  })[0] ?? null;
+}
+
+export function currentInterviews(items: readonly Interview[]): Interview[] {
+  const groups = new Map<string, Interview[]>();
+  for (const item of items) groups.set(item.applicationId, [...(groups.get(item.applicationId) ?? []), item]);
+  return [...groups.values()].flatMap(group => { const item = currentInterview(group); return item ? [item] : []; });
+}
+
 export function interviewActions(iv: Interview, now = Date.now()) {
   const start = Date.parse(iv.scheduledStart);
   const end = Date.parse(iv.scheduledEnd);
@@ -7,7 +21,7 @@ export function interviewActions(iv: Interview, now = Date.now()) {
   const active = ["SCHEDULED", "CONFIRMED", "RESCHEDULE_REQUESTED"].includes(iv.status);
   return {
     confirm: iv.status === "SCHEDULED" && future,
-    requestReschedule: ["SCHEDULED", "CONFIRMED"].includes(iv.status) && future,
+    requestReschedule: false,
     reschedule: active && (future || iv.status === "RESCHEDULE_REQUESTED"),
     cancel: active && start - now >= 2 * 3600_000,
     join: iv.mode === "ONLINE" && ["SCHEDULED", "CONFIRMED", "IN_PROGRESS"].includes(iv.status) && now >= start - 15 * 60_000 && now <= end + 60 * 60_000,
@@ -22,13 +36,13 @@ export function interviewDate(value: string, kind: "date" | "time" | "full" = "f
 }
 
 export function interviewGuidance(iv: Interview, recruiter = false, now = Date.now()): string {
-  if (iv.status === "RESCHEDULE_REQUESTED") return recruiter ? "Ứng viên đã đề xuất đổi giờ. Chọn thời gian phù hợp để gửi lịch mới; ứng viên cần xác nhận lại." : "Yêu cầu đổi giờ đã gửi. Chờ nhà tuyển dụng phản hồi; chưa có lịch mới được chốt.";
+  if (iv.status === "RESCHEDULE_REQUESTED") return recruiter ? "Lịch cũ đang chờ điều chỉnh. Chọn một thời gian mới và gửi để ứng viên xác nhận." : "Lịch đang chờ nhà tuyển dụng điều chỉnh. Bạn sẽ xác nhận khi nhận được thời gian mới.";
   if (iv.status === "CANCELLED") return "Lịch này đã hủy và không còn dùng để tham gia. Hủy lịch không đồng nghĩa kết thúc đơn ứng tuyển.";
   if (iv.status === "NO_SHOW") return "Chưa ghi nhận ứng viên tham gia phòng trực tuyến trong thời gian cho phép. Liên hệ để đối chiếu trước khi quyết định hồ sơ.";
   if (iv.status === "COMPLETED") return "Buổi phỏng vấn đã hoàn tất. Kết quả xét tuyển được cập nhật riêng trong đơn ứng tuyển.";
   if (iv.status === "IN_PROGRESS") return "Ứng viên đã vào phòng phỏng vấn. Kết quả sẽ được ghi nhận sau buổi trao đổi.";
   if (Date.parse(iv.scheduledEnd) <= now) return recruiter ? "Đã qua giờ hẹn. Kiểm tra tình hình tham dự và lưu đánh giá khi buổi phỏng vấn thực sự hoàn tất." : "Đã qua giờ hẹn. Theo dõi kết quả trong đơn ứng tuyển hoặc liên hệ nhà tuyển dụng.";
-  if (iv.status === "SCHEDULED") return recruiter ? "Đã gửi lời mời, đang chờ ứng viên xác nhận." + (iv.mode === "ONLINE" ? " Vào phòng trước không thay thế xác nhận của ứng viên." : "") : "Bạn có một lời mời phỏng vấn. Kiểm tra thời gian, hình thức và xác nhận tham gia hoặc đề nghị đổi giờ.";
+  if (iv.status === "SCHEDULED") return recruiter ? "Đã gửi lời mời, đang chờ ứng viên xác nhận." + (iv.mode === "ONLINE" ? " Vào phòng trước không thay thế xác nhận của ứng viên." : "") : "Kiểm tra thời gian, hình thức và bấm xác nhận tham gia. Nếu không thể tham dự, hãy liên hệ nhà tuyển dụng.";
   return recruiter ? "Ứng viên đã xác nhận lịch này. Nếu đổi thời gian, hệ thống sẽ gửi lịch mới để xác nhận lại." : iv.mode === "ONLINE" ? "Bạn đã xác nhận lịch này. Chuẩn bị tham gia đúng giờ; phòng trực tuyến mở trước 15 phút." : "Bạn đã xác nhận lịch này. Kiểm tra địa điểm, chuẩn bị giấy tờ và có mặt đúng giờ.";
 }
 

@@ -115,7 +115,7 @@ func TestScheduleInterviewOnlineAndOffline(t *testing.T) {
 	_, err = svc.ScheduleInterview(context.Background(), principal, "Bearer tok", model.CreateInterviewRequest{
 		ApplicationID:   &appID,
 		RequestID:       &reqID2,
-		RoundNumber:     2,
+		RoundNumber:     1,
 		ScheduledStart:  "2026-12-06T14:00:00Z",
 		TimeZone:        "Asia/Ho_Chi_Minh",
 		DurationMinutes: 30,
@@ -127,6 +127,15 @@ func TestScheduleInterviewOnlineAndOffline(t *testing.T) {
 	apiErr, ok := err.(*apierror.Error)
 	if !ok || apiErr.Code != "VALIDATION_FAILED" {
 		t.Fatalf("expected VALIDATION_FAILED, got %v", err)
+	}
+	location := "Test office"
+	offline, err := svc.ScheduleInterview(context.Background(), principal, "Bearer tok", model.CreateInterviewRequest{
+		ApplicationID: &appID, RequestID: &reqID2, RoundNumber: 1,
+		ScheduledStart: "2026-12-06T14:00:00Z", TimeZone: "Asia/Ho_Chi_Minh",
+		DurationMinutes: 30, Mode: "OFFLINE", Location: &location,
+	})
+	if err != nil || offline.Response.Mode != model.ModeOffline || offline.Response.RoomURL != nil {
+		t.Fatalf("valid offline appointment failed: %v", err)
 	}
 }
 
@@ -255,11 +264,8 @@ func TestLifecycleCandidateAndRecruiterFlows(t *testing.T) {
 		Reason:         &reason,
 		PreferredSlots: []string{"2026-12-06T09:00:00Z", "2026-12-06T14:00:00Z"},
 	})
-	if err != nil {
-		t.Fatalf("candidate reschedule failed: %v", err)
-	}
-	if reschedRes.Status != model.StatusRescheduleRequested {
-		t.Fatalf("expected RESCHEDULE_REQUESTED, got %s", reschedRes.Status)
+	if apiErr, ok := err.(*apierror.Error); !ok || apiErr.Code != "INTERVIEW_RESCHEDULE_DISABLED" {
+		t.Fatalf("candidate should only confirm the selected time, got %+v / %v", reschedRes, err)
 	}
 
 	// Join Room

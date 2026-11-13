@@ -18,6 +18,7 @@ import {
   listApplicationInterviews,
   type Interview,
 } from "@/lib/interviewApi";
+import { currentInterview } from "@/lib/interviewWorkflow";
 import { toUserMessage } from "@/lib/apiClient";
 import { ApplicationNextStep, ApplicationProgress, ApplicationTimeline } from "@/components/ApplicationJourney";
 import { ApplicationOfferSummary } from "@/components/ApplicationOfferSummary";
@@ -98,7 +99,7 @@ export default function RecruiterApplicationDetailPage({
                 href={`/recruiter/applications/${application.id}/interview`}
               >
                 {interviews.length > 0
-                  ? "Quản lý & Đặt lịch phỏng vấn"
+                  ? "Xem lịch phỏng vấn"
                   : "Đặt lịch phỏng vấn"}
               </Link>
             )}
@@ -128,15 +129,15 @@ export default function RecruiterApplicationDetailPage({
       {interviews.length > 0 && (
         <section className="card stack">
           <div className="section-head">
-            <h2>Lịch phỏng vấn ({interviews.length})</h2>
+            <h2>Lịch phỏng vấn</h2>
             <Link
               className="btn btn-secondary"
               href={`/recruiter/applications/${application.id}/interview`}
             >
-              Mở quản lý phỏng vấn & chấm điểm
+              Xem lịch phỏng vấn
             </Link>
           </div>
-          {interviews.map((iv) => (
+          {[currentInterview(interviews)].filter((iv): iv is Interview => !!iv).map((iv) => (
             <div
               key={iv.id}
               className="section-head"
@@ -146,7 +147,7 @@ export default function RecruiterApplicationDetailPage({
               }}
             >
               <div>
-                <strong>Vòng {iv.roundNumber}</strong> ·{" "}
+                <strong>Buổi phỏng vấn</strong> ·{" "}
                 {new Date(iv.scheduledStart).toLocaleString("vi-VN", {
                   timeZone: "Asia/Ho_Chi_Minh",
                 })}{" "}

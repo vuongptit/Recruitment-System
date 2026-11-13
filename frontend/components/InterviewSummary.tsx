@@ -7,7 +7,7 @@ import styles from "./InterviewWorkspace.module.css";
 export function InterviewSummary({ interview, recruiter = false, now, inactive = false }: { interview: Interview; recruiter?: boolean; now?: number; inactive?: boolean }) {
   const iv = interview;
   return <>
-    <div className={styles.cardHeading}><div><span className={styles.eyebrow}>PHỎNG VẤN · VÒNG {iv.roundNumber}</span><h3>{interviewDate(iv.scheduledStart, "date")}</h3>{(iv.scheduleRevision ?? 1) > 1 ? <span className={styles.revision}>Lịch cập nhật lần {(iv.scheduleRevision ?? 1) - 1}{iv.status === "SCHEDULED" ? " · Cần xác nhận theo lịch mới" : ""}</span> : null}</div><StatusBadge tone={iv.status === "CONFIRMED" || iv.status === "COMPLETED" ? "success" : iv.status === "CANCELLED" || iv.status === "NO_SHOW" ? "neutral" : "warning"}>{interviewStatusLabel(iv.status)}</StatusBadge></div>
+    <div className={styles.cardHeading}><div><span className={styles.eyebrow}>LỊCH PHỎNG VẤN</span><h3>{interviewDate(iv.scheduledStart, "date")}</h3>{(iv.scheduleRevision ?? 1) > 1 ? <span className={styles.revision}>Lịch cập nhật lần {(iv.scheduleRevision ?? 1) - 1}{iv.status === "SCHEDULED" ? " · Cần xác nhận theo lịch mới" : ""}</span> : null}</div><StatusBadge tone={iv.status === "CONFIRMED" || iv.status === "COMPLETED" ? "success" : iv.status === "CANCELLED" || iv.status === "NO_SHOW" ? "neutral" : "warning"}>{interviewStatusLabel(iv.status)}</StatusBadge></div>
     <div className={styles.facts}>
       <span><Clock3 size={17} />{interviewDate(iv.scheduledStart, "time")} – {interviewDate(iv.scheduledEnd, "time")} · {iv.durationMinutes} phút</span>
       <span>{iv.mode === "ONLINE" ? <Video size={17} /> : <MapPin size={17} />}{interviewModeLabel(iv.mode)}</span>

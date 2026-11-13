@@ -1,37 +1,38 @@
 # Interview Service (Go)
 
-Production-grade Go microservice managing the complete interview lifecycle for the Recruitment Platform:
+CareerHub uses one interview round per application. The scheduling UI has two steps:
 
-1. **Flow 1 — HR Interview Scheduling (`POST /interviews`)**:
-   - Supports `OFFLINE` (physical location required) and `ONLINE` (auto-generates video room path `/interviews/{id}/room`).
-   - Verifies active recruiter membership via `company-service` and application schedulability (`INTERVIEW` only) via `application-service`. Recruiters explicitly move a reviewed application into the interview stage before scheduling.
-   - Enforces PostgreSQL `btree_gist` exclusion constraints preventing candidate and interviewer double-booking (`[scheduled_start_at, scheduled_end_at)`).
-   - Enforces idempotency via `(scheduled_by, request_id)` and SHA-256 payload hash.
-   - Writes transactional outbox event (`SCHEDULED`) to `interview_event_outbox`.
+1. A recruiter selects one future time, duration (30/45/60 minutes), ONLINE/OFFLINE and a physical location when OFFLINE, then sends the invitation.
+2. The owning candidate confirms. SCHEDULED becomes CONFIRMED and booking is complete.
 
-2. **Flow 2 — Candidate Confirmation & Rescheduling (`PATCH /interviews/{id}/confirm`, `PATCH /interviews/{id}/reschedule`)**:
-   - Candidate confirms attendance (`SCHEDULED -> CONFIRMED`); pending reschedule requests cannot be silently confirmed.
-   - Confirmation, candidate reschedule requests and room entry re-check the current Application through its participant-authorized tracking API, forwarding the caller JWT. Ended/non-interview applications cannot continue on an old invitation.
-   - Candidate requests reschedule (`SCHEDULED/CONFIRMED -> RESCHEDULE_REQUESTED`) with reason and 2–3 distinct future ISO-8601 timestamps.
-   - Recruiter reschedules to a new time slot (marks previous interview `CANCELLED` and creates a new revision with `schedule_revision + 1` and `supersedes_interview_id`).
-   - The new revision is `SCHEDULED` with no inherited confirmation. Recruiter rescheduling checks the current application stage again and supports idempotent retries with the same request ID/payload.
-   - Background worker queues `REMINDER` events 24h prior to unconfirmed interviews.
+This does not complete the hiring application or automatically send an offer.
 
-3. **Flow 3 — Online Video Interview Room (`POST /interviews/{id}/join`, `POST /interviews/{id}/leave`)**:
-   - Synchronized with LiveKit (`github.com/livekit/protocol/auth`).
-   - Enforces join window `[scheduled_start_at - 15m, scheduled_end_at + 60m]`.
-   - Transitions interview to `IN_PROGRESS` on the candidate's first join (`started_at`, and implicit confirmation if needed). Recruiter preparation alone does not record candidate attendance. Leave before a candidate has joined does not record an end timestamp.
+## Scheduling and confirmation
 
-4. **Flow 4 — Post-Interview Evaluation (`PATCH /interviews/{id}/feedback`, `GET /interviews/{id}/feedback`)**:
-   - Stores structured competency scores (`technical`, `communication`, `attitude`, `cultureFit` 1..10), `overall_score`, `comment`, and `conclusion` (`PASS | FAIL | NEXT_ROUND`).
-   - Transitions interview to `COMPLETED` and emits `COMPLETED` event.
-   - Rejects feedback before scheduled start and while a reschedule request is pending. Feedback conclusions are recommendations; they do not automatically accept/reject the Application.
+- POST /interviews accepts roundNumber=1 (omitted/0 defaults to 1); other rounds are rejected.
+- Company membership and Application stage INTERVIEW are verified before scheduling; candidate confirmation revalidates participant-authorized Application access.
+- A per-application PostgreSQL transaction advisory lock prevents concurrent recruiters from creating separate appointments. A non-cancelled appointment, including COMPLETED/NO_SHOW, blocks a new initial schedule.
+- Cancelled appointments may be replaced with another round-1 appointment. Existing historical multi-round data is retained.
+- Idempotency uses scheduled_by/request_id and a normalized payload hash; retries return the same appointment.
+- Database exclusion constraints still prevent candidate/interviewer time conflicts.
+- Events are written through the transactional outbox.
 
-5. **Flow 5 — Cancellation & Automatic No-Show (`PATCH /interviews/{id}/cancel`)**:
-   - Allows cancellation at least 2 hours before `scheduled_start_at` with mandatory reason.
-   - Background scheduler only marks unstarted ONLINE interviews as `NO_SHOW` after `scheduled_end_at + 60 minutes`, consistent with the join grace window. OFFLINE attendance cannot be inferred from video usage and is handled by the recruiter.
+## Corrections and historical compatibility
 
-6. **Flow 6 — Query, Calendar & Availability (`GET /interviews`, `/my`, `/calendar`, `/availability`, `/{id}`)**:
-   - Role-scoped projections and HMAC-SHA256 signed keyset pagination cursors.
+- Recruiters may correct the existing appointment using PATCH /interviews/{id}/reschedule. It creates a revision of the same interview, cancels the prior revision atomically, and resets confirmation.
+- Candidate multi-slot negotiation is disabled: the reschedule endpoint returns 409 INTERVIEW_RESCHEDULE_DISABLED for CANDIDATE.
+- Old RESCHEDULE_REQUESTED rows remain readable and can be resolved by a recruiter correction.
+- The scheduling page no longer contains evaluation forms. Existing feedback API/read models remain for historical integration; new conclusions accept PASS/FAIL, not NEXT_ROUND.
+- Cancellation endpoints, role-scoped queries, calendar and availability APIs remain compatible. They are not additional required booking steps.
 
-See [workflow review and UI decisions](../../docs/interview-workflow-review.md) for the current policy matrix, validation and remaining integration limits.
+## Optional online participation
+
+ONLINE appointments retain authorized LiveKit room entry/leave and the join window from start minus 15 minutes to end plus 60 minutes. Recruiter preparation alone does not record candidate attendance. OFFLINE appointments are never automatically marked absent for lacking video activity.
+
+## Verification
+
+Run unit tests with go test ./internal/....
+
+Database integration tests require an explicit isolated TEST_DATABASE_URL and use go test ./test -v. They never fall back to the user's DATABASE_URL.
+
+See [the workflow and UI review](../../docs/interview-workflow-review.md) for the policy, UI decisions and limitations.
