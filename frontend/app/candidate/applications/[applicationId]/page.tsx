@@ -7,6 +7,9 @@ import { useEffect, useState } from "react";
 import { ErrorState, LoadingState, PageHeader, StatusBadge } from "@/components/ui";
 import { ApiClientError, toUserMessage } from "../../../../lib/apiClient";
 import { getApplicationDetail, type CandidateApplication } from "../../../../lib/person2Api";
+import { ApplicationNextStep, ApplicationProgress, ApplicationTimeline } from "@/components/ApplicationJourney";
+import { formatApplicationDate } from "@/lib/applicationStateMachine";
+import { ApplicationOfferSummary } from "@/components/ApplicationOfferSummary";
 
 export default function CandidateApplicationDetailPage({ params }: { params: { applicationId: string } }) {
   const [application, setApplication] = useState<CandidateApplication | null>(null);
@@ -36,28 +39,18 @@ export default function CandidateApplicationDetailPage({ params }: { params: { a
       <PageHeader title={application.jobTitle} description="Theo dõi tiến trình và phản hồi từ nhà tuyển dụng." action={<Link className="btn" href="/candidate/applications">Về hồ sơ ứng tuyển</Link>} />
       <section className="panel">
         <div className="section-head"><h2>Thông tin ứng tuyển</h2><StatusBadge tone={application.status === "HIRED" ? "success" : "info"}>{applicationStatusLabel(application.status)}</StatusBadge></div>
-        <p>Nộp ngày <time dateTime={application.createdAt}>{new Date(application.createdAt).toLocaleString("vi-VN")}</time></p>
+        <p>{application.companyName}</p>
+        <p>Nộp ngày <time dateTime={application.createdAt}>{formatApplicationDate(application.createdAt)}</time> · GMT+7</p>
+        <ApplicationProgress status={application.status} timeline={application.timeline} />
+        <ApplicationNextStep status={application.status} viewer="CANDIDATE" applicationId={application.id} offerId={application.offerId} />
+        <p className="help">Hồ sơ đã gửi không thể rút. Cập nhật hồ sơ cá nhân không thay đổi đơn ứng tuyển đã gửi.</p>
         {application.coverLetter ? <div><h3>Thư ứng tuyển</h3><p style={{ whiteSpace: "pre-wrap" }}>{application.coverLetter}</p></div> : null}
         <div className="btn-group">
           <Link className="btn" href={`/candidate/jobs/${application.jobId}`}>Xem việc làm</Link>
-          {application.offerId ? <Link className="btn btn-primary" href={`/candidate/offers/${application.offerId}`}>Xem và phản hồi thư mời nhận việc</Link> : null}
         </div>
       </section>
-      <section className="panel">
-        <h2>Lịch sử hồ sơ</h2>
-        <p className="help">Thời gian hiển thị theo múi giờ thiết bị của bạn.</p>
-        {application.timeline?.length ? (
-          <ol className="stack">
-            {application.timeline.map((entry, index) => (
-              <li key={`${entry.changedAt}-${index}`}>
-                <strong>{entry.fromStatus ? `${applicationStatusLabel(entry.fromStatus)} → ` : ""}{applicationStatusLabel(entry.toStatus)}</strong>
-                <p className="help"><time dateTime={entry.changedAt}>{new Date(entry.changedAt).toLocaleString("vi-VN")}</time></p>
-                {entry.note ? <p style={{ whiteSpace: "pre-wrap" }}>{entry.note}</p> : null}
-              </li>
-            ))}
-          </ol>
-        ) : <p className="notice">Hồ sơ chưa có cập nhật tiến trình.</p>}
-      </section>
+      <ApplicationTimeline entries={application.timeline} />
+      {application.offerId ? <ApplicationOfferSummary offerId={application.offerId} applicationId={application.id} candidate /> : null}
     </main>
   );
 }

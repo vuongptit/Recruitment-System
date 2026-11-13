@@ -701,9 +701,9 @@ test("Application state machine exposes only backend-valid recruiter commands", 
   assert.deepEqual(recruiterApplicationActions("WITHDRAWN"), []);
 });
 
-test("candidate actions withdraw only active applications and route OFFER decisions separately", () => {
-  for (const status of ["APPLIED", "REVIEWING", "INTERVIEW", "OFFER"] as const) {
-    assert.equal(candidateApplicationActions(status).some((action) => action.kind === "WITHDRAW"), true);
+test("submitted applications cannot be withdrawn and OFFER uses the offer decision flow", () => {
+  for (const status of ["APPLIED", "REVIEWING", "INTERVIEW", "OFFER", "HIRED", "REJECTED", "WITHDRAWN"] as const) {
+    assert.ok(candidateApplicationActions(status).every((action) => action.kind === "RESPOND_OFFER"));
   }
   assert.equal(candidateApplicationActions("OFFER").some((action) => action.kind === "RESPOND_OFFER"), true);
   assert.deepEqual(candidateApplicationActions("HIRED"), []);
@@ -736,8 +736,8 @@ test("recruiter Application filters validate date order and normalize the exact 
   assert.deepEqual(normalizeRecruiterApplicationQuery("job-id", draft, 2), {
     jobId: "job-id",
     status: "REVIEWING",
-    appliedFrom: "2026-08-01T00:00:00.000Z",
-    appliedTo: "2026-08-31T23:59:59.999Z",
+    appliedFrom: "2026-07-31T17:00:00.000Z",
+    appliedTo: "2026-08-31T16:59:59.999Z",
     skills: ["React", "Java"],
     sort: "MATCH_SCORE_DESC",
     page: 2,

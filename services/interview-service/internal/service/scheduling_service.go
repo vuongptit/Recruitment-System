@@ -102,7 +102,7 @@ func (s *SchedulingService) ScheduleInterview(
 	if appCtx.CompanyID != recruiterCtx.CompanyID {
 		return nil, apierror.NewStatus(http.StatusNotFound, "APPLICATION_NOT_FOUND", "Application was not found", nil)
 	}
-	if appCtx.Status != "REVIEWING" && appCtx.Status != "INTERVIEW" {
+	if appCtx.Status != "INTERVIEW" {
 		return nil, apierror.NewStatus(http.StatusConflict, "APPLICATION_NOT_SCHEDULABLE", "Application status does not allow scheduling interviews", map[string]any{
 			"applicationStatus": appCtx.Status,
 		})

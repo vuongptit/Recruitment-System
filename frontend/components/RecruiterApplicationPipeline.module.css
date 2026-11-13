@@ -1,0 +1,14 @@
+.filters { background: #f8faf9; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px; }
+.filters summary, .tools summary, .rejection summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 13px 16px; }
+.filters form { padding: 8px 16px 16px; }
+.application { padding: 22px; }
+.application h3 { margin: 0 0 8px; font-size: 19px; }
+.application h3 a { text-decoration: none; }
+.application h3 a:hover { text-decoration: underline; }
+.tools { border-top: 1px solid var(--border); margin-top: 18px; }
+.tools > div { padding: 0 16px 16px; }
+.rejection { border-top: 1px solid var(--border); color: #a32929; }
+.rejection > div { color: var(--text); padding: 0 16px 16px; }
+.rejection textarea { min-height: 88px; }
+.filters summary:focus-visible, .tools summary:focus-visible, .rejection summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+@media(max-width:600px) { .application { padding: 16px; } }

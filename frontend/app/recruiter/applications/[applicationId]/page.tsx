@@ -19,6 +19,8 @@ import {
   type Interview,
 } from "@/lib/interviewApi";
 import { toUserMessage } from "@/lib/apiClient";
+import { ApplicationNextStep, ApplicationProgress, ApplicationTimeline } from "@/components/ApplicationJourney";
+import { ApplicationOfferSummary } from "@/components/ApplicationOfferSummary";
 
 export default function RecruiterApplicationDetailPage({
   params,
@@ -32,20 +34,26 @@ export default function RecruiterApplicationDetailPage({
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [interviewError, setInterviewError] = useState("");
 
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError("");
+    setInterviewError("");
     Promise.all([
       getApplicationDetail(params.applicationId, controller.signal),
       listApplicationInterviews(
         params.applicationId,
         null,
         controller.signal
-      ).catch(() => ({ data: { items: [], nextCursor: null } })),
+      ).catch((reason: unknown) => {
+        if (!controller.signal.aborted) setInterviewError(toUserMessage(reason));
+        return { data: { items: [], nextCursor: null } };
+      }),
     ])
       .then(([appRes, ivRes]) => {
+        if (controller.signal.aborted) return;
         setApplication(appRes.data);
         setInterviews(ivRes.data.items);
       })
@@ -84,7 +92,7 @@ export default function RecruiterApplicationDetailPage({
         description="Xem hồ sơ, quản lý lịch phỏng vấn, đánh giá và liên hệ ứng viên trong cùng một nơi."
         action={
           <div className="btn-group">
-            {["REVIEWING", "INTERVIEW"].includes(application.status) && (
+            {application.status === "INTERVIEW" && (
               <Link
                 className="btn btn-primary"
                 href={`/recruiter/applications/${application.id}/interview`}
@@ -108,6 +116,14 @@ export default function RecruiterApplicationDetailPage({
           </div>
         }
       />
+
+      <section className="panel">
+        <div className="section-head"><h2>Tiến trình ứng tuyển</h2><StatusBadge>{applicationStatusLabel(application.status)}</StatusBadge></div>
+        <ApplicationProgress status={application.status} timeline={application.timeline} />
+        <ApplicationNextStep status={application.status} viewer="RECRUITER" applicationId={application.id} offerId={application.offerId} />
+        <Link className="btn" href="/recruiter/applications">Về danh sách và xử lý hồ sơ</Link>
+      </section>
+      {interviewError ? <ErrorState message={`Chưa tải được lịch phỏng vấn: ${interviewError}`} onRetry={() => setReload((value) => value + 1)} /> : null}
 
       {interviews.length > 0 && (
         <section className="card stack">
@@ -170,7 +186,6 @@ export default function RecruiterApplicationDetailPage({
 
       <section className="card stack">
         <h2>Thông tin ứng tuyển</h2>
-        <StatusBadge>{applicationStatusLabel(application.status)}</StatusBadge>
         <p>
           Nộp ngày{" "}
           {new Date(application.createdAt).toLocaleString("vi-VN", {
@@ -183,6 +198,8 @@ export default function RecruiterApplicationDetailPage({
         <RecruiterCvAccess applicationId={application.id} />
         <RecruiterEvaluation applicationId={application.id} />
       </section>
+      <ApplicationTimeline entries={application.timeline} />
+      {application.offerId ? <ApplicationOfferSummary offerId={application.offerId} applicationId={application.id} /> : null}
     </main>
   );
 }

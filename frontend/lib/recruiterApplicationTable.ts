@@ -22,12 +22,12 @@ export interface RecruiterApplicationQuery {
   size: number;
 }
 
-function startOfUtcDate(value: string): string | undefined {
-  return value ? `${value}T00:00:00.000Z` : undefined;
+function startOfVietnamDate(value: string): string | undefined {
+  return value ? new Date(`${value}T00:00:00.000+07:00`).toISOString() : undefined;
 }
 
-function endOfUtcDate(value: string): string | undefined {
-  return value ? `${value}T23:59:59.999Z` : undefined;
+function endOfVietnamDate(value: string): string | undefined {
+  return value ? new Date(`${value}T23:59:59.999+07:00`).toISOString() : undefined;
 }
 
 export function validateRecruiterApplicationFilters(draft: RecruiterApplicationFilterDraft): string | null {
@@ -51,8 +51,8 @@ export function normalizeRecruiterApplicationQuery(
   return {
     jobId,
     status: draft.status === "ALL" ? undefined : draft.status,
-    appliedFrom: startOfUtcDate(draft.appliedFrom),
-    appliedTo: endOfUtcDate(draft.appliedTo),
+    appliedFrom: startOfVietnamDate(draft.appliedFrom),
+    appliedTo: endOfVietnamDate(draft.appliedTo),
     skills: skills.length ? skills : undefined,
     sort: draft.sort,
     page: Math.max(0, Math.floor(page)),

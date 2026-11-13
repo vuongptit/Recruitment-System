@@ -12,10 +12,10 @@ const applicationStatuses: Record<string, string> = {
   APPLIED: "Đã ứng tuyển",
   REVIEWING: "Đang xem xét",
   INTERVIEW: "Phỏng vấn",
-  OFFER: "Chờ phản hồi thư mời",
-  HIRED: "Đã tuyển",
+  OFFER: "Thư mời nhận việc",
+  HIRED: "Đã nhận việc",
   REJECTED: "Đã từ chối",
-  WITHDRAWN: "Đã rút hồ sơ",
+  WITHDRAWN: "Đã rút trước đây",
 };
 
 const offerStatuses: Record<string, string> = {

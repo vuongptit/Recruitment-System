@@ -30,13 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ApplicationPipelineService {
-    private static final EnumSet<ApplicationStatus> WITHDRAWABLE = EnumSet.of(
-        ApplicationStatus.APPLIED,
-        ApplicationStatus.REVIEWING,
-        ApplicationStatus.INTERVIEW,
-        ApplicationStatus.OFFER
-    );
-
     private final ApplicationPipelineRepository applications;
     private final ApplicationHistoryWriter history;
     private final ApplicationEventOutboxRepository outbox;
@@ -197,20 +190,13 @@ public class ApplicationPipelineService {
             throw denied();
         }
         ensureVersion(application, request.expectedVersion());
-        if (!WITHDRAWABLE.contains(application.getStatus())) {
-            throw new BusinessException(
-                "APPLICATION_NOT_WITHDRAWABLE",
-                "Only an active application can be withdrawn",
-                HttpStatus.CONFLICT,
-                Map.of("currentStatus", application.getStatus().name())
-            );
-        }
-        return transition(
-            application,
-            candidateId,
-            ApplicationStatus.WITHDRAWN,
-            request.note(),
-            request.expectedVersion()
+        // Keep the legacy endpoint explicit for older clients. A submitted
+        // application is retained; offer responses have their own endpoint.
+        throw new BusinessException(
+            "APPLICATION_NOT_WITHDRAWABLE",
+            "Submitted applications cannot be withdrawn; respond to the offer instead",
+            HttpStatus.CONFLICT,
+            Map.of("currentStatus", application.getStatus().name())
         );
     }
 
@@ -273,10 +259,7 @@ public class ApplicationPipelineService {
     ) {
         if (
             application.getStatus() != ApplicationStatus.OFFER ||
-            (
-                target != ApplicationStatus.REJECTED &&
-                target != ApplicationStatus.WITHDRAWN
-            )
+            target != ApplicationStatus.REJECTED
         ) {
             return;
         }

@@ -206,31 +206,26 @@ class ApplicationPipelineServiceTest {
             .isEqualTo("REJECTION_REASON_REQUIRED");
     }
 
-    @Test
-    void candidateWithdrawsOwnActiveApplication() throws Exception {
-        StatusTransitionResponse response = service.withdraw(
-            applicationId,
-            candidateId,
-            new WithdrawApplicationRequest("Personal reason", 0L)
-        );
+    @ParameterizedTest
+    @EnumSource(ApplicationStatus.class)
+    void submittedApplicationCannotBeWithdrawnInAnyStatus(ApplicationStatus status) {
+        ApplicationEntity application = mock(ApplicationEntity.class);
+        when(application.getCandidateId()).thenReturn(candidateId);
+        when(application.getStatus()).thenReturn(status);
+        when(application.getVersion()).thenReturn(0L);
+        when(applications.findById(applicationId)).thenReturn(Optional.of(application));
 
-        assertThat(response.toStatus()).isEqualTo(ApplicationStatus.WITHDRAWN);
-        verify(history).append(
-            applicationId,
-            ApplicationStatus.APPLIED,
-            ApplicationStatus.WITHDRAWN,
-            candidateId,
-            "Personal reason",
-            NOW
-        );
-        ArgumentCaptor<ApplicationEventOutboxEntity> event =
-            ArgumentCaptor.forClass(ApplicationEventOutboxEntity.class);
-        verify(outbox).save(event.capture());
-        JsonNode payload = new ObjectMapper().findAndRegisterModules()
-            .readTree(event.getValue().getPayload());
-        assertThat(payload.path("actor_id").asText())
-            .isEqualTo(candidateId.toString());
-        assertThat(payload.path("aggregate_version").asLong()).isEqualTo(1L);
+        assertThatThrownBy(() -> service.withdraw(applicationId, candidateId,
+            new WithdrawApplicationRequest("Changed plans", 0L)))
+            .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                assertThat(exception.code()).isEqualTo("APPLICATION_NOT_WITHDRAWABLE");
+                assertThat(exception.status().value()).isEqualTo(409);
+                assertThat(exception.details()).containsEntry("currentStatus", status.name());
+            });
+        verify(applications, never()).transition(any(), any(), any(), anyLong());
+        verify(history, never()).append(any(), any(), any(), any(), any(), any());
+        verify(outbox, never()).save(any());
+        verify(offers, never()).cancelSent(any(), any(), anyLong());
     }
 
     @Test
@@ -283,33 +278,16 @@ class ApplicationPipelineServiceTest {
     }
 
     @Test
-    void candidateWithdrawalCancelsSentOfferAtomically() {
+    void candidateWithdrawalCannotCancelSentOffer() {
         stubOfferedApplication(7L);
-        when(offers.cancelSent(applicationId, NOW, 0L)).thenReturn(1);
-        when(applications.transition(
-            applicationId,
-            ApplicationStatus.WITHDRAWN,
-            NOW,
-            7L
-        )).thenReturn(1);
-
-        StatusTransitionResponse response = service.withdraw(
-            applicationId,
-            candidateId,
-            new WithdrawApplicationRequest("Accepted elsewhere", 7L)
-        );
-
-        assertThat(response.fromStatus()).isEqualTo(ApplicationStatus.OFFER);
-        assertThat(response.toStatus()).isEqualTo(ApplicationStatus.WITHDRAWN);
-        verify(offers).cancelSent(applicationId, NOW, 0L);
-        verify(history).append(
-            applicationId,
-            ApplicationStatus.OFFER,
-            ApplicationStatus.WITHDRAWN,
-            candidateId,
-            "Accepted elsewhere",
-            NOW
-        );
+        assertThatThrownBy(() -> service.withdraw(applicationId, candidateId,
+            new WithdrawApplicationRequest("Accepted elsewhere", 7L)))
+            .isInstanceOf(BusinessException.class).extracting("code")
+            .isEqualTo("APPLICATION_NOT_WITHDRAWABLE");
+        verify(offers, never()).cancelSent(any(), any(), anyLong());
+        verify(applications, never()).transition(any(), any(), any(), anyLong());
+        verify(history, never()).append(any(), any(), any(), any(), any(), any());
+        verify(outbox, never()).save(any());
     }
 
     @Test
@@ -318,10 +296,11 @@ class ApplicationPipelineServiceTest {
         when(offers.findByApplicationId(applicationId))
             .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.withdraw(
+        assertThatThrownBy(() -> service.changeStatus(
             applicationId,
-            candidateId,
-            new WithdrawApplicationRequest(null, 2L)
+            recruiterId,
+            "Bearer token",
+            new ChangeApplicationStatusRequest(ApplicationStatus.REJECTED, "No longer hiring", 2L)
         ))
             .isInstanceOf(BusinessException.class)
             .satisfies(exception -> {
@@ -373,29 +352,15 @@ class ApplicationPipelineServiceTest {
     }
 
     @Test
-    void expiredOfferLetsTheCandidateStillWithdraw() {
+    void expiredOfferDoesNotPermitWithdrawal() {
         OfferEntity offer = stubOfferedApplication(2L);
         when(offer.getStatus()).thenReturn(OfferStatus.EXPIRED);
-        when(applications.transition(
-            applicationId,
-            ApplicationStatus.WITHDRAWN,
-            NOW,
-            2L
-        )).thenReturn(1);
-
-        service.withdraw(
-            applicationId,
-            candidateId,
-            new WithdrawApplicationRequest("Accepted elsewhere", 2L)
-        );
-
+        assertThatThrownBy(() -> service.withdraw(applicationId, candidateId,
+            new WithdrawApplicationRequest("Accepted elsewhere", 2L)))
+            .isInstanceOf(BusinessException.class).extracting("code")
+            .isEqualTo("APPLICATION_NOT_WITHDRAWABLE");
         verify(offers, never()).cancelSent(any(), any(), anyLong());
-        verify(applications).transition(
-            applicationId,
-            ApplicationStatus.WITHDRAWN,
-            NOW,
-            2L
-        );
+        verify(applications, never()).transition(any(), any(), any(), anyLong());
     }
 
     @Test
@@ -477,10 +442,11 @@ class ApplicationPipelineServiceTest {
         when(applications.transition(any(), any(), any(), eq(0L)))
             .thenReturn(0);
 
-        assertThatThrownBy(() -> service.withdraw(
+        assertThatThrownBy(() -> service.changeStatus(
             applicationId,
-            candidateId,
-            new WithdrawApplicationRequest(null, 0L)
+            recruiterId,
+            "Bearer token",
+            new ChangeApplicationStatusRequest(ApplicationStatus.REVIEWING, null, 0L)
         ))
             .isInstanceOf(BusinessException.class)
             .extracting("code")

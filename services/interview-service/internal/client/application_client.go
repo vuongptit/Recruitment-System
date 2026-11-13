@@ -165,7 +165,7 @@ func (c *ApplicationClient) AuthorizeScheduling(ctx context.Context, application
 		authCtx.CandidateID == uuid.Nil ||
 		authCtx.CandidateID == uuid.MustParse("00000000-0000-0000-0000-000000000000") ||
 		authCtx.ApplicationVersion < 0 ||
-		(authCtx.Status != "REVIEWING" && authCtx.Status != "INTERVIEW") {
+		authCtx.Status != "INTERVIEW" {
 		return nil, unavailableAppErr()
 	}
 

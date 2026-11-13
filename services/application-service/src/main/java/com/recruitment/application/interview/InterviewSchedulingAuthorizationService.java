@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class InterviewSchedulingAuthorizationService {
     private static final EnumSet<ApplicationStatus> SCHEDULABLE_STATUSES =
-        EnumSet.of(ApplicationStatus.REVIEWING, ApplicationStatus.INTERVIEW);
+        EnumSet.of(ApplicationStatus.INTERVIEW);
 
     private final ApplicationRepository applications;
     private final CompanyClient companies;
@@ -44,7 +44,7 @@ public class InterviewSchedulingAuthorizationService {
         if (!SCHEDULABLE_STATUSES.contains(application.getStatus())) {
             throw new BusinessException(
                 "APPLICATION_NOT_SCHEDULABLE",
-                "Application must be in REVIEWING or INTERVIEW status",
+                "Move the application to INTERVIEW before scheduling an interview",
                 HttpStatus.CONFLICT
             );
         }

@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class InterviewSchedulingAuthorizationServiceTest {
     private static final UUID APPLICATION_ID = UUID.randomUUID();
@@ -139,9 +140,10 @@ class InterviewSchedulingAuthorizationServiceTest {
         });
     }
 
-    @Test
-    void sameCompanyCannotScheduleAnApplicationOutsideInterviewFlow() {
-        when(application.getStatus()).thenReturn(ApplicationStatus.APPLIED);
+    @ParameterizedTest
+    @EnumSource(value = ApplicationStatus.class, names = "INTERVIEW", mode = EnumSource.Mode.EXCLUDE)
+    void sameCompanyCannotScheduleAnApplicationOutsideInterviewFlow(ApplicationStatus status) {
+        when(application.getStatus()).thenReturn(status);
 
         assertThatThrownBy(() -> service.authorize(
             APPLICATION_ID,
@@ -157,7 +159,6 @@ class InterviewSchedulingAuthorizationServiceTest {
 
     static Stream<Arguments> schedulableStatuses() {
         return Stream.of(
-            Arguments.of(ApplicationStatus.REVIEWING),
             Arguments.of(ApplicationStatus.INTERVIEW)
         );
     }

@@ -273,7 +273,7 @@ export interface ApplicationOfferMutationResult {
   note: string | null;
   fileId: string | null;
   fileUrl: string | null;
-  status: "SENT" | "ACCEPTED" | "DECLINED" | "EXPIRED";
+  status: "SENT" | "ACCEPTED" | "DECLINED" | "EXPIRED" | "CANCELLED";
   sentAt: string;
   expiresAt: string;
   respondedAt: string | null;
@@ -1410,7 +1410,7 @@ export async function withdrawCandidateApplication(
   if (isDemoPerson2Api) {
     const application = demo.applications.find((item) => item.id === applicationId);
     if (!application) throw new ApiClientError({ code: "APPLICATION_NOT_FOUND", status: 404 });
-    return { data: { applicationId, fromStatus: application.status, toStatus: "WITHDRAWN", updatedAt: new Date().toISOString(), version: body.expectedVersion + 1 }, meta: null };
+    throw new ApiClientError({ code: "APPLICATION_NOT_WITHDRAWABLE", status: 409 });
   }
   assertCanonicalUuidV4(applicationId, "applicationId");
   return requestApi<ApplicationTransitionResult>(applicationResourceRoute(applicationId, "withdraw"), {

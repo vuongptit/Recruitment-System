@@ -80,6 +80,7 @@ export function ApplyForm({ jobId, source = "SEARCH" }: { jobId: string; source?
         <textarea id="apply-note" className="textarea resize-none" rows={4} maxLength={2000} value={coverLetter} disabled={pending || submitted} onChange={(event) => setCoverLetter(event.target.value)} />
         <span className="help">Tối đa 2.000 ký tự.</span>
       </div>
+      <p className="help">Kiểm tra CV và thư ứng tuyển trước khi gửi. Hồ sơ đã gửi không thể rút; nhà tuyển dụng sẽ xử lý và cập nhật tiến trình trên hệ thống.</p>
       <button className="btn btn-primary" type="submit" disabled={loading || !!cvError || !cvId || pending || submitted || cooldown !== null} aria-busy={pending}>
         {pending ? "Đang gửi…" : submitted ? "Đã ứng tuyển" : "Gửi ứng tuyển"}
       </button>

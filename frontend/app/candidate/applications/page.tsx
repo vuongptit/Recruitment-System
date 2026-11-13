@@ -1,135 +1,60 @@
 "use client";
 
-import { applicationStatusLabel } from "@/lib/recruitmentLabels";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ConfirmationDialog } from "@/components/ConfirmationDialog";
+import { Search, ArrowUpRight, Building2, RefreshCw } from "lucide-react";
+import { ApplicationNextStep, ApplicationProgress } from "@/components/ApplicationJourney";
+import { ApplicationStageFilter } from "@/components/ApplicationStageFilter";
 import { EmptyState, ErrorState, LoadingState, PageHeader, StatusBadge } from "@/components/ui";
-import { ApiClientError, toUserMessage } from "../../../lib/apiClient";
-import { candidateApplicationActions, type CandidateApplicationAction } from "../../../lib/applicationStateMachine";
-import { getApplicationDetail, getApplications, withdrawCandidateApplication, type CandidateApplication } from "../../../lib/person2Api";
-
-function fmtDate(value?: string) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("vi-VN");
-}
+import { ApiClientError, toUserMessage } from "@/lib/apiClient";
+import { APPLICATION_STATUSES, formatApplicationDate } from "@/lib/applicationStateMachine";
+import { applicationStatusLabel } from "@/lib/recruitmentLabels";
+import { getApplications, type CandidateApplication } from "@/lib/person2Api";
+import styles from "./applications.module.css";
 
 export default function CandidateApplicationsPage() {
-  const router = useRouter();
-  const [withdrawTarget, setWithdrawTarget] = useState<CandidateApplication | null>(null);
   const [applications, setApplications] = useState<CandidateApplication[]>([]);
   const [loadError, setLoadError] = useState("");
-  const [actionError, setActionError] = useState("");
-  const [actionStatus, setActionStatus] = useState("");
-  const [pendingApplicationId, setPendingApplicationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
+  const [stage, setStage] = useState<"ALL" | CandidateApplication["status"]>("ALL");
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    let active = true;
     const controller = new AbortController();
     setLoading(true);
     setLoadError("");
     getApplications(undefined, controller.signal)
-      .then((response) => {
-        if (active) setApplications(response.data);
-      })
+      .then((response) => { if (!controller.signal.aborted) setApplications(response.data); })
       .catch((reason: unknown) => {
-        if (active && !(reason instanceof ApiClientError && reason.code === "REQUEST_CANCELLED")) {
-          setLoadError(toUserMessage(reason));
-        }
+        if (!controller.signal.aborted && !(reason instanceof ApiClientError && reason.code === "REQUEST_CANCELLED")) setLoadError(toUserMessage(reason));
       })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-      controller.abort();
-    };
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
   }, [reloadKey]);
 
-  async function withdraw(application: CandidateApplication) {
-    if (pendingApplicationId) return;
-    setPendingApplicationId(application.id);
-    setActionError("");
-    setActionStatus("");
-    try {
-      const detail = await getApplicationDetail(application.id);
-      if (detail.data.version === null) throw new ApiClientError({ code: "INVALID_API_RESPONSE" });
-      const response = await withdrawCandidateApplication(application.id, {
-        note: "Ứng viên chủ động rút hồ sơ",
-        applicationVersion: detail.data.version,
-      });
-      setApplications((current) => current.map((item) => item.id === application.id ? {
-        ...item,
-        status: response.data.toStatus,
-        version: response.data.version,
-        notes: "Ứng viên chủ động rút hồ sơ",
-      } : item));
-      setActionStatus(`Đã rút hồ sơ ứng tuyển ${application.jobTitle}.`);
-      setWithdrawTarget(null);
-    } catch (reason: unknown) {
-      setActionError(toUserMessage(reason));
-    } finally {
-      setPendingApplicationId(null);
-    }
-  }
+  const keyword = search.trim().toLocaleLowerCase("vi-VN");
+  const searched = applications.filter((application) => `${application.jobTitle} ${application.companyName}`.toLocaleLowerCase("vi-VN").includes(keyword));
+  const visible = searched.filter((application) => stage === "ALL" || application.status === stage);
+  const counts = Object.fromEntries([ ["ALL", searched.length], ...APPLICATION_STATUSES.map((status) => [status, searched.filter((application) => application.status === status).length]) ]);
 
-  function runAction(application: CandidateApplication, action: CandidateApplicationAction) {
-    if (action.kind === "WITHDRAW") {
-      setActionError("");
-      setWithdrawTarget(application);
-      return;
-    }
-    setActionError("");
-    router.push(application.offerId ? `/candidate/offers/${application.offerId}` : `/candidate/applications/${application.id}`);
-  }
-
-  return (
-    <main>
-      <PageHeader eyebrow="HÀNH TRÌNH NGHỀ NGHIỆP" title="Hồ sơ ứng tuyển của tôi" description="Theo dõi tiến trình ứng tuyển và phản hồi mới nhất từ nhà tuyển dụng." action={<Link className="btn" href="/candidate/jobs">Tìm thêm việc</Link>} />
-      {actionStatus ? <p className="notice notice-success" role="status">{actionStatus}</p> : null}
-      {actionError ? <p className="notice notice-danger" role="alert"><strong>Chưa hoàn tất thao tác.</strong> {actionError}</p> : null}
+  return <main className="stack">
+    <PageHeader eyebrow="HÀNH TRÌNH NGHỀ NGHIỆP" title="Hồ sơ ứng tuyển của tôi" description="Cùng nhà tuyển dụng theo dõi một tiến trình, từ lúc gửi hồ sơ đến nhận việc." action={<div className="btn-group"><button className="btn" type="button" disabled={loading} onClick={() => setReloadKey((value) => value + 1)}><RefreshCw size={16} /> Làm mới</button><Link className="btn btn-primary" href="/candidate/jobs">Tìm thêm việc</Link></div>} />
+    <section className="panel">
+      <div className={styles.toolbar}><div><h2>Theo dõi ứng tuyển</h2><p className="help">Hồ sơ đã gửi được giữ lại và không thể rút. Mở chi tiết để xem lịch sử xử lý.</p></div><label className={styles.search}><Search size={17} aria-hidden="true" /><input type="search" aria-label="Tìm hồ sơ theo công việc hoặc công ty" placeholder="Tìm công việc, công ty…" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
+      <ApplicationStageFilter value={stage} onChange={setStage} counts={loading || loadError ? undefined : counts} />
       {loadError ? <ErrorState message={loadError} onRetry={() => setReloadKey((value) => value + 1)} /> : null}
       {loading ? <LoadingState label="Đang tải hồ sơ ứng tuyển" /> : null}
-      {!loading && !loadError && applications.length === 0 ? <EmptyState title="Chưa có hồ sơ ứng tuyển" description="Các công việc bạn đã ứng tuyển sẽ xuất hiện tại đây." href="/candidate/jobs" action="Khám phá việc làm" /> : null}
-      <section className="stack">
-        {applications.map((application) => {
-          const actions = candidateApplicationActions(application.status);
-          const pending = pendingApplicationId === application.id;
-          return (
-            <article className="panel" key={application.id}>
-              <div className="section-head row-between">
-                <div><strong>{application.jobTitle}</strong><p className="help">{application.companyName}</p></div>
-                <StatusBadge tone={application.status === "HIRED" ? "success" : application.status === "REJECTED" || application.status === "WITHDRAWN" ? "danger" : "warning"}>{applicationStatusLabel(application.status)}</StatusBadge>
-              </div>
-              <p className="help">Điểm phù hợp: {application.matchScore == null ? "Chưa có" : `${application.matchScore}%`} · Nộp ngày {fmtDate(application.createdAt)}</p>
-              <div className="btn-group">
-                <Link className="btn" href={`/candidate/applications/${application.id}`}>Xem chi tiết và lịch sử</Link>
-                {actions.map((action) => (
-                  <button key={action.kind} className={action.kind === "RESPOND_OFFER" ? "btn btn-primary" : "btn btn-warning"} type="button" disabled={pendingApplicationId !== null} aria-busy={pending && action.kind === "WITHDRAW"} onClick={() => runAction(application, action)}>
-                    {pending && action.kind === "WITHDRAW" ? "Đang rút hồ sơ…" : action.label}
-                  </button>
-                ))}
-              </div>
-              {actions.length === 0 ? <p className="status-line">Quá trình xét tuyển của hồ sơ này đã kết thúc.</p> : null}
-              {application.notes ? <p className="help">Ghi chú: {application.notes}</p> : null}
-            </article>
-          );
-        })}
-      </section>
-      <ConfirmationDialog
-        open={withdrawTarget !== null}
-        title="Rút hồ sơ ứng tuyển?"
-        description={`Bạn sẽ rút hồ sơ cho vị trí ${withdrawTarget?.jobTitle ?? ""}. Nhà tuyển dụng sẽ không tiếp tục xử lý hồ sơ này.`}
-        confirmLabel="Xác nhận rút hồ sơ"
-        pending={pendingApplicationId !== null}
-        onConfirm={() => { if (withdrawTarget) void withdraw(withdrawTarget); }}
-        onCancel={() => setWithdrawTarget(null)}
-        error={actionError}
-      />
-    </main>
-  );
+      {!loading && !loadError ? <>
+        <p className="help" role="status">{visible.length} hồ sơ{stage !== "ALL" ? ` · ${applicationStatusLabel(stage)}` : ""}</p>
+        {applications.length === 0 ? <EmptyState title="Chưa có hồ sơ ứng tuyển" description="Các công việc bạn đã ứng tuyển sẽ xuất hiện tại đây." href="/candidate/jobs" action="Khám phá việc làm" /> : visible.length === 0 ? <EmptyState title="Không có hồ sơ phù hợp bộ lọc" description="Chọn bước khác hoặc bỏ từ khóa để xem lại hồ sơ." /> : null}
+        <div className="stack">{visible.map((application) => <article className={styles.application} key={application.id}>
+          <div className={styles.heading}><div><h3><Link href={`/candidate/applications/${application.id}`}>{application.jobTitle}</Link></h3><p className={styles.company}><Building2 size={15} aria-hidden="true" /> {application.companyName}</p><p className="help">Đã gửi: <time dateTime={application.createdAt}>{formatApplicationDate(application.createdAt)}</time> · GMT+7</p></div><StatusBadge tone={application.status === "HIRED" ? "success" : application.status === "REJECTED" || application.status === "WITHDRAWN" ? "neutral" : "info"}>{applicationStatusLabel(application.status)}</StatusBadge></div>
+          <ApplicationProgress status={application.status} compact />
+          <ApplicationNextStep status={application.status} viewer="CANDIDATE" applicationId={application.id} offerId={application.offerId} />
+          <div className="btn-group"><Link className="btn btn-primary" href={`/candidate/applications/${application.id}`}>Chi tiết và lịch sử <ArrowUpRight size={16} /></Link><Link className="btn" href={`/candidate/jobs/${application.jobId}`}>Xem việc làm</Link></div>
+        </article>)}</div>
+      </> : null}
+    </section>
+  </main>;
 }

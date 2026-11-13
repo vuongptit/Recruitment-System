@@ -389,7 +389,7 @@ func (s *QueryService) GetAvailability(
 	if scope.companyID == nil || appCtx.CompanyID != *scope.companyID {
 		return model.AvailabilityResponse{}, apierror.NewStatus(http.StatusNotFound, "APPLICATION_NOT_FOUND", "Application was not found", nil)
 	}
-	if appCtx.Status != "REVIEWING" && appCtx.Status != "INTERVIEW" {
+	if appCtx.Status != "INTERVIEW" {
 		return model.AvailabilityResponse{}, apierror.NewStatus(http.StatusConflict, "APPLICATION_NOT_SCHEDULABLE", "Application status does not allow scheduling interviews", map[string]any{
 			"applicationStatus": appCtx.Status,
 		})

@@ -6,7 +6,7 @@ const applicationId = "2795c0de-7908-4ab5-9bed-4c4f1cf9c211";
 const jobId = "3795c0de-7908-4ab5-9bed-4c4f1cf9c211";
 const interviewId = "4795c0de-7908-4ab5-9bed-4c4f1cf9c211";
 const application = { id: applicationId, jobId, companyId: jobId, candidateId: userId,
-  jobTitle: "Backend Engineer live fixture", status: "REVIEWING", version: 4,
+  jobTitle: "Backend Engineer live fixture", status: "INTERVIEW", version: 4,
   appliedAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z", matchScore: null };
 const interview = { id: interviewId, applicationId, roundNumber: 2,
   scheduledStart: "2030-01-15T02:30:00Z", scheduledEnd: "2030-01-15T03:15:00Z",
@@ -138,7 +138,7 @@ test("Recruiter detail loads the stored application and hides scheduling for a t
   await page.route(api + "/applications/" + applicationId, r => reply(r, { ...application, status: "HIRED" }));
   await login(page, "RECRUITER", "/recruiter/applications/" + applicationId);
   await expect(page.getByRole("heading", { name: application.jobTitle })).toBeVisible();
-  await expect(page.getByText("Đã tuyển", { exact: true })).toBeVisible();
+  await expect(page.getByText("Đã nhận việc", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Đặt lịch phỏng vấn" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Tạo thư mời nhận việc" })).toHaveCount(0);
   await expect(page.getByText("nguyenvana@example.com")).toHaveCount(0);

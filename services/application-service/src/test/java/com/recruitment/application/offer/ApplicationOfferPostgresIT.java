@@ -591,42 +591,25 @@ class ApplicationOfferPostgresIT {
     }
 
     @Test
-    void candidateWithdrawalCancelsOfferInTheSameTransaction() {
+    void candidateCannotWithdrawOrCancelASentOffer() {
         UUID applicationId = saveApplication(
             ApplicationStatus.INTERVIEW,
             0L
         );
         OfferResponse sent = sendOffer(applicationId);
 
-        StatusTransitionResponse withdrawn = pipeline.withdraw(
+        assertThatThrownBy(() -> pipeline.withdraw(
             applicationId,
             CANDIDATE_ID,
             new WithdrawApplicationRequest("Accepted elsewhere", 1L)
-        );
-
-        OfferEntity cancelled = offers.findById(sent.id()).orElseThrow();
-        ApplicationEntity application = applications.findById(applicationId)
-            .orElseThrow();
-        Map<String, Object> withdrawnHistory = transitionHistory(
-            applicationId,
-            ApplicationStatus.WITHDRAWN
-        );
-        assertThat(withdrawn.toStatus())
-            .isEqualTo(ApplicationStatus.WITHDRAWN);
-        assertThat(cancelled.getStatus()).isEqualTo(OfferStatus.CANCELLED);
-        assertThat(cancelled.getVersion()).isEqualTo(1L);
-        assertThat(cancelled.getRespondedAt()).isNotNull();
-        assertThat(cancelled.getResponseNote()).isNull();
-        assertThat(application.getStatus())
-            .isEqualTo(ApplicationStatus.WITHDRAWN);
-        assertThat(application.getVersion()).isEqualTo(2L);
-        assertThat(withdrawnHistory)
-            .containsEntry("from_status", "OFFER")
-            .containsEntry("to_status", "WITHDRAWN")
-            .containsEntry("changed_by", CANDIDATE_ID)
-            .containsEntry("note", "Accepted elsewhere");
-        assertThat(history.count()).isEqualTo(2L);
-        assertThat(outbox.count()).isEqualTo(2L);
+        )).isInstanceOfSatisfying(BusinessException.class, exception -> {
+            assertThat(exception.code()).isEqualTo("APPLICATION_NOT_WITHDRAWABLE");
+            assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+        });
+        assertOfferAndApplicationUnchanged(sent.id(), applicationId,
+            OfferStatus.SENT, ApplicationStatus.OFFER, 0L, 1L);
+        assertThat(history.count()).isEqualTo(1L);
+        assertThat(outbox.count()).isEqualTo(1L);
     }
 
     @Test
@@ -800,14 +783,15 @@ class ApplicationOfferPostgresIT {
         jdbc.execute(
             "ALTER TABLE application.applications " +
                 "ADD CONSTRAINT " + APPLICATION_STATUS_CONSTRAINT +
-                " CHECK (status <> 'WITHDRAWN')"
+                " CHECK (status <> 'REJECTED')"
         );
 
         try {
-            assertThatThrownBy(() -> pipeline.withdraw(
+            assertThatThrownBy(() -> pipeline.changeStatus(
                 applicationId,
-                CANDIDATE_ID,
-                new WithdrawApplicationRequest("Changed plans", 1L)
+                RECRUITER_ID,
+                AUTHORIZATION,
+                new ChangeApplicationStatusRequest(ApplicationStatus.REJECTED, "Changed plans", 1L)
             )).isInstanceOf(DataIntegrityViolationException.class);
         } finally {
             jdbc.execute(
@@ -1088,7 +1072,10 @@ class ApplicationOfferPostgresIT {
         assertThat(application.getVersion()).isEqualTo(2L);
         String statePair =
             application.getStatus().name() + "/" + offer.getStatus().name();
-        if (decision == OfferDecision.ACCEPTED) {
+        if (pipelineTarget == ApplicationStatus.WITHDRAWN) {
+            assertThat(statePair).isEqualTo(decision == OfferDecision.ACCEPTED
+                ? "HIRED/ACCEPTED" : "REJECTED/DECLINED");
+        } else if (decision == OfferDecision.ACCEPTED) {
             assertThat(statePair).isIn(
                 "HIRED/ACCEPTED",
                 "REJECTED/CANCELLED"
@@ -1096,7 +1083,7 @@ class ApplicationOfferPostgresIT {
         } else {
             assertThat(statePair).isIn(
                 "REJECTED/DECLINED",
-                "WITHDRAWN/CANCELLED"
+                "REJECTED/CANCELLED"
             );
         }
         assertThat(history.count()).isEqualTo(2L);

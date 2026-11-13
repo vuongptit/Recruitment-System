@@ -308,7 +308,7 @@ export default function ScheduleInterviewPage({
     );
   }
 
-  const eligible = ["REVIEWING", "INTERVIEW"].includes(application.status);
+  const eligible = application.status === "INTERVIEW";
 
   return (
     <main className="stack" style={{ maxWidth: 780, margin: "0 auto" }}>
@@ -711,7 +711,8 @@ export default function ScheduleInterviewPage({
         </section>
       ) : !eligible ? (
         <p role="alert">
-          Chỉ hồ sơ đang xét duyệt hoặc phỏng vấn mới có thể đặt lịch.
+          Chuyển hồ sơ sang bước Phỏng vấn trước khi tạo lịch hẹn.
+          <Link className="btn" href="/recruiter/applications">Về quy trình tuyển dụng</Link>
         </p>
       ) : (
         <form className="card stack" noValidate onSubmit={submit}>

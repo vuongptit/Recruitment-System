@@ -11,6 +11,8 @@ import { EmptyState, ErrorState, LoadingState, PageHeader, StatusBadge } from "@
 import { ApiClientError, toUserMessage } from "../../../../../lib/apiClient";
 import { OFFER_ATTACHMENT_SUPPORT } from "../../../../../lib/offerAttachment";
 import { getApplicationDetail, sendApplicationOffer, type CandidateApplication } from "../../../../../lib/person2Api";
+import { ApplicationOfferSummary } from "@/components/ApplicationOfferSummary";
+import { ApplicationProgress } from "@/components/ApplicationJourney";
 
 // Exact 409 codes POST /applications/:id/offer can return when the page is stale.
 const OFFER_STALE_MESSAGES: Partial<Record<string, string>> = {
@@ -100,7 +102,7 @@ export default function RecruiterSendOfferPage() {
         expiresAt: expiresInstant.toISOString(),
         applicationVersion: application.version,
       });
-      setApplication((current) => current ? { ...current, status: response.data.applicationStatus, version: response.data.applicationVersion } : current);
+      setApplication((current) => current ? { ...current, status: response.data.applicationStatus, version: response.data.applicationVersion, offerId: response.data.id } : current);
       setSubmitted(true);
     } catch (reason: unknown) {
       const staleMessage = reason instanceof ApiClientError ? OFFER_STALE_MESSAGES[reason.code] : undefined;
@@ -119,6 +121,11 @@ export default function RecruiterSendOfferPage() {
 
   if (loading) return <main><LoadingState label="Đang tải hồ sơ để soạn thư mời nhận việc" /></main>;
   if (loadError || !application) return <main><ErrorState message={loadError || "Không tìm thấy hồ sơ ứng tuyển."} onRetry={() => setReloadKey((value) => value + 1)} /></main>;
+  if (application.offerId) return <main className="stack">
+    <PageHeader eyebrow="THƯ MỜI NHẬN VIỆC" title={application.jobTitle} description="Theo dõi điều kiện đề nghị và phản hồi của ứng viên." action={<Link className="btn" href={`/recruiter/applications/${application.id}`}>Về chi tiết hồ sơ</Link>} />
+    <section className="panel"><ApplicationProgress status={application.status} timeline={application.timeline} /></section>
+    <ApplicationOfferSummary offerId={application.offerId} applicationId={application.id} />
+  </main>;
 
   return (
     <main>

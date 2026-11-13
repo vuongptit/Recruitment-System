@@ -411,7 +411,7 @@ class ApplicationOfferExpiryPostgresIT {
     }
 
     @Test
-    void candidateCanStillWithdrawAnApplicationWhoseOfferAlreadyExpired() {
+    void expiredOfferDoesNotEnableApplicationWithdrawal() {
         UUID applicationId = saveApplication(ApplicationStatus.OFFER, 1L);
         UUID offerId = saveOffer(
             applicationId,
@@ -421,19 +421,20 @@ class ApplicationOfferExpiryPostgresIT {
         assertThat(expiry.expireBatch(NOW, 100)).isEqualTo(1);
         Map<String, Object> afterExpiry = offerState(offerId);
 
-        pipeline.withdraw(
+        assertThatThrownBy(() -> pipeline.withdraw(
             applicationId,
             CANDIDATE_ID,
             new WithdrawApplicationRequest("Accepted elsewhere", 1L)
-        );
+        )).isInstanceOfSatisfying(BusinessException.class, exception ->
+            assertThat(exception.code()).isEqualTo("APPLICATION_NOT_WITHDRAWABLE"));
 
         assertThat(jdbc.queryForObject(
             "SELECT status FROM application.applications WHERE id = ?",
             String.class,
             applicationId
-        )).isEqualTo("WITHDRAWN");
+        )).isEqualTo("OFFER");
         assertThat(offerState(offerId)).isEqualTo(afterExpiry);
-        assertThat(onlyEvent().has("offer_status")).isFalse();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM application.application_event_outbox", Long.class)).isZero();
     }
 
     private UUID saveOffer(OfferStatus status, Instant expiresAt) {

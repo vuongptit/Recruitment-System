@@ -8,6 +8,16 @@ requests. The dedicated `/offers` gateway route preserves its prefix. Gateway
 traffic cannot reach `/applications/internal...`, and public Profile/Application
 routes discard client-supplied internal identity headers.
 
+## Unified application pipeline
+
+See [the shared Candidate/Recruiter workflow](../../docs/application-pipeline.md).
+Submitted applications cannot be withdrawn. The legacy withdrawal endpoint
+checks ownership and version, then returns `409 APPLICATION_NOT_WITHDRAWABLE`
+without writing application/offer/history/outbox data. Existing `WITHDRAWN`
+records remain readable; no migration is required. Candidates accept or decline
+valid offers through the offer response endpoint. Scheduling requires the
+explicit `INTERVIEW` application stage.
+
 | Internal | Gateway | Access |
 | --- | --- | --- |
 | `POST /` | `POST /applications/` | CANDIDATE |
@@ -83,7 +93,9 @@ contains only `{applicationId}`. It must carry exactly one
 Application Service independently verifies that JWT, requires its canonical
 UUID subject and `RECRUITER` role, then verifies `MEMBER` or `OWNER` membership
 through Company Service. The membership company must equal the stored
-Application company, and the Application must be in `REVIEWING` or `INTERVIEW`.
+Application company, and the Application must be in `INTERVIEW`.
+Recruiters must explicitly advance `REVIEWING` to `INTERVIEW` before scheduling;
+opening a CV or a detail page never changes the application stage.
 
 The no-store response is limited to `applicationId`, `jobId`, `companyId`,
 `candidateId`, `status`, and `applicationVersion`. It deliberately excludes
@@ -374,13 +386,13 @@ to `ACCEPTED` and the application to `HIRED`; declining changes them to
 conflict errors without partially updating the offer, application, history, or
 outbox.
 
-When an Application in `OFFER` is rejected by a Recruiter or withdrawn by its
-Candidate, the pipeline now atomically changes the linked `SENT` Offer to
+When an Application in `OFFER` is rejected by a Recruiter,
+the pipeline atomically changes the linked `SENT` Offer to
 `CANCELLED` before changing the Application. Cancellation increments the
 Offer version, stores its terminal timestamp in `responded_at`, clears
 `response_note`, and makes later Candidate responses return a sanitized
 conflict. Both cancellation and Candidate response acquire the Offer row before
-the Application row, so an accept/decline race against reject/withdraw has
+the Application row, so an accept/decline race against recruiter rejection has
 exactly one winner and cannot commit a mixed terminal pair.
 
 Flyway V9 backfills legacy `REJECTED`/`WITHDRAWN` Applications whose Offers
@@ -423,11 +435,11 @@ so the outcome is deterministic and identical whether a row was repaired by the
 Flyway V10 backfill or expired later by the worker.
 
 Expiry resolves the Offer only. The Application keeps its `OFFER` status so the
-terminal pipeline decision stays with the Recruiter or the Candidate, and the
+terminal pipeline decision stays with the Recruiter, and the
 worker writes no history row and no outbox event: the canonical
 `application-events` v1 contract carries neither an expiry action nor an
 `EXPIRED` `offer_status`, so emitting one would be rejected by the Notification
-consumer. Rejecting or withdrawing an Application whose Offer has already
+consumer. Rejecting an Application whose Offer has already
 expired keeps working and still produces an ordinary `STATUS_CHANGED` event
 without the Offer trio; a terminal Offer simply leaves the transition nothing to
 cancel. A Candidate responding to a lapsed Offer receives the same
@@ -466,7 +478,7 @@ include salary, notes, decline reasons, `fileId`, or `fileUrl`. Every v1 event
 includes the acting user in nullable `actor_id` and the resulting Application
 state in `aggregate_version`; this version can skip values when a non-event
 mutation, such as a match-score update, increments the same aggregate.
-Reject/withdraw cancellation remains an ordinary Application
+Recruiter rejection cancellation remains an ordinary Application
 `STATUS_CHANGED` event without the Offer trio, preserving the canonical v1
 contract and its privacy boundary.
 
@@ -553,7 +565,7 @@ Profile parsing, transactional snapshot persistence/rollback, metadata and
 child-row protection, exact `ANY` filtering, combined filters, company
 isolation, legacy/empty-snapshot behavior, and deterministic tied-value
 pagination. V9 coverage verifies legacy backfill, runtime cancellation,
-transaction rollback, and accept/decline races against reject/withdraw while
+transaction rollback, and accept/decline races against rejection or blocked withdrawal while
 keeping the v1 event contract unchanged. The earlier recorded baseline was
 286 unit/WebMvc/security tests and 71 PostgreSQL/Kafka integration tests.
 For the 2026-09-10 read-flow/outbox change, `mvn package` passed all 324
@@ -679,7 +691,7 @@ for each of five write races, or exactly 10,000 service calls:
 
 - duplicate Candidate submission for the same Job;
 - two Recruiters changing the same Application version;
-- Candidate withdrawal racing the Recruiter transition to `INTERVIEW`;
+- Blocked Candidate withdrawal racing the Recruiter transition to `INTERVIEW` (the Recruiter transition wins);
 - two Recruiters sending the only Offer for one Application; and
 - Candidate `ACCEPTED` racing `DECLINED` for one Offer.
 

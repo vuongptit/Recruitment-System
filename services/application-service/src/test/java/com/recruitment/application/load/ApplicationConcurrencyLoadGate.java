@@ -444,7 +444,7 @@ public class ApplicationConcurrencyLoadGate {
             "withdraw-versus-transition",
             pairs,
             StatusTransitionResponse.class,
-            Set.of("APPLICATION_CHANGED_CONCURRENTLY")
+            Set.of("APPLICATION_CHANGED_CONCURRENTLY", "APPLICATION_NOT_WITHDRAWABLE")
         );
         assertWithdrawTransitionInvariants();
         assertLatencyThreshold(metrics);
@@ -833,7 +833,7 @@ public class ApplicationConcurrencyLoadGate {
             FROM application.applications
             WHERE job_title = ?
               AND version = 1
-              AND status IN ('WITHDRAWN', 'INTERVIEW')
+              AND status = 'INTERVIEW'
             """,
             WITHDRAW_MARKER
         )).isEqualTo(PAIRS_PER_WORKLOAD);

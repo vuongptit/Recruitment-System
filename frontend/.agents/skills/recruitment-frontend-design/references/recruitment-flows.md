@@ -45,9 +45,11 @@ Các đường dẫn code tính từ `frontend/`.
 ## Đơn ứng tuyển, phỏng vấn và offer
 
 - Dùng `applicationStateMachine` và helper chuyên biệt cho hành động của từng vai trò. Không tạo mảng trạng thái riêng trong component hoặc cho nhảy thẳng từ bất kỳ bước nào sang `HIRED`.
+- Pipeline thống nhất: `APPLIED → REVIEWING → INTERVIEW → OFFER → HIRED`; `REJECTED` là nhánh kết thúc, `WITHDRAWN` chỉ để đọc dữ liệu lịch sử. Dùng `ApplicationProgress`, `ApplicationNextStep`, `ApplicationTimeline`, `ApplicationStageFilter`; xem [quy trình chi tiết](../../../../../docs/application-pipeline.md).
+- Hồ sơ đã gửi không được rút ở bất kỳ bước nào. API cũ trả `APPLICATION_NOT_WITHDRAWABLE`; không tạo lại nút rút hoặc dùng rút thay cho từ chối thư mời. Đặt lịch chỉ sau khi chuyển hồ sơ sang `INTERVIEW`.
 - Phân biệt hồ sơ đã gửi, đang xem xét, phỏng vấn, offer, đã tuyển, bị từ chối, đã rút. API là nguồn xác nhận trạng thái và version, không phải màu badge hoặc vị trí cột.
 - Khi ứng tuyển, kiểm tra CV có thể dùng, thông tin tin tuyển dụng và phản hồi trùng/cooldown theo helper hiện có. Giữ điều hướng về đúng tin sau đăng nhập.
-- Thao tác từ chối, rút, gửi offer, phản hồi offer có điều kiện riêng và có thể cần lý do/confirmation. Lưu input khi lỗi, làm rõ kết quả chưa xác định, không retry mù khi có nguy cơ gửi trùng.
+- Thao tác từ chối, gửi offer, phản hồi offer có điều kiện riêng và có thể cần lý do/confirmation. Lưu input khi lỗi, làm rõ kết quả chưa xác định, không retry mù khi có nguy cơ gửi trùng. `WITHDRAWN` chỉ nằm trong “Lịch sử cũ”, nhãn “Đã rút trước đây”; không trình bày như một bước của pipeline hiện hành.
 - Phỏng vấn hiển thị timezone, phương thức và thông tin tham gia thật từ API. Không tự dựng phòng video hoặc cho nút tham gia hoạt động khi chưa có room/call được cấp quyền.
 - Điểm đọc: `lib/applicationStateMachine.ts`, `lib/applicationVersioning.ts`, `lib/applicationCooldown.ts`, `lib/recruiterCvAccess.ts`, `lib/offerResponseRecovery.ts`, `lib/interviewApi.ts`.
 

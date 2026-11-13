@@ -26,7 +26,7 @@ export type ApplicationStatus =
   | "REJECTED"
   | "WITHDRAWN";
 
-export type OfferStatus = "DRAFT" | "PENDING_CANDIDATE_RESPONSE" | "ACCEPTED" | "DECLINED" | "EXPIRED";
+export type OfferStatus = "DRAFT" | "PENDING_CANDIDATE_RESPONSE" | "ACCEPTED" | "DECLINED" | "EXPIRED" | "CANCELLED";
 
 export type RecommendationCursorState = "ACTIVE" | "STALE";
 

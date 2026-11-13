@@ -33,7 +33,7 @@ func TestApplicationClientAuthorizeScheduling(t *testing.T) {
 				"jobId":              jobID.String(),
 				"companyId":          compID.String(),
 				"candidateId":        candID.String(),
-				"status":             "REVIEWING",
+				"status":             "INTERVIEW",
 				"applicationVersion": 2,
 			},
 		})
@@ -49,7 +49,7 @@ func TestApplicationClientAuthorizeScheduling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AuthorizeScheduling failed: %v", err)
 	}
-	if res.CompanyID != compID || res.CandidateID != candID || res.Status != "REVIEWING" {
+	if res.CompanyID != compID || res.CandidateID != candID || res.Status != "INTERVIEW" {
 		t.Fatalf("unexpected context: %+v", res)
 	}
 }

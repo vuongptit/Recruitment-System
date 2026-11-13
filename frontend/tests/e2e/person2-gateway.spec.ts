@@ -242,60 +242,21 @@ test("Job edit keeps the local draft after one authoritative 409 reload and neve
   await expectNoDocumentOverflow(page);
 });
 
-test("Application tracking reloads authoritative version before withdraw", async ({ page }) => {
-  const applicationId = "4795c0de-7908-4ab5-9bed-4c4f1cf9c213";
-  const application = {
-    id: applicationId,
-    jobId: "2795c0de-7908-4ab5-9bed-4c4f1cf9c211",
-    companyId: "3795c0de-7908-4ab5-9bed-4c4f1cf9c212",
-    candidateId: "5795c0de-7908-4ab5-9bed-4c4f1cf9c214",
-    jobTitle: "Backend Engineer",
-    status: "APPLIED",
-    matchScore: 82,
-    appliedAt: "2026-08-20T00:00:00.000Z",
-    updatedAt: "2026-08-20T00:00:00.000Z",
-  };
-  let detailReads = 0;
-  let withdrawBody: Record<string, unknown> | null = null;
-  let privateListHeaders: Record<string, string> = {};
-
-  await page.route(`${gatewayOrigin}/applications/my`, async (route) => {
-    privateListHeaders = route.request().headers();
-    await json(route, { data: [application], meta: null });
+test("submitted application tracking has no withdrawal and keeps private requests", async ({ page }) => {
+  let withdrawCalls = 0;
+  let headers: Record<string, string> = {};
+  await page.route(gatewayOrigin + "/applications/my", route => {
+    headers = route.request().headers();
+    return json(route, { data: [{ id: "4795c0de-7908-4ab5-9bed-4c4f1cf9c213", jobId: "2795c0de-7908-4ab5-9bed-4c4f1cf9c211", companyId: "3795c0de-7908-4ab5-9bed-4c4f1cf9c212", candidateId: "5795c0de-7908-4ab5-9bed-4c4f1cf9c214", jobTitle: "Backend Engineer", status: "APPLIED", appliedAt: "2026-08-20T00:00:00Z", updatedAt: "2026-08-20T00:00:00Z", version: 7 }], meta: null });
   });
-  await page.route(`${gatewayOrigin}/applications/${applicationId}`, async (route) => {
-    detailReads += 1;
-    await json(route, { data: { ...application, version: 7 }, meta: null });
-  });
-  await page.route(`${gatewayOrigin}/applications/${applicationId}/withdraw`, async (route) => {
-    withdrawBody = route.request().postDataJSON() as Record<string, unknown>;
-    await json(route, {
-      data: {
-        applicationId, fromStatus: "APPLIED", toStatus: "WITHDRAWN",
-        updatedAt: "2026-08-31T00:00:00.000Z", version: 8,
-      },
-      meta: null,
-    });
-  });
-
+  await page.route(gatewayOrigin + "/applications/*/withdraw", route => { withdrawCalls += 1; return json(route, { code: "APPLICATION_NOT_WITHDRAWABLE" }, 409); });
   await login(page, "CANDIDATE", "/candidate/applications");
-  await expect(page.getByRole("article").getByText(application.jobTitle, { exact: true })).toBeVisible();
-  expect(detailReads).toBe(0);
-  await page.getByRole("button", { name: "Rút hồ sơ", exact: true }).click();
-  expect(withdrawBody).toBeNull();
-  await page.getByRole("alertdialog").getByRole("button", { name: "Quay lại", exact: true }).click();
-  expect(withdrawBody).toBeNull();
-  await page.getByRole("button", { name: "Rút hồ sơ", exact: true }).click();
-  await page.getByRole("alertdialog").getByRole("button", { name: "Xác nhận rút hồ sơ", exact: true }).click();
-
-  await expect(page.getByText("Đã rút hồ sơ ứng tuyển Backend Engineer.")).toBeVisible();
-  await expect(page.getByText("Đã rút hồ sơ", { exact: true })).toBeVisible();
-  expect(detailReads).toBe(1);
-  const sentWithdraw = withdrawBody as unknown as Record<string, unknown>;
-  expect(Object.keys(sentWithdraw).sort()).toEqual(["expectedVersion", "note"]);
-  expect(sentWithdraw.expectedVersion).toBe(7);
-  expect(privateListHeaders["cache-control"]).toBe("no-store");
-  expect(privateListHeaders.authorization).toBeUndefined();
+  await expect(page.getByRole("article").getByRole("heading", { name: "Backend Engineer" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Rút hồ sơ", exact: true })).toHaveCount(0);
+  await expect(page.getByText(/Hồ sơ đã gửi được giữ lại và không thể rút/)).toBeVisible();
+  expect(withdrawCalls).toBe(0);
+  expect(headers["cache-control"]).toBe("no-store");
+  expect(headers.authorization).toBeUndefined();
   await expectNoDocumentOverflow(page);
 });
 

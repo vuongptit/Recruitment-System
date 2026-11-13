@@ -4,7 +4,7 @@ Production-grade Go microservice managing the complete interview lifecycle for t
 
 1. **Flow 1 — HR Interview Scheduling (`POST /interviews`)**:
    - Supports `OFFLINE` (physical location required) and `ONLINE` (auto-generates video room path `/interviews/{id}/room`).
-   - Verifies active recruiter membership via `company-service` and application schedulability (`REVIEWING` / `INTERVIEW`) via `application-service`.
+   - Verifies active recruiter membership via `company-service` and application schedulability (`INTERVIEW` only) via `application-service`. Recruiters explicitly move a reviewed application into the interview stage before scheduling.
    - Enforces PostgreSQL `btree_gist` exclusion constraints preventing candidate and interviewer double-booking (`[scheduled_start_at, scheduled_end_at)`).
    - Enforces idempotency via `(scheduled_by, request_id)` and SHA-256 payload hash.
    - Writes transactional outbox event (`SCHEDULED`) to `interview_event_outbox`.

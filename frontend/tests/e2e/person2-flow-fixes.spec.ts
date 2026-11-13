@@ -143,7 +143,7 @@ test("candidate opens application history then responds to a real Offer with bot
   });
   await authenticate(page, "CANDIDATE", `/candidate/applications/${applicationId}`);
   await expect(page.getByText("Mời trao đổi chuyên môn.", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Xem và phản hồi thư mời nhận việc", exact: true }).click();
+  await page.getByRole("link", { name: "Phản hồi thư mời", exact: true }).click();
   await page.getByRole("button", { name: "Chấp nhận", exact: true }).click();
   expect(writes).toHaveLength(0);
   await page.getByRole("alertdialog").getByRole("button", { name: "Chấp nhận thư mời nhận việc", exact: true }).click();
@@ -157,6 +157,7 @@ test("existing evaluation is fetched and shown instead of inviting a duplicate s
   await page.route(`${gateway}/applications/?**`, (route) => reply(route, { items: [{ id: applicationId, jobId, candidateId: accountId, jobTitle: job.title, status: "INTERVIEW", version: 3, appliedAt: "2026-09-01T00:00:00Z" }], page: 0, size: 20, totalElements: 1, totalPages: 1 }));
   await page.route(`${gateway}/applications/${applicationId}/evaluations`, (route) => reply(route, [{ id: "evaluation-one", applicationId, evaluatorId: accountId, score: 88, criteria: { technical: 90, communication: 85, culture: 90 }, note: "Ghi chú đánh giá đã lưu.", createdAt: "2026-09-02T00:00:00Z" }]));
   await authenticate(page, "RECRUITER", `/recruiter/jobs/${jobId}`);
+  await page.getByText("CV, đánh giá và trao đổi", { exact: true }).click();
   await page.getByRole("button", { name: "Xem và đánh giá ứng viên", exact: true }).click();
   await expect(page.getByText("Ghi chú đánh giá đã lưu.", { exact: true })).toBeVisible();
   await expect(page.getByText("Bạn đã đánh giá", { exact: true })).toBeVisible();

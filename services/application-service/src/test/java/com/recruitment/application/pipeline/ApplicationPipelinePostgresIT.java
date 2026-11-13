@@ -29,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -177,6 +179,26 @@ class ApplicationPipelinePostgresIT {
         }
         executor.shutdownNow();
         assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(ApplicationStatus.class)
+    void withdrawalCannotChangePersistedApplicationInAnyStage(ApplicationStatus status) {
+        UUID id = saveAppliedApplication();
+        jdbc.update("UPDATE application.applications SET status = ? WHERE id = ?", status.name(), id);
+        ApplicationEntity before = applicationRepository.findById(id).orElseThrow();
+        assertThatThrownBy(() -> pipeline.withdraw(id, before.getCandidateId(),
+            new WithdrawApplicationRequest("Changed plans", before.getVersion())))
+            .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                assertThat(exception.code()).isEqualTo("APPLICATION_NOT_WITHDRAWABLE");
+                assertThat(exception.status()).isEqualTo(HttpStatus.CONFLICT);
+            });
+        ApplicationEntity after = applicationRepository.findById(id).orElseThrow();
+        assertThat(after.getStatus()).isEqualTo(status);
+        assertThat(after.getVersion()).isEqualTo(before.getVersion());
+        assertThat(after.getUpdatedAt()).isEqualTo(before.getUpdatedAt());
+        assertThat(historyRepository.count()).isZero();
+        assertThat(outboxRepository.count()).isZero();
     }
 
     @Test

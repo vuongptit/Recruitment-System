@@ -1,0 +1,10 @@
+.filters { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 0 16px; margin: 12px 0 20px; border-bottom: 1px solid var(--border, #e2e9e5); }
+.filters button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 9px; border: 1px solid var(--border, #e2e9e5); background: white; color: #4d6256; padding: 10px 13px; min-height: 42px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.filters .selected { background: #e8f4ed; border-color: #83bd9c; color: #086c3a; }
+.filters button:hover { background: #f1f7f3; }
+.filters button:focus-visible { outline: 2px solid #087f46; outline-offset: 3px; }
+.filters button:disabled { cursor: wait; opacity: .6; }
+.filters span { border-radius: 6px; background: #eff3f0; padding: 1px 6px; font-size: 12px; }
+.selected span { background: #d5eadd; }
+.filters .legacy { margin-inline-start: auto; border-style: dashed; font-weight: 400; }
+@media(max-width: 600px) { .filters { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 12px; } .filters button { flex-shrink: 0; } }

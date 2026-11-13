@@ -318,6 +318,8 @@ export function normalizeError(code: string): string {
     OFFER_ALREADY_RESPONDED: "Thư mời nhận việc này đã được phản hồi.",
     OFFER_CHANGED_CONCURRENTLY: "Thư mời nhận việc vừa được cập nhật. Hãy tải lại trước khi phản hồi.",
     APPLICATION_CHANGED_CONCURRENTLY: "Hồ sơ vừa thay đổi. Hãy tải lại trước khi tiếp tục.",
+    APPLICATION_NOT_WITHDRAWABLE: "Hồ sơ đã gửi không thể rút. Bạn vẫn có thể theo dõi tiến trình và phản hồi thư mời nhận việc.",
+    APPLICATION_NOT_SCHEDULABLE: "Hãy chuyển hồ sơ sang bước Phỏng vấn trước khi đặt lịch. Nếu hồ sơ đã kết thúc, bạn chỉ có thể xem lại lịch sử.",
     INVALID_EVALUATION_SCORE: "Điểm đánh giá phải từ 0 đến 100 và có tối đa 2 chữ số thập phân.",
     INVALID_EVALUATION_NOTE: "Ghi chú đánh giá không được vượt quá 2.000 ký tự.",
     EVALUATION_ALREADY_EXISTS: "Bạn đã đánh giá hồ sơ này.",

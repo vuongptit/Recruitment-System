@@ -89,7 +89,7 @@ public class ApplicationPipelineController {
 
     @PatchMapping("/{applicationId}/withdraw")
     @PreAuthorize("hasRole('CANDIDATE')")
-    @Operation(summary = "Withdraw the candidate's active application")
+    @Operation(summary = "Legacy withdrawal endpoint; submitted applications return APPLICATION_NOT_WITHDRAWABLE")
     public ApiResponse<StatusTransitionResponse> withdraw(
         JwtAuthenticationToken authentication,
         @PathVariable UUID applicationId,

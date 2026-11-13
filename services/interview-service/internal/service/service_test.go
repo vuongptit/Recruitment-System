@@ -326,7 +326,7 @@ func TestQueryServiceAvailabilitySlots(t *testing.T) {
 		CompanyID:     compID,
 		JobID:         uuid.New(),
 		CandidateID:   candID,
-		Status:        "REVIEWING",
+		Status:        "INTERVIEW",
 		Version:       1,
 	}}
 	codec, err := cursor.NewCodec("dev-only-interview-cursor-secret-32-bytes")

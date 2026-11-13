@@ -17,6 +17,10 @@ import { RecruiterCvAccess } from "./RecruiterCvAccess";
 import { RecruiterEvaluation } from "./RecruiterEvaluation";
 import { createConversation } from "../lib/chatApi";
 import { useRouter } from "next/navigation";
+import { ApplicationNextStep, ApplicationProgress } from "./ApplicationJourney";
+import { ApplicationStageFilter } from "./ApplicationStageFilter";
+import { formatApplicationDate } from "../lib/applicationStateMachine";
+import styles from "./RecruiterApplicationPipeline.module.css";
 
 const DEFAULT_FILTERS: RecruiterApplicationFilterDraft = {
   status: "ALL",
@@ -133,6 +137,16 @@ export function RecruiterApplicationPipeline({ jobId }: { jobId?: string }) {
     setDriftNotice("");
     expectedTotalRef.current = null;
     seenPageIdsRef.current = new Map();
+    setPage(0);
+  }
+
+  function selectStage(status: RecruiterApplicationFilterDraft["status"]) {
+    const next = { ...filters, status };
+    setFilterDraft(next);
+    setFilters(next);
+    expectedTotalRef.current = null;
+    seenPageIdsRef.current = new Map();
+    setDriftNotice("");
     setPage(0);
   }
 
@@ -275,10 +289,13 @@ export function RecruiterApplicationPipeline({ jobId }: { jobId?: string }) {
     <section className="panel">
       <div className="section-head row-between">
         <div><h2>Tiến trình hồ sơ</h2><p className="help">Theo dõi hồ sơ, liên hệ ứng viên và chuyển sang bước tuyển dụng tiếp theo.</p></div>
-        {total ? <span className="badge">{total} hồ sơ</span> : null}
+        <button className="btn" type="button" disabled={loading} onClick={() => setReloadKey((value) => value + 1)}>Làm mới hồ sơ</button>
       </div>
+      <ApplicationStageFilter value={filters.status} onChange={selectStage} disabled={loading} />
+      <details className={styles.filters}>
+        <summary>Lọc nâng cao và sắp xếp</summary>
       <form className="toolbar application-filter-toolbar" aria-label="Bộ lọc hồ sơ ứng tuyển" onSubmit={applyFilters} noValidate>
-        <div className="field"><label className="label" htmlFor="application-status-filter">Trạng thái</label><select id="application-status-filter" className="select" value={filterDraft.status} onChange={(event) => setFilterDraft((current) => ({ ...current, status: event.target.value as RecruiterApplicationFilterDraft["status"] }))}><option value="ALL">Tất cả</option><option value="APPLIED">{applicationStatusLabel("APPLIED")}</option><option value="REVIEWING">{applicationStatusLabel("REVIEWING")}</option><option value="INTERVIEW">{applicationStatusLabel("INTERVIEW")}</option><option value="OFFER">{applicationStatusLabel("OFFER")}</option><option value="HIRED">{applicationStatusLabel("HIRED")}</option><option value="REJECTED">{applicationStatusLabel("REJECTED")}</option><option value="WITHDRAWN">{applicationStatusLabel("WITHDRAWN")}</option></select></div>
+        <div className="field"><label className="label" htmlFor="application-status-filter">Trạng thái</label><select id="application-status-filter" className="select" value={filterDraft.status} onChange={(event) => setFilterDraft((current) => ({ ...current, status: event.target.value as RecruiterApplicationFilterDraft["status"] }))}><option value="ALL">Tất cả</option><option value="APPLIED">{applicationStatusLabel("APPLIED")}</option><option value="REVIEWING">{applicationStatusLabel("REVIEWING")}</option><option value="INTERVIEW">{applicationStatusLabel("INTERVIEW")}</option><option value="OFFER">{applicationStatusLabel("OFFER")}</option><option value="HIRED">{applicationStatusLabel("HIRED")}</option><option value="REJECTED">{applicationStatusLabel("REJECTED")}</option><option value="WITHDRAWN">Lịch sử cũ</option></select></div>
         <div className="field"><label className="label" htmlFor="application-from">Nộp từ ngày</label><input id="application-from" className="input" type="date" value={filterDraft.appliedFrom} onChange={(event) => setFilterDraft((current) => ({ ...current, appliedFrom: event.target.value }))} /></div>
         <div className="field"><label className="label" htmlFor="application-to">Nộp đến ngày</label><input id="application-to" className="input" type="date" value={filterDraft.appliedTo} onChange={(event) => setFilterDraft((current) => ({ ...current, appliedTo: event.target.value }))} /></div>
         <div className="field"><label className="label" htmlFor="application-skills">Kỹ năng</label><input id="application-skills" className="input" value={filterDraft.skills} placeholder="React, Java" onChange={(event) => setFilterDraft((current) => ({ ...current, skills: event.target.value }))} /></div>
@@ -286,6 +303,7 @@ export function RecruiterApplicationPipeline({ jobId }: { jobId?: string }) {
         <div className="field"><label className="label" htmlFor="application-size">Số dòng</label><select id="application-size" className="select" value={filterDraft.size} onChange={(event) => setFilterDraft((current) => ({ ...current, size: Number(event.target.value) }))}><option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="100">100</option></select></div>
         <div className="btn-group"><button className="btn btn-primary" type="submit" disabled={loading}>Áp dụng</button><button className="btn" type="button" disabled={loading} onClick={resetFilters}>Xóa lọc</button></div>
       </form>
+      </details>
       {filterError ? <p className="form-error" role="alert">{filterError}</p> : null}
       {driftNotice ? <p className="notice" role="status">{driftNotice}</p> : null}
       {conflict ? (
@@ -308,20 +326,33 @@ export function RecruiterApplicationPipeline({ jobId }: { jobId?: string }) {
       {actionError ? <p className="notice notice-danger" role="alert"><strong>Chưa hoàn tất thao tác.</strong> {actionError}</p> : null}
       {loadError ? <ErrorState message={loadError} onRetry={() => setReloadKey((value) => value + 1)} /> : null}
       {loading ? <LoadingState label="Đang tải hồ sơ ứng tuyển" /> : null}
-      {!loading && !loadError && applications.length === 0 ? <EmptyState title="Chưa có hồ sơ ứng tuyển" description="Hồ sơ mới sẽ xuất hiện tại đây sau khi ứng viên nộp thành công." /> : null}
-      <div className="stack">
+      {!loading && !loadError ? <p className="help" role="status">{total} hồ sơ theo bộ lọc{filters.status !== "ALL" ? ` · ${applicationStatusLabel(filters.status)}` : ""} · Thời gian GMT+7</p> : null}
+      {!loading && !loadError && applications.length === 0 ? <EmptyState title="Không có hồ sơ trong danh sách này" description="Chọn bước khác hoặc xóa bộ lọc để kiểm tra hồ sơ của công ty." /> : null}
+      {!loading && !loadError ? <div className="stack">
         {applications.map((application) => {
           const actions = recruiterApplicationActions(application.status);
           const hasRejectAction = actions.some((action) => action.kind === "STATUS" && action.status === "REJECTED");
           const pending = pendingApplicationId === application.id;
           const matchState = matchStates[application.id];
           return (
-            <article className="card application-pipeline-card" key={application.id}>
+            <article className={`card application-pipeline-card ${styles.application}`} key={application.id}>
               <div className="section-head row-between">
-                <div><strong>{application.candidateName || "Ứng viên"}</strong><p className="help">Nộp ngày {new Date(application.createdAt).toLocaleDateString("vi-VN")}</p></div>
+                <div><h3><Link href={`/recruiter/applications/${application.id}`}>{application.candidateName || "Ứng viên"}</Link></h3><strong>{application.jobTitle}</strong><p className="help">Nộp ngày {formatApplicationDate(application.createdAt)} · GMT+7</p></div>
                 <StatusBadge tone={application.status === "HIRED" ? "success" : application.status === "REJECTED" || application.status === "WITHDRAWN" ? "danger" : "warning"}>{applicationStatusLabel(application.status)}</StatusBadge>
               </div>
-              <p className="help">Điểm phù hợp: {application.matchScore ?? "chưa sẵn sàng"}</p>
+              <ApplicationProgress status={application.status} compact />
+              <ApplicationNextStep status={application.status} viewer="RECRUITER" applicationId={application.id} offerId={application.offerId} />
+              <div className="btn-group">
+                <Link className="btn" href={`/recruiter/applications/${application.id}`}>Chi tiết và lịch sử</Link>
+                {actions.filter((action) => action.kind !== "STATUS" || action.status !== "REJECTED").map((action) => action.kind === "SEND_OFFER" ? (
+                  <Link key={action.kind} className="btn btn-primary" href={`/recruiter/applications/${application.id}/offer`}>{action.label}</Link>
+                ) : (
+                  <button key={action.status} className="btn btn-primary" type="button" disabled={pendingApplicationId !== null} aria-busy={pending} onClick={() => { void moveStatus(application, action.status); }}>{pending ? "Đang cập nhật…" : action.label}</button>
+                ))}
+              </div>
+              <details className={styles.tools}><summary>CV, đánh giá và trao đổi</summary>
+              <div className="stack">
+              <p className="help">Điểm phù hợp AI: {application.matchScore == null ? "Chưa sẵn sàng" : `${application.matchScore}/100`}. Điểm này hỗ trợ đánh giá, không tự quyết định chuyển bước.</p>
               <RecruiterCvAccess applicationId={application.id} />
               <RecruiterEvaluation applicationId={application.id} />
               {matchState ? (
@@ -329,35 +360,29 @@ export function RecruiterApplicationPipeline({ jobId }: { jobId?: string }) {
                   <strong>AI chưa sẵn sàng.</strong> {matchState.message} {matchState.polling ? "CareerHub sẽ tự thử lại một lần sau 5 giây." : "Bạn có thể thử lại khi dữ liệu đã đồng bộ."}
                 </p>
               ) : null}
-              {hasRejectAction ? (
-                <div className="field">
-                  <label className="label" htmlFor={`reject-${application.id}`}>Lý do nếu từ chối</label>
-                  <textarea id={`reject-${application.id}`} className="textarea resize-none" maxLength={2000} value={rejectionReasons[application.id] ?? ""} aria-describedby={validationErrors[application.id] ? `reject-error-${application.id}` : undefined} onChange={(event) => { setRejectionReasons((current) => ({ ...current, [application.id]: event.target.value })); setValidationErrors((current) => ({ ...current, [application.id]: "" })); }} />
-                  {validationErrors[application.id] ? <span id={`reject-error-${application.id}`} className="form-error">{validationErrors[application.id]}</span> : null}
-                </div>
-              ) : null}
               <div className="btn-group">
-                <Link className="btn" href={`/recruiter/applications/${application.id}`}>Chi tiết hồ sơ</Link>
-                {["REVIEWING", "INTERVIEW"].includes(application.status) && <Link className="btn" href={`/recruiter/applications/${application.id}/interview`}>Đặt lịch phỏng vấn</Link>}
                 <button className="btn" type="button" disabled={pendingApplicationId !== null || matchState?.polling} aria-busy={pending && !matchState} onClick={() => { void refreshMatch(application); }}>
                   {pending && !matchState ? "Đang tính điểm…" : matchState?.polling ? "Đang chờ AI…" : "Làm mới điểm phù hợp"}
                 </button>
-                {actions.map((action) => action.kind === "SEND_OFFER" ? (
-                  <Link key={action.kind} className="btn btn-primary" href={`/recruiter/applications/${application.id}/offer`}>{action.label}</Link>
-                ) : (
-                  <button key={action.status} className={action.status === "REJECTED" ? "btn btn-danger" : "btn btn-secondary"} type="button" disabled={pendingApplicationId !== null} aria-busy={pending} onClick={() => { void moveStatus(application, action.status); }}>{pending ? "Đang cập nhật…" : action.label}</button>
-                ))}
                 {application.candidateId ? (
                   <button className="btn" type="button" disabled={chattingId !== null || !application.candidateId} aria-busy={chattingId === application.id} onClick={() => startChat(application)}>
                     {chattingId === application.id ? "Đang tạo..." : "Chat với ứng viên"}
                   </button>
                 ) : null}
               </div>
+              </div></details>
+              {hasRejectAction ? <details className={styles.rejection}><summary>{application.status === "OFFER" ? "Thu hồi thư mời và từ chối hồ sơ" : "Từ chối hồ sơ"}</summary><div className="field">
+                <label className="label" htmlFor={`reject-${application.id}`}>Lý do từ chối (hiển thị trong lịch sử hồ sơ)</label>
+                <textarea id={`reject-${application.id}`} className="textarea resize-none" maxLength={2000} value={rejectionReasons[application.id] ?? ""} aria-describedby={validationErrors[application.id] ? `reject-error-${application.id}` : undefined} onChange={(event) => { setRejectionReasons((current) => ({ ...current, [application.id]: event.target.value })); setValidationErrors((current) => ({ ...current, [application.id]: "" })); }} />
+                {validationErrors[application.id] ? <span id={`reject-error-${application.id}`} className="form-error" role="alert">{validationErrors[application.id]}</span> : null}
+                <p className="help">Thao tác kết thúc xét tuyển hồ sơ này{application.status === "OFFER" ? " và thu hồi thư mời còn hiệu lực" : ""}.</p>
+                <button className="btn btn-danger" type="button" disabled={pendingApplicationId !== null} onClick={() => { void moveStatus(application, "REJECTED"); }}>{pending ? "Đang cập nhật…" : "Xác nhận từ chối"}</button>
+              </div></details> : null}
               {actions.length === 0 ? <p className="status-line">Hồ sơ đã kết thúc bước xét tuyển. Bạn vẫn có thể xem lại thông tin và trao đổi với ứng viên.</p> : null}
             </article>
           );
         })}
-      </div>
+      </div> : null}
       {!loadError && total > 0 ? (
         <nav className="btn-group pagination-actions" aria-label="Phân trang hồ sơ ứng tuyển">
           <button className="btn" type="button" disabled={loading || page === 0} onClick={() => setPage((current) => Math.max(0, current - 1))}>Trang trước</button>
