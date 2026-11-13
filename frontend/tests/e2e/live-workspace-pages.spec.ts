@@ -66,6 +66,28 @@ test("CV detail reads owned metadata and refuses a non-HTTPS download URL", asyn
   await expect(page.getByText(/85\/100/)).toHaveCount(0);
 });
 
+test("Xem CV opens an inline PDF in another tab and keeps the download action separate", async ({ page, context }, testInfo) => {
+  test.skip(testInfo.project.name.includes("mobile"), "Native PDF viewer is browser-dependent on mobile");
+  const printable = await context.newPage();
+  await printable.setContent("<h1>CareerHub CV preview</h1><p>Private PDF fixture</p>");
+  const pdf = await printable.pdf();
+  await printable.close();
+  await page.route(api + "/profile/cvs/" + cvId, r => reply(r, { id: cvId, title: "Stored private CV", type: "UPLOAD", revisionNumber: 3, aggregateVersion: 4, isDefault: true }));
+  await context.route(api + "/cv-preview/candidate/" + cvId, r => r.fulfill({ contentType: "application/pdf", headers: { "Content-Disposition": 'inline; filename="cv.pdf"', "Cache-Control": "private, no-store" }, body: pdf }));
+  await login(page, "CANDIDATE", "/candidate/cvs/" + cvId);
+  const link = page.getByRole("link", { name: "Xem CV", exact: true });
+  await expect(link).toHaveAttribute("target", "_blank");
+  const [response, popup] = await Promise.all([
+    context.waitForEvent("response", { predicate: response => response.url().endsWith("/cv-preview/candidate/" + cvId) }),
+    page.waitForEvent("popup"),
+    link.click(),
+  ]);
+  expect(response.headers()["content-disposition"]).toBe('inline; filename="cv.pdf"');
+  await expect(popup).toHaveURL(api + "/cv-preview/candidate/" + cvId);
+  await expect(page.getByRole("button", { name: "Tải xuống PDF", exact: true })).toBeVisible();
+  await popup.close();
+});
+
 test("Legacy CV creation opens the functional builder", async ({ page }) => {
   await login(page, "CANDIDATE", "/candidate/profile");
   await page.route(api + "/auth/me", r => reply(r, { id: userId, email: "fixture@example.test", role: "CANDIDATE" }));

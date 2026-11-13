@@ -41,6 +41,7 @@ function CvDetail({ cvId }: { cvId: string }) {
       <div className="section-head"><h2>Thông tin CV</h2>{cv.isDefault && <StatusBadge tone="success">CV mặc định</StatusBadge>}</div>
       <div className="chip-list"><StatusBadge tone="neutral">{cv.type === "ONLINE" ? "CV trực tuyến" : "CV tải lên"}</StatusBadge><span className="muted">Phiên bản {cv.revisionNumber}</span></div>
       <div className="btn-group">
+        <a className="btn btn-primary" href={`/api/cv-preview/candidate/${encodeURIComponent(cvId)}`} target="_blank" rel="noopener noreferrer">Xem CV</a>
         <button className="btn btn-primary" disabled={pending} onClick={() => void download()}>{pending ? "Đang lấy liên kết…" : "Tải xuống PDF"}</button>
         {cv.type === "ONLINE" && <Link className="btn" href={`/candidate/profile/cvs/builder?id=${encodeURIComponent(cv.id)}`}>Chỉnh sửa CV</Link>}
       </div>

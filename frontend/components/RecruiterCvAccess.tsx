@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { ApiClientError, toUserMessage } from "../lib/apiClient";
-import { resolveFreshCvDownload } from "../lib/recruiterCvAccess";
-import { createRecruiterCvDownload, getRecruiterApplicationCv, type RecruiterApplicationCv } from "../lib/person2Api";
+import { getRecruiterApplicationCv, type RecruiterApplicationCv } from "../lib/person2Api";
 import { StatusBadge } from "./ui";
 
 export function RecruiterCvAccess({ applicationId }: { applicationId: string }) {
@@ -14,7 +13,7 @@ export function RecruiterCvAccess({ applicationId }: { applicationId: string }) 
 
   async function openCv() {
     if (pending) return;
-    const popup = window.open("about:blank", "_blank", "popup");
+    const popup = window.open("about:blank", "_blank");
     if (!popup) {
       setError("Trình duyệt đã chặn cửa sổ xem CV. Hãy cho phép popup rồi thử lại.");
       return;
@@ -26,11 +25,8 @@ export function RecruiterCvAccess({ applicationId }: { applicationId: string }) 
     try {
       const cv = await getRecruiterApplicationCv(applicationId);
       setMetadata(cv.data);
-      const download = await resolveFreshCvDownload(async () => (
-        await createRecruiterCvDownload(applicationId)
-      ).data);
-      popup.location.replace(download.url);
-      setStatus(`CV đã mở bằng link mới, hết hạn lúc ${new Date(download.expiresAt).toLocaleTimeString("vi-VN")}.`);
+      popup.location.replace(`/api/cv-preview/recruiter/${encodeURIComponent(applicationId)}`);
+      setStatus("Đã mở trang xem PDF trong tab mới.");
     } catch (reason: unknown) {
       popup.close();
       setError(toUserMessage(reason));

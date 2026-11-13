@@ -192,6 +192,7 @@ export default function CvsPage() {
               <div className="section-head"><h2>{cv.title}</h2>{cv.isDefault && <StatusBadge tone="success">Mặc định</StatusBadge>}</div>
               <div className="chip-list"><StatusBadge tone="neutral">{cv.type === "ONLINE" ? "CV trực tuyến" : "CV tải lên"}</StatusBadge><span className="muted">Tạo ngày {new Date(cv.createdAt).toLocaleDateString("vi-VN")}</span></div>
               <div className="btn-group">
+                <a className="btn btn-primary" href={`/api/cv-preview/candidate/${encodeURIComponent(cv.id)}`} target="_blank" rel="noopener noreferrer">Xem CV</a>
                 <button
                   className="btn"
                   disabled={pending}

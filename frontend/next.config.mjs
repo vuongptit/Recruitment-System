@@ -5,13 +5,15 @@ export default {
   async rewrites() {
     const gateway = (process.env.API_INTERNAL_BASE_URL || 'http://localhost:8080')
       .replace(/\/+$/, '').replace(/\/api$/, '');
-    return [
+    return { afterFiles: [
       // OAuth redirects and path-scoped cookies use Auth's canonical paths.
       // Keep the browser on the frontend origin throughout the handshake.
       { source: '/auth/google/:path*', destination: `${gateway}/auth/google/:path*` },
       { source: '/auth/oauth2/:path*', destination: `${gateway}/auth/oauth2/:path*` },
-      // Keep the API namespace on both browser and server hops.
+    ], fallback: [
+      // Local API handlers, including dynamic PDF preview routes, must resolve
+      // before forwarding unmatched API paths to the gateway.
       { source: '/api/:path*', destination: `${gateway}/api/:path*` },
-    ];
+    ] };
   },
 };

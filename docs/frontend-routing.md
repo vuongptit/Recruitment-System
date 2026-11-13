@@ -33,4 +33,12 @@ Các URL bắt đầu OAuth (`/auth/google`, `/auth/oauth2/...`), callback Googl
 
 `/auth/callback` là trang frontend. `/api/auth-cookie/*` là API do Next.js xử lý để quản lý cookie, không proxy trực tiếp sang Auth.
 
+## Xem PDF CV trong tab mới
+
+`GET /api/cv-preview/candidate/:cvId` và `GET /api/cv-preview/recruiter/:applicationId` là route Next.js trả tài liệu PDF. Nút “Xem CV” mở route này trong tab mới; nút tải xuống vẫn dùng download-url hiện hành.
+
+Handler lấy token từ cookie HttpOnly, xin URL ngắn hạn qua đúng API có kiểm tra quyền của Profile/Application Service, rồi đọc tệp từ Cloudinary. Không nhận URL tùy ý từ trình duyệt, không chuyển token sang Cloudinary, không chuyển hướng tới liên kết có chữ ký. Giới hạn 5 MiB và kiểm tra đầu tệp `%PDF-` trước khi trả `application/pdf`, `Content-Disposition: inline`, `private, no-store`.
+
+Quy tắc proxy `/api/:path*` nằm trong `fallback` của Next.js để các API handler nội bộ, kể cả route động xem CV, được xử lý trước. Hai rewrite OAuth canonical giữ ở `afterFiles`. Lỗi quyền và phiên hiển thị thông báo tiếng Việt trong tab mới; không trả nội dung lỗi hoặc URL lưu trữ nội bộ ra trình duyệt.
+
 Upload Cloudinary dùng URL có chữ ký do Media Service trả về; không thêm `/api` vào URL dịch vụ ngoài. SSE thông báo và WebSocket chat đã dùng `/api/notifications/stream` và `/api/chat/ws/chat`.
