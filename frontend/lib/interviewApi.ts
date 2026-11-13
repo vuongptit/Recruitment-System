@@ -306,13 +306,13 @@ export function getInterviewFeedback(interviewId: string, signal?: AbortSignal) 
 export function interviewStatusLabel(status: string): string {
   return (
     ({
-      SCHEDULED: "Đã lên lịch",
+      SCHEDULED: "Chờ ứng viên xác nhận",
       CONFIRMED: "Đã xác nhận",
       IN_PROGRESS: "Đang phỏng vấn",
       COMPLETED: "Đã hoàn thành",
       RESCHEDULE_REQUESTED: "Đề nghị đổi lịch",
       CANCELLED: "Đã hủy",
-      NO_SHOW: "Vắng mặt",
+      NO_SHOW: "Chưa ghi nhận tham gia",
     } as Record<string, string>)[status] ?? "Đang cập nhật"
   );
 }
@@ -321,7 +321,7 @@ export function feedbackConclusionLabel(conclusion: string): string {
   return (
     ({
       PASS: "Đạt — Đề xuất gửi thư mời nhận việc",
-      FAIL: "Chưa phù hợp — Từ chối",
+      FAIL: "Chưa phù hợp — Đề xuất từ chối hồ sơ",
       NEXT_ROUND: "Đạt vòng này — Lên lịch vòng tiếp",
     } as Record<string, string>)[conclusion] ?? "Chưa có kết luận"
   );
@@ -359,6 +359,9 @@ export function interviewScheduleError(error: unknown): string {
         "Trạng thái hồ sơ đã thay đổi. Hãy quay về hồ sơ và kiểm tra lại.",
       INTERVIEW_CANCEL_TOO_LATE:
         "Chỉ có thể hủy lịch trước giờ phỏng vấn ít nhất 2 tiếng.",
+      INTERVIEW_FEEDBACK_NOT_READY: "Chưa thể đánh giá: buổi phỏng vấn chưa bắt đầu hoặc đang chờ đổi lịch.",
+      INTERVIEW_STATE_INVALID: "Lịch đã thay đổi hoặc thao tác không còn phù hợp. Hãy làm mới và kiểm tra trạng thái hiện tại.",
+      INTERVIEW_ALREADY_STARTED: "Đã đến hoặc qua giờ hẹn. Không thể xác nhận hay đổi giờ cho lịch cũ; hãy liên hệ để thống nhất phương án tiếp theo.",
       INTERVIEW_JOIN_TOO_EARLY:
         "Phòng phỏng vấn trực tuyến chỉ mở trước giờ hẹn 15 phút.",
       INTERVIEW_JOIN_WINDOW_EXPIRED:

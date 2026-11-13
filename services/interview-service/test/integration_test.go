@@ -33,10 +33,7 @@ import (
 func TestFullInterviewLifecycleDatabaseIntegration(t *testing.T) {
 	dbURL := os.Getenv("TEST_DATABASE_URL")
 	if dbURL == "" {
-		dbURL = os.Getenv("DATABASE_URL")
-	}
-	if dbURL == "" {
-		t.Skip("skipping database integration test: TEST_DATABASE_URL / DATABASE_URL not set")
+		t.Skip("requires isolated TEST_DATABASE_URL")
 	}
 
 	ctx := context.Background()
@@ -116,6 +113,10 @@ func TestFullInterviewLifecycleDatabaseIntegration(t *testing.T) {
 
 	appUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"id": applicationID, "jobId": jobID, "companyId": companyID, "candidateId": candidateID, "status": "INTERVIEW", "version": 1}})
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"data": map[string]any{
 				"applicationId":      applicationID.String(),
@@ -137,7 +138,7 @@ func TestFullInterviewLifecycleDatabaseIntegration(t *testing.T) {
 	ivRepo := repository.NewInterviewRepository(pool)
 	qRepo := repository.NewQueryRepository(pool)
 	schedSvc := service.NewSchedulingService(ivRepo, companyClient, appClient, cfg.KafkaInterviewTopic)
-	lifeSvc := service.NewLifecycleService(ivRepo, companyClient, tokenIssuer, cfg.LiveKitURL, cfg.KafkaInterviewTopic)
+	lifeSvc := service.NewLifecycleService(ivRepo, companyClient, appClient, tokenIssuer, cfg.LiveKitURL, cfg.KafkaInterviewTopic)
 	qSvc := service.NewQueryService(qRepo, companyClient, appClient, cursorCodec)
 
 	router := handler.NewRouter(
@@ -290,8 +291,15 @@ func TestFullInterviewLifecycleDatabaseIntegration(t *testing.T) {
 		t.Fatalf("PATCH /feedback failed: %v", err)
 	}
 	defer fbResp.Body.Close()
-	if fbResp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 OK on feedback, got %d", fbResp.StatusCode)
+	if fbResp.StatusCode != http.StatusConflict {
+		t.Fatalf("expected future-feedback conflict, got %d", fbResp.StatusCode)
+	}
+	var feedback model.SubmitFeedbackRequest
+	if err := json.Unmarshal(fbBody, &feedback); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := ivRepo.SubmitFeedback(ctx, rev2Env.Data.ID, companyID, recruiterID, feedback, cfg.KafkaInterviewTopic, newStart.Add(46*time.Minute)); err != nil {
+		t.Fatalf("feedback after the interview failed: %v", err)
 	}
 
 	// 6. Verify background batch queries (MarkNoShowsBatch & SendRemindersBatch)

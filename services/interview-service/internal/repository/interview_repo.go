@@ -265,7 +265,7 @@ func (r *InterviewRepository) Confirm(ctx context.Context, id, candidateID uuid.
 	if iv.Status == model.StatusConfirmed {
 		return iv, nil
 	}
-	if iv.Status != model.StatusScheduled && iv.Status != model.StatusRescheduleRequested {
+	if iv.Status != model.StatusScheduled {
 		return nil, apierror.NewStatus(http.StatusConflict, "INTERVIEW_STATE_INVALID", "Only SCHEDULED interviews can be confirmed", map[string]any{
 			"currentStatus": iv.Status,
 		})
@@ -374,10 +374,24 @@ func (r *InterviewRepository) RescheduleByRecruiter(
 	if oldIv == nil || oldIv.CompanyID != companyID {
 		return nil, apierror.NewStatus(http.StatusNotFound, "INTERVIEW_NOT_FOUND", "Interview was not found", nil)
 	}
+	// The old row lock serializes concurrent retries of the same revision.
+	existing, lookupErr := scanInterview(tx.QueryRow(ctx, `SELECT `+interviewSelectColumns+` FROM interviews WHERE scheduled_by = $1 AND request_id = $2`, recruiterID, newInterview.RequestID))
+	if lookupErr == nil {
+		if existing.CompanyID != companyID || existing.RequestHash != newInterview.RequestHash || existing.SupersedesInterviewID == nil || *existing.SupersedesInterviewID != oldID {
+			return nil, apierror.NewStatus(http.StatusConflict, "IDEMPOTENCY_CONFLICT", "Request ID was already used for different interview details", nil)
+		}
+		return existing, nil
+	}
+	if !errors.Is(lookupErr, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("lookup reschedule retry: %w", lookupErr)
+	}
 	if oldIv.Status != model.StatusScheduled && oldIv.Status != model.StatusConfirmed && oldIv.Status != model.StatusRescheduleRequested {
 		return nil, apierror.NewStatus(http.StatusConflict, "INTERVIEW_STATE_INVALID", "Only active interviews (SCHEDULED, CONFIRMED, RESCHEDULE_REQUESTED) can be rescheduled", map[string]any{
 			"currentStatus": oldIv.Status,
 		})
+	}
+	if oldIv.Status != model.StatusRescheduleRequested && !oldIv.ScheduledStartAt.After(nowUTC) {
+		return nil, apierror.NewStatus(http.StatusConflict, "INTERVIEW_ALREADY_STARTED", "Cannot reschedule after the interview has started", nil)
 	}
 
 	cancelSQL := `
@@ -543,11 +557,16 @@ func (r *InterviewRepository) JoinRoom(
 		})
 	}
 
+	// Opening a preparation room as a recruiter is not candidate attendance.
+	if role == "RECRUITER" && iv.StartedAt == nil {
+		return iv, nil
+	}
 	if iv.Status != model.StatusInProgress || iv.StartedAt == nil {
 		updateSQL := `
 			UPDATE interviews
 			SET status = 'IN_PROGRESS',
 			    started_at = COALESCE(started_at, $1),
+			    confirmed_at = COALESCE(confirmed_at, $1),
 			    room_url = COALESCE(room_url, $2),
 			    updated_at = GREATEST($1, created_at),
 			    version = version + 1
@@ -591,6 +610,9 @@ func (r *InterviewRepository) LeaveRoom(
 	}
 	if iv == nil || !canActorAccessInterview(iv, actorID, role, companyID) {
 		return nil, apierror.NewStatus(http.StatusNotFound, "INTERVIEW_NOT_FOUND", "Interview was not found", nil)
+	}
+	if iv.Status != model.StatusInProgress || iv.StartedAt == nil {
+		return iv, nil
 	}
 
 	updateSQL := `
@@ -638,6 +660,9 @@ func (r *InterviewRepository) SubmitFeedback(
 		return nil, nil, apierror.NewStatus(http.StatusConflict, "INTERVIEW_STATE_INVALID", "Cannot submit feedback for a cancelled or no-show interview", map[string]any{
 			"currentStatus": iv.Status,
 		})
+	}
+	if iv.Status == model.StatusRescheduleRequested || nowUTC.Before(iv.ScheduledStartAt) {
+		return nil, nil, apierror.NewStatus(http.StatusConflict, "INTERVIEW_FEEDBACK_NOT_READY", "Feedback requires an interview that has started, not a pending reschedule", nil)
 	}
 
 	scoresJSON, err := json.Marshal(req.CriteriaScores)
@@ -783,7 +808,8 @@ func (r *InterviewRepository) MarkNoShowsBatch(ctx context.Context, topic string
 			SELECT id
 			FROM interviews
 			WHERE status IN ('SCHEDULED', 'CONFIRMED')
-			  AND scheduled_end_at < $1
+			  AND mode = 'ONLINE'
+			  AND scheduled_end_at + INTERVAL '60 minutes' < $1
 			  AND started_at IS NULL
 			ORDER BY scheduled_end_at ASC
 			LIMIT $2

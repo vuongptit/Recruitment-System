@@ -77,7 +77,7 @@ func main() {
 	outboxRepo := repository.NewOutboxRepository(pool)
 
 	schedulingSvc := service.NewSchedulingService(interviewRepo, companyClient, applicationClient, cfg.KafkaInterviewTopic)
-	lifecycleSvc := service.NewLifecycleService(interviewRepo, companyClient, tokenIssuer, cfg.LiveKitURL, cfg.KafkaInterviewTopic)
+	lifecycleSvc := service.NewLifecycleService(interviewRepo, companyClient, applicationClient, tokenIssuer, cfg.LiveKitURL, cfg.KafkaInterviewTopic)
 	querySvc := service.NewQueryService(queryRepo, companyClient, applicationClient, cursorCodec)
 
 	outboxPublisher := worker.NewOutboxPublisher(outboxRepo, cfg)

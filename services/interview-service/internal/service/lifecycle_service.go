@@ -4,10 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -30,37 +32,43 @@ type LifecycleRepository interface {
 }
 
 type LifecycleService struct {
-	repo          LifecycleRepository
-	companyClient CompanyVerifier
-	tokenIssuer   *livekit.TokenIssuer
-	livekitURL    string
-	topic         string
-	nowFunc       func() time.Time
+	repo              LifecycleRepository
+	companyClient     CompanyVerifier
+	applicationClient ApplicationVerifier
+	tokenIssuer       *livekit.TokenIssuer
+	livekitURL        string
+	topic             string
+	nowFunc           func() time.Time
 }
 
 func NewLifecycleService(
 	repo LifecycleRepository,
 	companyClient CompanyVerifier,
+	applicationClient ApplicationVerifier,
 	tokenIssuer *livekit.TokenIssuer,
 	livekitURL string,
 	topic string,
 ) *LifecycleService {
 	return &LifecycleService{
-		repo:          repo,
-		companyClient: companyClient,
-		tokenIssuer:   tokenIssuer,
-		livekitURL:    livekitURL,
-		topic:         topic,
-		nowFunc:       time.Now,
+		repo:              repo,
+		companyClient:     companyClient,
+		applicationClient: applicationClient,
+		tokenIssuer:       tokenIssuer,
+		livekitURL:        livekitURL,
+		topic:             topic,
+		nowFunc:           time.Now,
 	}
 }
 
-func (s *LifecycleService) ConfirmInterview(ctx context.Context, principal *middleware.Principal, interviewID uuid.UUID) (model.InterviewResponse, error) {
+func (s *LifecycleService) ConfirmInterview(ctx context.Context, principal *middleware.Principal, authorizationHeader string, interviewID uuid.UUID) (model.InterviewResponse, error) {
 	if principal == nil {
 		return model.InterviewResponse{}, apierror.NewStatus(http.StatusUnauthorized, "AUTH_UNAUTHORIZED", "Valid bearer token is required", nil)
 	}
 	if principal.Role != "CANDIDATE" {
 		return model.InterviewResponse{}, apierror.NewStatus(http.StatusForbidden, "AUTH_FORBIDDEN", "Only candidates can confirm interviews", nil)
+	}
+	if err := s.ensureActiveApplication(ctx, interviewID, authorizationHeader); err != nil {
+		return model.InterviewResponse{}, err
 	}
 	iv, err := s.repo.Confirm(ctx, interviewID, principal.Subject, s.topic, s.nowFunc().UTC())
 	if err != nil {
@@ -89,21 +97,24 @@ func (s *LifecycleService) RescheduleInterview(
 		}
 		if reason == "" {
 			fieldErrors["reason"] = "reason is required when requesting a reschedule"
-		} else if len(reason) > 500 || containsControlChars(reason) {
+		} else if utf8.RuneCountInString(reason) > 500 || containsControlChars(reason) {
 			fieldErrors["reason"] = "reason must be at most 500 printable characters"
 		}
 
 		var slots []string
+		seenSlots := make(map[int64]bool)
 		for _, rawSlot := range req.PreferredSlots {
 			trimmed := strings.TrimSpace(rawSlot)
 			if trimmed == "" {
 				continue
 			}
-			if len(trimmed) > 120 || containsControlChars(trimmed) {
-				fieldErrors["preferredSlots"] = "each preferred slot must be a valid time description or ISO-8601 timestamp"
+			parsed, parseErr := time.Parse(time.RFC3339, trimmed)
+			if parseErr != nil || !parsed.After(nowUTC) || seenSlots[parsed.UnixMilli()] {
+				fieldErrors["preferredSlots"] = "preferred slots must be distinct future ISO-8601 timestamps"
 				break
 			}
-			slots = append(slots, trimmed)
+			seenSlots[parsed.UnixMilli()] = true
+			slots = append(slots, model.FormatMillisUTC(parsed))
 		}
 		if len(slots) < 2 || len(slots) > 3 {
 			fieldErrors["preferredSlots"] = "preferredSlots must contain between 2 and 3 suggested time slots"
@@ -112,6 +123,9 @@ func (s *LifecycleService) RescheduleInterview(
 			return model.InterviewResponse{}, apierror.ValidationFailed(fieldErrors)
 		}
 
+		if err := s.ensureActiveApplication(ctx, interviewID, authorizationHeader); err != nil {
+			return model.InterviewResponse{}, err
+		}
 		updated, err := s.repo.RequestReschedule(ctx, interviewID, principal.Subject, reason, slots, s.topic, nowUTC)
 		if err != nil {
 			return model.InterviewResponse{}, err
@@ -134,6 +148,13 @@ func (s *LifecycleService) RescheduleInterview(
 		}
 		if oldIv == nil || oldIv.CompanyID != recruiterCtx.CompanyID {
 			return model.InterviewResponse{}, apierror.NewStatus(http.StatusNotFound, "INTERVIEW_NOT_FOUND", "Interview was not found", nil)
+		}
+		appCtx, authErr := s.applicationClient.GetSchedulingContext(ctx, oldIv.ApplicationID, authorizationHeader)
+		if authErr != nil {
+			return model.InterviewResponse{}, authErr
+		}
+		if appCtx.CompanyID != oldIv.CompanyID || appCtx.Status != "INTERVIEW" {
+			return model.InterviewResponse{}, apierror.NewStatus(http.StatusConflict, "APPLICATION_NOT_SCHEDULABLE", "Application is no longer in the interview stage", nil)
 		}
 
 		fieldErrors := make(map[string]any)
@@ -184,20 +205,15 @@ func (s *LifecycleService) RescheduleInterview(
 
 		scheduledEndAt := scheduledStartAt.Add(time.Duration(duration) * time.Minute)
 		newID := uuid.New()
-		hashInput := fmt.Sprintf(
-			"reschedule|%s|%s|%s|%d|%s",
-			oldIv.ID.String(),
-			model.FormatMillisUTC(scheduledStartAt),
-			tzStr,
-			duration,
-			string(mode),
-		)
-		sum := sha256.Sum256([]byte(hashInput))
-
 		cancelReason := "Rescheduled to a new time slot by recruiter"
 		if req.Reason != nil && strings.TrimSpace(*req.Reason) != "" {
 			cancelReason = strings.TrimSpace(*req.Reason)
 		}
+		hashInput, hashErr := json.Marshal([]any{oldIv.ID, model.FormatMillisUTC(scheduledStartAt), tzStr, duration, mode, location, notes, cancelReason})
+		if hashErr != nil {
+			return model.InterviewResponse{}, fmt.Errorf("hash reschedule request: %w", hashErr)
+		}
+		sum := sha256.Sum256(hashInput)
 
 		newIv := &model.Interview{
 			ID:               newID,
@@ -241,7 +257,7 @@ func (s *LifecycleService) CancelInterview(
 	}
 
 	reason := strings.TrimSpace(req.Reason)
-	if reason == "" || len(reason) > 500 || containsControlChars(reason) {
+	if reason == "" || utf8.RuneCountInString(reason) > 500 || containsControlChars(reason) {
 		return model.InterviewResponse{}, apierror.ValidationFailed(map[string]any{
 			"reason": "reason is required and must be at most 500 printable characters",
 		})
@@ -266,6 +282,9 @@ func (s *LifecycleService) JoinRoom(
 		return model.JoinRoomResponse{}, err
 	}
 
+	if err := s.ensureActiveApplication(ctx, interviewID, authorizationHeader); err != nil {
+		return model.JoinRoomResponse{}, err
+	}
 	roomURL := fmt.Sprintf("/interviews/%s/room", interviewID.String())
 	iv, err := s.repo.JoinRoom(ctx, interviewID, principal.Subject, principal.Role, companyID, roomURL, s.topic, s.nowFunc().UTC())
 	if err != nil {
@@ -414,6 +433,24 @@ func (s *LifecycleService) resolveActorCompanyID(
 		return &compID, nil
 	}
 	return nil, apierror.NewStatus(http.StatusForbidden, "AUTH_FORBIDDEN", "Unsupported role", nil)
+}
+
+func (s *LifecycleService) ensureActiveApplication(ctx context.Context, interviewID uuid.UUID, authorizationHeader string) error {
+	iv, err := s.repo.GetByID(ctx, interviewID)
+	if err != nil {
+		return err
+	}
+	if iv == nil {
+		return apierror.New("INTERVIEW_NOT_FOUND", "Interview was not found", http.StatusNotFound)
+	}
+	app, err := s.applicationClient.GetActiveApplicationContext(ctx, iv.ApplicationID, authorizationHeader)
+	if err != nil {
+		return err
+	}
+	if app == nil || app.Status != "INTERVIEW" {
+		return apierror.New("APPLICATION_NOT_SCHEDULABLE", "Application is no longer in the interview stage", http.StatusConflict)
+	}
+	return nil
 }
 
 func isScoreValid(score int) bool {

@@ -89,6 +89,50 @@ func (c *ApplicationClient) GetSchedulingContext(ctx context.Context, applicatio
 	}, nil
 }
 
+// The tracking API authorizes both the owning candidate and active company
+// members. It prevents stale interview actions after the Application has ended.
+func (c *ApplicationClient) GetActiveApplicationContext(ctx context.Context, applicationID uuid.UUID, bearerToken string) (*ApplicationSchedulingContext, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/"+applicationID.String(), nil)
+	if err != nil {
+		return nil, unavailableAppErr()
+	}
+	req.Header.Set("Authorization", bearerToken)
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, unavailableAppErr()
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 401 || resp.StatusCode == 403 || resp.StatusCode == 404 {
+		return nil, apierror.New("APPLICATION_ACCESS_DENIED", "Application is not available to this participant", resp.StatusCode)
+	}
+	if resp.StatusCode != 200 || !isJSONContentType(resp.Header.Get("Content-Type")) {
+		return nil, unavailableAppErr()
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 256*1024+1))
+	if err != nil || len(body) > 256*1024 {
+		return nil, unavailableAppErr()
+	}
+	var payload struct {
+		Data *struct {
+			ID          uuid.UUID `json:"id"`
+			JobID       uuid.UUID `json:"jobId"`
+			CompanyID   uuid.UUID `json:"companyId"`
+			CandidateID uuid.UUID `json:"candidateId"`
+			Status      string    `json:"status"`
+			Version     int64     `json:"version"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(body, &payload) != nil || payload.Data == nil || payload.Data.ID != applicationID || payload.Data.CompanyID == uuid.Nil || payload.Data.CandidateID == uuid.Nil || payload.Data.JobID == uuid.Nil {
+		return nil, unavailableAppErr()
+	}
+	data := payload.Data
+	if data.Status != "INTERVIEW" {
+		return nil, apierror.New("APPLICATION_NOT_SCHEDULABLE", "Application is no longer in the interview stage", http.StatusConflict)
+	}
+	return &ApplicationSchedulingContext{ApplicationID: data.ID, JobID: data.JobID, CompanyID: data.CompanyID, CandidateID: data.CandidateID, Status: data.Status, Version: data.Version}, nil
+}
+
 func (c *ApplicationClient) AuthorizeScheduling(ctx context.Context, applicationID uuid.UUID, bearerToken string) (*ApplicationAuthContext, error) {
 	if !strings.HasPrefix(bearerToken, "Bearer ") {
 		bearerToken = "Bearer " + strings.TrimSpace(bearerToken)

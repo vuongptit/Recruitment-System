@@ -51,6 +51,7 @@ Các đường dẫn code tính từ `frontend/`.
 - Khi ứng tuyển, kiểm tra CV có thể dùng, thông tin tin tuyển dụng và phản hồi trùng/cooldown theo helper hiện có. Giữ điều hướng về đúng tin sau đăng nhập.
 - Thao tác từ chối, gửi offer, phản hồi offer có điều kiện riêng và có thể cần lý do/confirmation. Lưu input khi lỗi, làm rõ kết quả chưa xác định, không retry mù khi có nguy cơ gửi trùng. `WITHDRAWN` chỉ nằm trong “Lịch sử cũ”, nhãn “Đã rút trước đây”; không trình bày như một bước của pipeline hiện hành.
 - Phỏng vấn hiển thị timezone, phương thức và thông tin tham gia thật từ API. Không tự dựng phòng video hoặc cho nút tham gia hoạt động khi chưa có room/call được cấp quyền.
+- Dùng `interviewWorkflow`/`InterviewSummary` cho điều kiện thao tác và thông tin lịch hai phía. `SCHEDULED` là chờ ứng viên xác nhận; lịch đổi cần xác nhận lại. Không suy luận tham dự từ việc nhà tuyển dụng mở phòng và không tự đánh vắng mặt lịch trực tiếp. Xem [quy trình lịch phỏng vấn](../../../../../docs/interview-workflow-review.md).
 - Điểm đọc: `lib/applicationStateMachine.ts`, `lib/applicationVersioning.ts`, `lib/applicationCooldown.ts`, `lib/recruiterCvAccess.ts`, `lib/offerResponseRecovery.ts`, `lib/interviewApi.ts`.
 
 ## Hội thoại và thông báo

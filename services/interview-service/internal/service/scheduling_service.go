@@ -29,6 +29,7 @@ type CompanyVerifier interface {
 
 type ApplicationVerifier interface {
 	GetSchedulingContext(ctx context.Context, applicationID uuid.UUID, authorizationHeader string) (*client.ApplicationSchedulingContext, error)
+	GetActiveApplicationContext(ctx context.Context, applicationID uuid.UUID, authorizationHeader string) (*client.ApplicationSchedulingContext, error)
 }
 
 type SchedulingResult struct {

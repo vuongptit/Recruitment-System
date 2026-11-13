@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { CalendarCheck2, Plus, RefreshCw } from "lucide-react";
+import { InterviewSummary } from "@/components/InterviewSummary";
+import { InterviewActionDialog } from "@/components/InterviewActionDialog";
+import { interviewActions, interviewDate } from "@/lib/interviewWorkflow";
+import styles from "@/components/InterviewWorkspace.module.css";
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { PageHeader, ErrorState, LoadingState, StatusBadge } from "@/components/ui";
+import { PageHeader, ErrorState, LoadingState } from "@/components/ui";
 import { getApplicationDetail, type CandidateApplication } from "@/lib/person2Api";
 import { toUserMessage } from "@/lib/apiClient";
 import {
@@ -12,7 +17,6 @@ import {
   getInterviewFeedback,
   interviewStartGmt7,
   interviewScheduleError,
-  interviewStatusLabel,
   interviewModeLabel,
   listApplicationInterviews,
   rescheduleInterviewByRecruiter,
@@ -45,12 +49,22 @@ export default function ScheduleInterviewPage({
   const [feedbacks, setFeedbacks] = useState<Record<string, InterviewFeedback>>(
     {}
   );
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [reload, setReload] = useState(0);
+  const [createOpen, setCreateOpen] = useState(true);
+  const [cancelTarget, setCancelTarget] = useState<Interview | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [now, setNow] = useState(Date.now);
+  const initialized = useRef(false);
+  const editorRef = useRef<HTMLElement>(null);
+  const availabilitySequence = useRef(0);
+  const [availabilityChecked, setAvailabilityChecked] = useState(false);
   const [created, setCreated] = useState<Interview | null>(null);
 
   // Schedule form state
@@ -70,6 +84,7 @@ export default function ScheduleInterviewPage({
   const [rescheduleTarget, setRescheduleTarget] = useState<Interview | null>(
     null
   );
+  const [reschedReason, setReschedReason] = useState("");
   const [reschedStart, setReschedStart] = useState("");
   const [reschedMode, setReschedMode] = useState<InterviewMode>("ONLINE");
   const [reschedLocation, setReschedLocation] = useState("");
@@ -82,13 +97,34 @@ export default function ScheduleInterviewPage({
   const [attitude, setAttitude] = useState(8);
   const [cultureFit, setCultureFit] = useState(8);
   const [fbComment, setFbComment] = useState("");
-  const [fbConclusion, setFbConclusion] = useState<FeedbackConclusion>("PASS");
+  const [fbConclusion, setFbConclusion] = useState<FeedbackConclusion | "">("");
 
+  const rescheduleIdentity = useRef<{ fingerprint: string; id: string } | null>(null);
   const requestIdentity = useRef<{ fingerprint: string; id: string } | null>(
     null
   );
   const submitLock = useRef(false);
 
+  useEffect(() => {
+    if (!rescheduleTarget && !feedbackTarget && !(createOpen && initialized.current && interviews.length > 0)) return;
+    const frame = requestAnimationFrame(() => {
+      const editor = editorRef.current;
+      editor?.scrollIntoView({ block: "start", behavior: "auto" });
+      editor?.querySelector<HTMLElement>("input, select, textarea")?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+    // Move to a form only when the user selects a different editing task.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rescheduleTarget?.id, feedbackTarget?.id, createOpen]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    availabilitySequence.current += 1;
+    setAvailSlots([]); setAvailabilityChecked(false); setLoadingSlots(false);
+  }, [availDate, duration]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
@@ -98,26 +134,16 @@ export default function ScheduleInterviewPage({
       listApplicationInterviews(params.applicationId, null, controller.signal),
     ])
       .then(async ([appRes, ivRes]) => {
+        if (controller.signal.aborted) return;
         setApplication(appRes.data);
         const list = ivRes.data.items;
-        setInterviews(list);
+        setInterviews(list); setNextCursor(ivRes.data.nextCursor);
+        if (!initialized.current) { setCreateOpen(list.length === 0); initialized.current = true; }
         if (list.length > 0) {
           const maxRound = Math.max(...list.map((i) => i.roundNumber));
           setRound(Math.min(20, maxRound + 1));
         }
-        const completed = list.filter((i) => i.status === "COMPLETED");
-        const fbMap: Record<string, InterviewFeedback> = {};
-        for (const iv of completed) {
-          try {
-            const fbRes = await getInterviewFeedback(iv.id, controller.signal);
-            fbMap[iv.id] = fbRes.data;
-          } catch {
-            /* ignore if not found */
-          }
-        }
-        if (!controller.signal.aborted) {
-          setFeedbacks(fbMap);
-        }
+
       })
       .catch((e) => {
         if (!controller.signal.aborted) setLoadError(toUserMessage(e));
@@ -130,7 +156,8 @@ export default function ScheduleInterviewPage({
 
   async function handleCheckAvailability() {
     if (!availDate) return;
-    setLoadingSlots(true);
+    const sequence = ++availabilitySequence.current;
+    setLoadingSlots(true); setAvailSlots([]); setAvailabilityChecked(false);
     setError("");
     try {
       const from = `${availDate}T08:00:00+07:00`;
@@ -141,11 +168,11 @@ export default function ScheduleInterviewPage({
         to,
         duration
       );
-      setAvailSlots(res.data.slots);
+      if (sequence === availabilitySequence.current) { setAvailSlots(res.data.slots); setAvailabilityChecked(true); }
     } catch (e) {
-      setError(interviewScheduleError(e));
+      if (sequence === availabilitySequence.current) setError(interviewScheduleError(e));
     } finally {
-      setLoadingSlots(false);
+      if (sequence === availabilitySequence.current) setLoadingSlots(false);
     }
   }
 
@@ -186,6 +213,7 @@ export default function ScheduleInterviewPage({
         () => crypto.randomUUID()
       );
       submitLock.current = true;
+      submitLock.current = true;
       setPending(true);
       const response = await scheduleInterview({
         ...payload,
@@ -204,44 +232,48 @@ export default function ScheduleInterviewPage({
 
   async function handleRescheduleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!rescheduleTarget || pending) return;
+    if (!rescheduleTarget || pending || submitLock.current) return;
     setError("");
     setNotice("");
     try {
+      if (!reschedReason.trim()) throw new Error("Nhập lý do thay đổi lịch để ứng viên hiểu rõ.");
       const scheduledStart = interviewStartGmt7(reschedStart);
       if (reschedMode === "OFFLINE" && !reschedLocation.trim()) {
         throw new Error("Nhập địa điểm phỏng vấn trực tiếp.");
       }
+      submitLock.current = true;
       setPending(true);
-      const res = await rescheduleInterviewByRecruiter(rescheduleTarget.id, {
-        requestId: crypto.randomUUID(),
-        scheduledStart,
-        timeZone: "Asia/Ho_Chi_Minh",
-        durationMinutes: reschedDuration,
-        mode: reschedMode,
+      const draft = {
+        scheduledStart, timeZone: "Asia/Ho_Chi_Minh" as const,
+        durationMinutes: reschedDuration, mode: reschedMode,
         location: reschedMode === "OFFLINE" ? reschedLocation.trim() : null,
-      });
+        reason: reschedReason.trim(),
+      };
+      const fingerprint = JSON.stringify({ interviewId: rescheduleTarget.id, ...draft });
+      if (rescheduleIdentity.current?.fingerprint !== fingerprint) rescheduleIdentity.current = { fingerprint, id: crypto.randomUUID() };
+      const res = await rescheduleInterviewByRecruiter(rescheduleTarget.id, { ...draft, requestId: rescheduleIdentity.current.id });
       setRescheduleTarget(null);
-      setNotice(
-        `Đã cập nhật lịch phỏng vấn vòng ${res.data.roundNumber} (Lần #${res.data.scheduleRevision}).`
-      );
+      setNotice(`Đã gửi lịch mới cho vòng ${res.data.roundNumber}. Đang chờ ứng viên xác nhận lại.`);
       setReload((v) => v + 1);
     } catch (err) {
       setError(interviewScheduleError(err));
     } finally {
+      submitLock.current = false;
       setPending(false);
     }
   }
 
   async function handleFeedbackSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!feedbackTarget || pending) return;
+    if (!feedbackTarget || pending || submitLock.current) return;
     setError("");
     setNotice("");
     try {
+      if (!fbConclusion || [technical, communication, attitude, cultureFit].some(score => !Number.isInteger(score) || score < 1 || score > 10)) throw new Error("Chấm đầy đủ các tiêu chí từ 1 đến 10 và chọn kết luận.");
       if (!fbComment.trim()) {
         throw new Error("Vui lòng nhập nhận xét chi tiết.");
       }
+      submitLock.current = true;
       setPending(true);
       const overallScore =
         Math.round(
@@ -266,28 +298,37 @@ export default function ScheduleInterviewPage({
     } catch (err) {
       setError(interviewScheduleError(err));
     } finally {
+      submitLock.current = false;
       setPending(false);
     }
   }
 
-  async function handleCancelInterview(iv: Interview) {
-    const reason = window.prompt(
-      "Nhập lý do hủy lịch phỏng vấn (trước giờ hẹn ít nhất 2 tiếng):",
-      "Thay đổi kế hoạch phỏng vấn"
-    );
-    if (!reason || !reason.trim()) return;
-    setError("");
-    setNotice("");
+  async function handleCancelInterview(event: FormEvent) {
+    event.preventDefault();
+    if (!cancelTarget || pending || submitLock.current || !cancelReason.trim()) return;
+    setError(""); setNotice(""); submitLock.current = true; setPending(true);
     try {
+      await cancelInterview(cancelTarget.id, cancelReason.trim());
+      setCancelTarget(null); setNotice("Đã hủy lịch. Đơn ứng tuyển vẫn được giữ nguyên.");
+      setReload(value => value + 1);
+    } catch (cause) { setError(interviewScheduleError(cause)); }
+    finally { submitLock.current = false; setPending(false); }
+  }
+
+  async function openFeedback(iv: Interview) {
+    if (pending) return;
+    setError("");
+    let fb = feedbacks[iv.id];
+    if (iv.status === "COMPLETED" && !fb) {
       setPending(true);
-      await cancelInterview(iv.id, reason.trim());
-      setNotice(`Đã hủy lịch phỏng vấn vòng ${iv.roundNumber}.`);
-      setReload((v) => v + 1);
-    } catch (err) {
-      setError(interviewScheduleError(err));
-    } finally {
-      setPending(false);
+      try { fb = (await getInterviewFeedback(iv.id)).data; setFeedbacks(old => ({ ...old, [iv.id]: fb })); }
+      catch (cause) { setError(interviewScheduleError(cause)); return; }
+      finally { setPending(false); }
     }
+    setTechnical(fb?.criteriaScores.technical ?? 0); setCommunication(fb?.criteriaScores.communication ?? 0);
+    setAttitude(fb?.criteriaScores.attitude ?? 0); setCultureFit(fb?.criteriaScores.cultureFit ?? 0);
+    setFbComment(fb?.comment ?? ""); setFbConclusion(fb?.conclusion ?? "");
+    setFeedbackTarget(iv); setRescheduleTarget(null); setCreateOpen(false); setCreated(null);
   }
 
   if (loading) {
@@ -311,72 +352,36 @@ export default function ScheduleInterviewPage({
   const eligible = application.status === "INTERVIEW";
 
   return (
-    <main className="stack" style={{ maxWidth: 780, margin: "0 auto" }}>
+    <main className={styles.page}>
       <PageHeader
         eyebrow="QUẢN LÝ & ĐẶT LỊCH PHỎNG VẤN"
         title={application.jobTitle}
         description="Tạo lịch phỏng vấn trực tuyến hoặc trực tiếp, kiểm tra khung giờ trống và đánh giá kết quả sau phỏng vấn."
         action={
-          <Link
-            className="btn"
-            href={`/recruiter/applications/${params.applicationId}`}
-          >
-            Về hồ sơ ứng tuyển
-          </Link>
+<div className="btn-group"><button className="btn" type="button" disabled={pending} onClick={() => setReload(value => value + 1)}><RefreshCw size={16} /> Làm mới</button><Link className="btn" href={"/recruiter/applications/" + params.applicationId}>Về hồ sơ</Link></div>
         }
       />
 
-      {error && (
-        <div className="card" role="alert" style={{ borderColor: "#dc2626" }}>
-          <p style={{ color: "#dc2626", margin: 0 }}>{error}</p>
-        </div>
-      )}
       {notice && (
         <div className="card" role="status" style={{ borderColor: "#16a34a" }}>
           <p style={{ color: "#15803d", margin: 0 }}>{notice}</p>
         </div>
       )}
 
+      <div className={styles.intro}><CalendarCheck2 size={30} /><div><strong>Lịch rõ ràng, phản hồi nhất quán</strong><p>Tạo lời mời → Ứng viên xác nhận → Phỏng vấn → Đánh giá. Khi đổi giờ, ứng viên cần xác nhận lịch mới. Tất cả thời gian theo GMT+7.</p></div></div>
+      <div className="section-head"><h2>Lịch của hồ sơ</h2>{eligible ? <button className="btn btn-primary" type="button" disabled={pending} onClick={() => { setCreateOpen(true); setCreated(null); setRescheduleTarget(null); setFeedbackTarget(null); }}><Plus size={17} /> Tạo lịch mới</button> : null}</div>
+      {cancelTarget ? <InterviewActionDialog title={"Hủy lịch phỏng vấn vòng " + cancelTarget.roundNumber} pending={pending} onClose={() => setCancelTarget(null)}><form onSubmit={handleCancelInterview}><p>Hủy buổi hẹn, giữ nguyên đơn ứng tuyển. Ứng viên sẽ nhận cập nhật; chỉ tự hủy trước giờ hẹn ít nhất 2 giờ.</p><label className="field">Lý do hủy lịch<textarea className="textarea" required maxLength={500} disabled={pending} value={cancelReason} onChange={event => setCancelReason(event.target.value)} /></label>{error ? <p className="notice notice-danger" role="alert">{error}</p> : null}<div className="btn-group"><button className="btn btn-danger" type="submit" disabled={pending}>Xác nhận hủy lịch</button><button className="btn" type="button" disabled={pending} onClick={() => setCancelTarget(null)}>Đóng</button></div></form></InterviewActionDialog> : null}
+      <div className={styles.workspace}><section className={styles.history}>
+      {!interviews.length ? <div className={styles.card}><h2>Chưa có lịch hẹn</h2><p className="help">Chọn hình thức, thời gian và gửi lời mời để ứng viên xác nhận. Việc vào vòng Phỏng vấn chưa tự tạo lịch hẹn.</p></div> : null}
       {interviews.length > 0 && (
         <section className="stack" aria-label="Các vòng phỏng vấn đã tạo">
           <h2>Các vòng phỏng vấn của hồ sơ</h2>
           {interviews.map((iv) => {
             const fb = feedbacks[iv.id];
-            const isActive = [
-              "SCHEDULED",
-              "CONFIRMED",
-              "RESCHEDULE_REQUESTED",
-              "IN_PROGRESS",
-            ].includes(iv.status);
+            const actions = interviewActions(iv, now);
             return (
-              <article className="card stack" key={iv.id}>
-                <div className="section-head">
-                  <h3>
-                    Vòng {iv.roundNumber}
-                    {iv.scheduleRevision && iv.scheduleRevision > 1
-                      ? ` (Lần dời #${iv.scheduleRevision})`
-                      : ""}
-                  </h3>
-                  <StatusBadge
-                    tone={
-                      iv.status === "COMPLETED" || iv.status === "CONFIRMED"
-                        ? "success"
-                        : iv.status === "CANCELLED" || iv.status === "NO_SHOW"
-                        ? "warning"
-                        : "info"
-                    }
-                  >
-                    {interviewStatusLabel(iv.status)}
-                  </StatusBadge>
-                </div>
-                <p className="muted">
-                  {new Date(iv.scheduledStart).toLocaleString("vi-VN", {
-                    timeZone: "Asia/Ho_Chi_Minh",
-                  })}{" "}
-                  (GMT+7) · {iv.durationMinutes} phút ·{" "}
-                  {interviewModeLabel(iv.mode)}
-                  {iv.mode === "OFFLINE" && iv.location ? ` (${iv.location})` : ""}
-                </p>
+              <article className={styles.card} key={iv.id}>
+                <InterviewSummary interview={iv} recruiter now={now} inactive={!eligible} />
 
                 {iv.status === "RESCHEDULE_REQUESTED" && (
                   <div
@@ -394,17 +399,15 @@ export default function ScheduleInterviewPage({
                               type="button"
                               className="btn btn-secondary"
                               onClick={() => {
-                                setRescheduleTarget(iv);
+                                setRescheduleTarget(iv); setFeedbackTarget(null); setCreateOpen(false); setCreated(null);
                                 setReschedMode(iv.mode);
                                 setReschedLocation(iv.location ?? "");
                                 setReschedDuration(iv.durationMinutes);
-                                setReschedStart(toLocalInputValue(slot));
+                                setReschedStart(toLocalInputValue(slot)); setReschedReason("Điều chỉnh theo khung giờ ứng viên đề xuất");
                               }}
                             >
                               Chọn giờ ứng viên đề xuất:{" "}
-                              {new Date(slot).toLocaleString("vi-VN", {
-                                timeZone: "Asia/Ho_Chi_Minh",
-                              })}
+                              {interviewDate(slot)}
                             </button>
                           ))}
                         </div>
@@ -432,7 +435,7 @@ export default function ScheduleInterviewPage({
                 )}
 
                 <div className="btn-group">
-                  {iv.mode === "ONLINE" && isActive && (
+                  {actions.join && eligible && (
                     <Link
                       className="btn btn-primary"
                       href={`/recruiter/applications/${params.applicationId}/interview/room?interviewId=${iv.id}`}
@@ -441,51 +444,42 @@ export default function ScheduleInterviewPage({
                     </Link>
                   )}
 
-                  {["SCHEDULED", "CONFIRMED", "RESCHEDULE_REQUESTED"].includes(
-                    iv.status
-                  ) && (
+                  {actions.reschedule && eligible && (
                     <button
                       className="btn"
                       type="button"
+                      disabled={pending}
                       onClick={() => {
-                        setRescheduleTarget(iv);
+                        setRescheduleTarget(iv); setFeedbackTarget(null); setCreateOpen(false); setCreated(null);
                         setReschedMode(iv.mode);
                         setReschedLocation(iv.location ?? "");
                         setReschedDuration(iv.durationMinutes);
-                        setReschedStart(toLocalInputValue(iv.scheduledStart));
+                        setReschedStart(toLocalInputValue(iv.scheduledStart)); setReschedReason("");
                       }}
                     >
                       Dời lịch
                     </button>
                   )}
 
-                  {iv.status !== "CANCELLED" && iv.status !== "NO_SHOW" && (
+                  {actions.feedback && (
                     <button
                       className="btn"
                       type="button"
+                      disabled={pending}
                       onClick={() => {
-                        setFeedbackTarget(iv);
-                        if (fb) {
-                          setTechnical(fb.criteriaScores.technical);
-                          setCommunication(fb.criteriaScores.communication);
-                          setAttitude(fb.criteriaScores.attitude);
-                          setCultureFit(fb.criteriaScores.cultureFit);
-                          setFbComment(fb.comment);
-                          setFbConclusion(fb.conclusion);
-                        }
+                        void openFeedback(iv);
                       }}
                     >
                       {fb ? "Cập nhật đánh giá" : "Chấm điểm & Đánh giá"}
                     </button>
                   )}
 
-                  {["SCHEDULED", "CONFIRMED", "RESCHEDULE_REQUESTED"].includes(
-                    iv.status
-                  ) && (
+                  {actions.cancel && (
                     <button
                       className="btn"
                       type="button"
-                      onClick={() => void handleCancelInterview(iv)}
+                      disabled={pending}
+                      onClick={() => { setCancelTarget(iv); setCancelReason(""); setError(""); }}
                     >
                       Hủy lịch
                     </button>
@@ -497,11 +491,23 @@ export default function ScheduleInterviewPage({
         </section>
       )}
 
+      {nextCursor ? <button className="btn" type="button" disabled={loadingMore || pending} onClick={async () => {
+        setLoadingMore(true); setError("");
+        try {
+          const response = await listApplicationInterviews(params.applicationId, nextCursor);
+          setInterviews(old => [...new Map([...old, ...response.data.items].map(iv => [iv.id, iv])).values()]);
+          setNextCursor(response.data.nextCursor);
+        } catch (cause) { setError(interviewScheduleError(cause)); }
+        finally { setLoadingMore(false); }
+      }}>{loadingMore ? "Đang tải…" : "Tải thêm lịch cũ"}</button> : null}
+      </section><aside ref={editorRef} className={styles.editor} aria-label="Xử lý lịch phỏng vấn">
+      {error ? <p className="notice notice-danger" role="alert">{error}</p> : null}
       {rescheduleTarget && (
         <form className="card stack" onSubmit={handleRescheduleSubmit}>
           <h3>
             Dời lịch phỏng vấn vòng {rescheduleTarget.roundNumber}
           </h3>
+          <p className="help">Lịch cũ sẽ được giữ trong lịch sử. Lịch mới được gửi ở trạng thái chờ ứng viên xác nhận lại.</p>
           <label className="field">
             Hình thức phỏng vấn
             <select
@@ -550,6 +556,7 @@ export default function ScheduleInterviewPage({
               />
             </label>
           )}
+          <label className="field">Lý do đổi lịch<input className="input" required maxLength={500} value={reschedReason} onChange={event => setReschedReason(event.target.value)} disabled={pending} /></label>
           <div className="btn-group">
             <button
               className="btn btn-primary"
@@ -589,7 +596,7 @@ export default function ScheduleInterviewPage({
                 min={1}
                 max={10}
                 required
-                value={technical}
+                value={technical || ""}
                 onChange={(e) => setTechnical(Number(e.target.value))}
               />
             </label>
@@ -601,7 +608,7 @@ export default function ScheduleInterviewPage({
                 min={1}
                 max={10}
                 required
-                value={communication}
+                value={communication || ""}
                 onChange={(e) => setCommunication(Number(e.target.value))}
               />
             </label>
@@ -613,7 +620,7 @@ export default function ScheduleInterviewPage({
                 min={1}
                 max={10}
                 required
-                value={attitude}
+                value={attitude || ""}
                 onChange={(e) => setAttitude(Number(e.target.value))}
               />
             </label>
@@ -625,7 +632,7 @@ export default function ScheduleInterviewPage({
                 min={1}
                 max={10}
                 required
-                value={cultureFit}
+                value={cultureFit || ""}
                 onChange={(e) => setCultureFit(Number(e.target.value))}
               />
             </label>
@@ -639,6 +646,7 @@ export default function ScheduleInterviewPage({
                 setFbConclusion(e.target.value as FeedbackConclusion)
               }
             >
+              <option value="" disabled>Chọn kết luận sau phỏng vấn</option>
               <option value="PASS">Đạt — Đề xuất gửi thư mời nhận việc</option>
               <option value="NEXT_ROUND">
                 Đạt vòng này — Lên lịch vòng tiếp theo
@@ -677,7 +685,7 @@ export default function ScheduleInterviewPage({
         </form>
       )}
 
-      {created ? (
+      {!rescheduleTarget && !feedbackTarget && (created ? (
         <section className="card stack">
           <p role="status">Đã gửi lịch phỏng vấn thành công.</p>
           <p>
@@ -689,7 +697,7 @@ export default function ScheduleInterviewPage({
             {created.mode === "OFFLINE" && created.location ? ` · ${created.location}` : ""}
           </p>
           <div className="btn-group">
-            {created.mode === "ONLINE" && (
+            {interviewActions(created, now).join && (
               <Link
                 className="btn btn-primary"
                 href={`/recruiter/applications/${params.applicationId}/interview/room?interviewId=${created.id}`}
@@ -714,9 +722,10 @@ export default function ScheduleInterviewPage({
           Chuyển hồ sơ sang bước Phỏng vấn trước khi tạo lịch hẹn.
           <Link className="btn" href="/recruiter/applications">Về quy trình tuyển dụng</Link>
         </p>
-      ) : (
+      ) : createOpen ? (
         <form className="card stack" noValidate onSubmit={submit}>
           <h2>Tạo lịch phỏng vấn mới</h2>
+          <p className="help">Kiểm tra thông tin trước khi gửi. Lời mời được gửi cho ứng viên và cần được xác nhận; không tự coi là đã chốt lịch.</p>
           <label className="field">
             Hình thức phỏng vấn
             <select
@@ -768,6 +777,7 @@ export default function ScheduleInterviewPage({
               <input
                 className="input"
                 type="date"
+                aria-label="Ngày tìm khung giờ trống"
                 value={availDate}
                 onChange={(e) => setAvailDate(e.target.value)}
                 disabled={pending || loadingSlots}
@@ -783,7 +793,7 @@ export default function ScheduleInterviewPage({
             </div>
             {availSlots.length > 0 && (
               <div className="btn-group" style={{ flexWrap: "wrap" }}>
-                {availSlots.slice(0, 12).map((slot) => {
+                {availSlots.map((slot) => {
                   const localVal = toLocalInputValue(slot.start);
                   return (
                     <button
@@ -800,6 +810,8 @@ export default function ScheduleInterviewPage({
             )}
           </div>
 
+          {availabilityChecked && !availSlots.length ? <p className="notice">Không có khung giờ phù hợp trong khoảng 08:00–18:00 của ngày đã chọn. Hãy chọn ngày khác.</p> : null}
+          <p className="help">Gợi ý chỉ dựa trên lịch đã lưu trong CareerHub, không bao gồm lịch Google/Outlook cá nhân. Hệ thống kiểm tra trùng lần nữa khi gửi.</p>
           <label className="field">
             Thời gian dự kiến (GMT+7)
             <input
@@ -829,10 +841,10 @@ export default function ScheduleInterviewPage({
 
           <label className="field">
             Lời nhắn / Ghi chú
-            <textarea
-              className="input resize-none"
-              rows={4}
+            <input
+              className="input"
               maxLength={2000}
+              placeholder="Lời nhắn ngắn cho ứng viên (một dòng)"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               disabled={pending}
@@ -843,7 +855,8 @@ export default function ScheduleInterviewPage({
             {pending ? "Đang gửi…" : "Gửi lịch phỏng vấn"}
           </button>
         </form>
-      )}
+      ) : <section className={styles.emptyEditor}><CalendarCheck2 size={32} /><h3>Chọn việc cần xử lý</h3><p>Mở lịch ở bên cạnh để đổi giờ, xem đánh giá hoặc tạo một lời mời mới.</p></section>)}
+      </aside></div>
     </main>
   );
 }

@@ -29,7 +29,7 @@ func (h *LifecycleHandler) ConfirmInterview(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	res, err := h.svc.ConfirmInterview(r.Context(), principal, id)
+	res, err := h.svc.ConfirmInterview(r.Context(), principal, r.Header.Get("Authorization"), id)
 	if err != nil {
 		apierror.WriteError(w, err)
 		return

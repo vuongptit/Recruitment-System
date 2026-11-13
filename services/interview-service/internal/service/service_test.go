@@ -33,6 +33,9 @@ type mockAppVerifier struct {
 func (m *mockAppVerifier) GetSchedulingContext(_ context.Context, _ uuid.UUID, _ string) (*client.ApplicationSchedulingContext, error) {
 	return m.ctx, m.err
 }
+func (m *mockAppVerifier) GetActiveApplicationContext(_ context.Context, _ uuid.UUID, _ string) (*client.ApplicationSchedulingContext, error) {
+	return m.ctx, m.err
+}
 
 type mockSchedulingRepo struct {
 	existing *model.Interview
@@ -231,14 +234,14 @@ func TestLifecycleCandidateAndRecruiterFlows(t *testing.T) {
 	comp := &mockCompanyVerifier{ctx: &client.RecruiterContext{UserID: recruiterID, CompanyID: compID}}
 	issuer := livekit.NewTokenIssuer("ws://localhost:7880", "devkey", "devsecret123456789012345678901234")
 
-	svc := NewLifecycleService(repo, comp, issuer, "ws://localhost:7880", "interview-events")
+	svc := NewLifecycleService(repo, comp, &mockAppVerifier{ctx: &client.ApplicationSchedulingContext{Status: "INTERVIEW"}}, issuer, "ws://localhost:7880", "interview-events")
 	svc.nowFunc = func() time.Time { return time.Date(2026, 12, 5, 13, 50, 0, 0, time.UTC) }
 
 	candPrincipal := &middleware.Principal{Subject: candID, Role: "CANDIDATE"}
 	recPrincipal := &middleware.Principal{Subject: recruiterID, Role: "RECRUITER", CompanyID: &compID}
 
 	// Candidate Confirm
-	confRes, err := svc.ConfirmInterview(context.Background(), candPrincipal, ivID)
+	confRes, err := svc.ConfirmInterview(context.Background(), candPrincipal, "Bearer tok", ivID)
 	if err != nil {
 		t.Fatalf("confirm failed: %v", err)
 	}
