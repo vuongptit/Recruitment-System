@@ -93,7 +93,7 @@ test("editing a REMOTE draft retains currency and sends the loaded expectedVersi
   await expect(page.locator("#jobType")).toHaveValue("REMOTE");
   await expect(page.locator("#currency")).toHaveValue("USD");
   await page.locator("#title").fill("Remote Engineer Updated");
-  await page.getByRole("button", { name: "Lưu và gửi admin duyệt", exact: true }).click();
+  await page.getByRole("button", { name: "Lưu và gửi quản trị viên duyệt", exact: true }).click();
   await expect.poll(() => writes.length).toBe(1);
   expect(writes[0]).toMatchObject({ jobType: "REMOTE", currency: "USD", expectedVersion: 7, title: "Remote Engineer Updated" });
 });
@@ -143,13 +143,13 @@ test("candidate opens application history then responds to a real Offer with bot
   });
   await authenticate(page, "CANDIDATE", `/candidate/applications/${applicationId}`);
   await expect(page.getByText("Mời trao đổi chuyên môn.", { exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Xem và phản hồi Offer", exact: true }).click();
+  await page.getByRole("link", { name: "Xem và phản hồi thư mời nhận việc", exact: true }).click();
   await page.getByRole("button", { name: "Chấp nhận", exact: true }).click();
   expect(writes).toHaveLength(0);
-  await page.getByRole("alertdialog").getByRole("button", { name: "Chấp nhận Offer", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Chấp nhận thư mời nhận việc", exact: true }).click();
   await expect.poll(() => writes.length).toBe(1);
   expect(writes[0]).toMatchObject({ decision: "ACCEPTED", expectedOfferVersion: 2, expectedApplicationVersion: 5 });
-  await expect(page.getByText("Đã chấp nhận Offer.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Đã chấp nhận thư mời nhận việc.", { exact: true })).toBeVisible();
 });
 
 test("existing evaluation is fetched and shown instead of inviting a duplicate submission", async ({ page }) => {
@@ -179,7 +179,7 @@ test("published Job edits require confirmation and do not call publish after bac
   await expect(page.getByRole("alertdialog")).toBeVisible();
   expect(updates).toBe(0);
   await page.getByRole("alertdialog").getByRole("button", { name: "Lưu và gửi duyệt lại", exact: true }).click();
-  await expect(page.getByText("Đã lưu thay đổi. Tin đang chờ admin duyệt trước khi công khai.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Đã lưu thay đổi. Tin đang chờ quản trị viên duyệt trước khi công khai.", { exact: true })).toBeVisible();
   expect(updates).toBe(1);
   expect(publishes).toBe(0);
 });
@@ -237,8 +237,8 @@ test("an Offer expiring while its confirmation is open is not sent", async ({ pa
   await page.getByRole("button", { name: "Chấp nhận", exact: true }).click();
   await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.clock.setFixedTime(new Date("2099-01-01T00:01:01Z"));
-  await page.getByRole("alertdialog").getByRole("button", { name: "Chấp nhận Offer", exact: true }).click();
-  await expect(page.getByText("Offer đã hết hạn", { exact: true })).toBeVisible();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Chấp nhận thư mời nhận việc", exact: true }).click();
+  await expect(page.getByText("Thư mời nhận việc đã hết hạn", { exact: true })).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   expect(responses).toBe(0);
 });

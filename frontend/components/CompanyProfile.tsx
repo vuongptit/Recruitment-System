@@ -92,7 +92,7 @@ export async function CompanyProfile({ companyId, basePath = "/companies" }: { c
             <div className={styles.fact}><Building2 size={19} aria-hidden="true" /><div><dt>Lĩnh vực hoạt động</dt><dd>{company.industry || "Chưa cập nhật"}</dd></div></div>
             <div className={styles.fact}><UsersRound size={19} aria-hidden="true" /><div><dt>Quy mô công ty</dt><dd>{company.size || "Chưa cập nhật"}</dd></div></div>
             <div className={styles.fact}><FileText size={19} aria-hidden="true" /><div><dt>Mã số thuế</dt><dd>{company.taxCode || "Chưa cập nhật"}</dd></div></div>
-            {website ? <div className={styles.fact}><Globe size={19} aria-hidden="true" /><div><dt>Website</dt><dd><a href={website} target="_blank" rel="noreferrer">{new URL(website).hostname}</a></dd></div></div> : null}
+            {website ? <div className={styles.fact}><Globe size={19} aria-hidden="true" /><div><dt>Trang web</dt><dd><a href={website} target="_blank" rel="noreferrer">{new URL(website).hostname}</a></dd></div></div> : null}
             <div className={styles.fact}><CalendarDays size={19} aria-hidden="true" /><div><dt>Cập nhật hồ sơ</dt><dd>{updatedLabel}</dd></div></div>
           </dl></section>
           <section className={styles.section}><h2>Địa chỉ công ty</h2><div className={styles.fact}><MapPin size={20} aria-hidden="true" /><span>{company.address || "Doanh nghiệp chưa cập nhật địa chỉ."}</span></div></section>

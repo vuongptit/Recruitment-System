@@ -98,7 +98,7 @@ export default function RecruiterJobsPage() {
     try {
       const response = action === "SUBMIT_FOR_APPROVAL" ? await submitJobForApproval(job.id) : await closeRecruiterJob(job.id);
       setJobs((current) => current.map((item) => item.id === job.id ? response.data : item));
-      setActionStatus(action === "SUBMIT_FOR_APPROVAL" ? "Đã gửi tin cho admin duyệt." : "Đã đóng tin tuyển dụng.");
+      setActionStatus(action === "SUBMIT_FOR_APPROVAL" ? "Đã gửi tin cho quản trị viên duyệt." : "Đã đóng tin tuyển dụng.");
     } catch (reason: unknown) {
       setActionError(toUserMessage(reason));
       if (isRecruiterJobAccessDenied(reason)) setReloadKey((value) => value + 1);
@@ -113,7 +113,7 @@ export default function RecruiterJobsPage() {
       <section className="metric-grid">
         <Metric label="Tổng tin" value={String(jobs.length)} detail="Trong công ty" />
         <Metric label="Đang tuyển" value={String(jobs.filter((job) => job.status === "PUBLISHED").length)} detail="Công khai" />
-        <Metric label="Chờ duyệt" value={String(jobs.filter((job) => job.status === "PENDING_APPROVAL").length)} detail="Đã gửi admin" />
+        <Metric label="Chờ duyệt" value={String(jobs.filter((job) => job.status === "PENDING_APPROVAL").length)} detail="Đã gửi quản trị viên" />
         <Metric label="Bản nháp" value={String(jobs.filter((job) => job.status === "DRAFT").length)} detail="Chưa gửi duyệt" />
       </section>
 
@@ -185,7 +185,7 @@ export default function RecruiterJobsPage() {
                     <strong>{job.title}</strong><div className="help">{job.location} · {job.department}</div>
                     {isRejectedRecruiterJob(job.status, job.rejectionReason) ? (
                       <div className="job-rejection-summary" role="note">
-                        <strong>Admin yêu cầu chỉnh sửa</strong>
+                        <strong>Quản trị viên yêu cầu chỉnh sửa</strong>
                         <span>{job.rejectionReason}</span>
                       </div>
                     ) : null}

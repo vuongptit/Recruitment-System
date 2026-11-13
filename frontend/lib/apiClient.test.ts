@@ -659,7 +659,8 @@ test("Offer attachment is either one confirmed pair or fully absent", () => {
     (error: unknown) => error instanceof ApiClientError && error.code === "INVALID_OFFER_FILE_URL",
   );
   assert.equal(OFFER_ATTACHMENT_SUPPORT.available, false);
-  assert.match(OFFER_ATTACHMENT_SUPPORT.description, /OFFER_LETTER/);
+  assert.match(OFFER_ATTACHMENT_SUPPORT.description, /chưa được hỗ trợ/);
+  assert.doesNotMatch(OFFER_ATTACHMENT_SUPPORT.description, /OFFER_LETTER|canonical|Media Service/);
 });
 
 test("mutation responses become the only source for the next command versions", () => {
@@ -947,7 +948,7 @@ test("company verification exposes resubmission only for REJECTED", () => {
 test("company verification does not leak a stale reject reason outside REJECTED", () => {
   const pending = companyVerificationView("PENDING", "Lý do cũ");
   assert.equal(pending.rejectReason, null);
-  assert.match(pending.description, /chờ Admin/i);
+  assert.match(pending.description, /chờ quản trị viên/i);
 });
 
 test("resubmission conflict is recognized by exact code and status", () => {
@@ -1169,7 +1170,7 @@ test("recruiter Job actions are derived only from the backend status", () => {
 });
 
 test("recruiter Job action copy and target status match backend semantics", () => {
-  assert.equal(recruiterJobActionLabel("SUBMIT_FOR_APPROVAL"), "Gửi admin duyệt");
+  assert.equal(recruiterJobActionLabel("SUBMIT_FOR_APPROVAL"), "Gửi quản trị viên duyệt");
   assert.equal(nextRecruiterJobStatus("SUBMIT_FOR_APPROVAL"), "PENDING_APPROVAL");
   assert.equal(recruiterJobActionLabel("CLOSE"), "Đóng tin");
   assert.equal(nextRecruiterJobStatus("CLOSE"), "CLOSED");

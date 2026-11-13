@@ -43,7 +43,7 @@ const COMPANY_FIELD_LABELS: Record<keyof CompanyEditValues, string> = {
   industry: "Lĩnh vực",
   size: "Quy mô",
   address: "Địa chỉ",
-  website: "Website",
+  website: "Trang web",
 };
 
 export const COMPANY_EDIT_CONFLICT_FIELDS: readonly ConflictFieldDefinition<CompanyEditValues, Company>[] =

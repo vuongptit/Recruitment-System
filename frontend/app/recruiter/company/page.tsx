@@ -342,7 +342,7 @@ export default function RecruiterCompanyPage() {
               <div><dt className="label">Lĩnh vực</dt><dd>{company.industry || "Chưa cập nhật"}</dd></div>
               <div><dt className="label">Quy mô</dt><dd>{company.size || "Chưa cập nhật"}</dd></div>
               <div><dt className="label">Địa chỉ</dt><dd>{company.address || "Chưa cập nhật"}</dd></div>
-              <div><dt className="label">Website</dt><dd>{company.website || "Chưa cập nhật"}</dd></div>
+              <div><dt className="label">Trang web</dt><dd>{company.website || "Chưa cập nhật"}</dd></div>
               <div><dt className="label">Mô tả công ty</dt><dd style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{company.description || "Chưa cập nhật"}</dd></div>
             </dl>
           ) : null}
@@ -384,7 +384,7 @@ export default function RecruiterCompanyPage() {
               </div>
 
               <div className="field">
-                <label className="label" htmlFor="company-website">Website (không bắt buộc)</label>
+                <label className="label" htmlFor="company-website">Trang web (không bắt buộc)</label>
                 <input id="company-website" name="website" className="input" type="url" inputMode="url" autoComplete="url" placeholder="https://example.vn" value={values.website} disabled={saving || conflict !== null} onChange={(event) => changeField("website", event.target.value)} aria-invalid={!!errors.website} aria-describedby={errors.website ? "company-website-error" : undefined} />
                 {errors.website ? <span id="company-website-error" className="form-error">{errors.website}</span> : null}
               </div>

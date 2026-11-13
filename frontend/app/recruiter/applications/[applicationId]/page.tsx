@@ -99,7 +99,7 @@ export default function RecruiterApplicationDetailPage({
                 className="btn"
                 href={`/recruiter/applications/${application.id}/offer`}
               >
-                Tạo Offer
+                Tạo thư mời nhận việc
               </Link>
             )}
             <Link className="btn" href={`/recruiter/jobs/${application.jobId}`}>

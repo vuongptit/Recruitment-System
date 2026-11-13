@@ -9,6 +9,7 @@
     "outDir": ".test-dist"
   },
   "include": [
+    "lib/notificationPresentation.test.ts",
     "lib/locations.test.ts",
     "lib/apiRoutes.test.ts",
     "lib/chatIdentity.test.ts",

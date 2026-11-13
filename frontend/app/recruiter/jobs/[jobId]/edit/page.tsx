@@ -126,10 +126,10 @@ export default function EditRecruiterJobPage() {
       if (savedJob.status === "DRAFT") {
         const submitted = await submitJobForApproval(job.id);
         setJob(submitted.data);
-        setSuccessMessage("Đã lưu thay đổi và gửi tin cho admin duyệt.");
+        setSuccessMessage("Đã lưu thay đổi và gửi tin cho quản trị viên duyệt.");
       } else {
         setSuccessMessage(savedJob.status === "PENDING_APPROVAL"
-          ? "Đã lưu thay đổi. Tin đang chờ admin duyệt trước khi công khai."
+          ? "Đã lưu thay đổi. Tin đang chờ quản trị viên duyệt trước khi công khai."
           : "Đã lưu thay đổi.");
       }
       setSavedForSubmission(false);
@@ -173,14 +173,14 @@ export default function EditRecruiterJobPage() {
       <PageHeader
         eyebrow="CHỈNH SỬA TIN"
         title={job.rejectionReason ? "Sửa tin theo góp ý" : "Sửa tin tuyển dụng"}
-        description="Sửa nội dung tuyển dụng. Với tin đang công khai, đổi tiêu đề, mô tả, yêu cầu, lương hoặc đơn vị tiền cần admin duyệt lại; hạn nộp, số lượng và các trường khác được cập nhật ngay."
+        description="Sửa nội dung tuyển dụng. Với tin đang công khai, đổi tiêu đề, mô tả, yêu cầu, lương hoặc đơn vị tiền cần quản trị viên duyệt lại; hạn nộp, số lượng và các trường khác được cập nhật ngay."
         action={<Link className="btn" href="/recruiter/jobs">Về danh sách</Link>}
       />
 
-      <ConfirmationDialog open={confirmPublishedEdit} title="Gửi tin tuyển dụng duyệt lại?" description={`Tin “${job.title}” sẽ tạm ngừng công khai sau khi lưu và chờ admin duyệt lại. Bản nhập của bạn được giữ nếu quay lại.`} confirmLabel="Lưu và gửi duyệt lại" pending={submitting} onConfirm={() => { void submitForReview(undefined, true); }} onCancel={() => setConfirmPublishedEdit(false)} />
+      <ConfirmationDialog open={confirmPublishedEdit} title="Gửi tin tuyển dụng duyệt lại?" description={`Tin “${job.title}” sẽ tạm ngừng công khai sau khi lưu và chờ quản trị viên duyệt lại. Bản nhập của bạn được giữ nếu quay lại.`} confirmLabel="Lưu và gửi duyệt lại" pending={submitting} onConfirm={() => { void submitForReview(undefined, true); }} onCancel={() => setConfirmPublishedEdit(false)} />
       {job.rejectionReason && editable ? (
         <section className="notice notice-warning" role="note" aria-labelledby="job-review-feedback">
-          <strong id="job-review-feedback">Góp ý từ admin</strong>
+          <strong id="job-review-feedback">Góp ý từ quản trị viên</strong>
           <p>{job.rejectionReason}</p>
           <span className="help">Góp ý sẽ được giữ để đối chiếu cho đến khi tin được gửi duyệt lại thành công.</span>
         </section>
@@ -196,7 +196,7 @@ export default function EditRecruiterJobPage() {
         <div className="notice notice-danger" role="alert">
           <strong>Chưa hoàn tất luồng gửi duyệt.</strong>
           <p>{mutationError}</p>
-          {savedForSubmission ? <button className="btn btn-secondary" type="button" disabled={submitting} onClick={() => { void submitForReview(); }}>Thử gửi admin duyệt</button> : null}
+          {savedForSubmission ? <button className="btn btn-secondary" type="button" disabled={submitting} onClick={() => { void submitForReview(); }}>Thử gửi quản trị viên duyệt</button> : null}
         </div>
       ) : null}
       {conflict ? (
@@ -293,7 +293,7 @@ export default function EditRecruiterJobPage() {
           {attempted && errors.benefits ? <span id="benefits-error" className="form-error">{errors.benefits}</span> : null}
         </div>
         <div className="span-2 btn-group">
-          {editable ? <button className="btn btn-primary" type="submit" disabled={submitting} aria-busy={submitting}>{submitting ? "Đang lưu…" : savedForSubmission ? "Gửi admin duyệt" : job.status === "DRAFT" ? "Lưu và gửi admin duyệt" : "Lưu thay đổi"}</button> : null}
+          {editable ? <button className="btn btn-primary" type="submit" disabled={submitting} aria-busy={submitting}>{submitting ? "Đang lưu…" : savedForSubmission ? "Gửi quản trị viên duyệt" : job.status === "DRAFT" ? "Lưu và gửi quản trị viên duyệt" : "Lưu thay đổi"}</button> : null}
           <Link className="btn" href="/recruiter/jobs">Hủy</Link>
         </div>
       </form>

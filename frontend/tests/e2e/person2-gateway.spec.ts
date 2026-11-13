@@ -227,7 +227,7 @@ test("Job edit keeps the local draft after one authoritative 409 reload and neve
   const titleInput = page.getByRole("textbox", { name: "Tên vị trí" });
   await expect(titleInput).toHaveValue("Backend ban đầu");
   await titleInput.fill("Backend do tôi sửa");
-  await page.getByRole("button", { name: "Lưu và gửi admin duyệt" }).click();
+  await page.getByRole("button", { name: "Lưu và gửi quản trị viên duyệt" }).click();
 
   await expect(page.getByRole("heading", { name: "Tin tuyển dụng vừa được người khác sửa" })).toBeVisible();
   await expect(page.getByRole("row", { name: /Tên vị trí Backend do tôi sửa Backend phía server Khác nhau/ })).toBeVisible();

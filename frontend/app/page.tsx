@@ -7,7 +7,7 @@ import { FeaturedJobs } from "@/components/FeaturedJobs";
 
 const categories = [
   { label: "Công nghệ thông tin", q: "Developer", icon: Code2 },
-  { label: "Kinh doanh & Marketing", q: "Marketing", icon: ChartNoAxesCombined },
+  { label: "Kinh doanh & Tiếp thị", q: "Marketing", icon: ChartNoAxesCombined },
   { label: "Thiết kế & Sáng tạo", q: "Designer", icon: Palette },
   { label: "Chăm sóc khách hàng", q: "Chăm sóc khách hàng", icon: Headphones },
 ];
@@ -24,7 +24,7 @@ export default function HomePage() {
         <h1 id="discovery-title">Công việc phù hợp.<br /><em>Tương lai bạn chọn.</em></h1>
         <p>Khám phá cơ hội mới, tạo hồ sơ ấn tượng và kết nối với nơi bạn thuộc về.</p>
         <HomeJobSearch />
-        <div className="popular-searches"><span>Thử tìm:</span>{["Developer", "Marketing", "Kế toán"].map(q => <Link prefetch={false} key={q} href={`/candidate/jobs?q=${encodeURIComponent(q)}`}>{q}</Link>)}</div>
+        <div className="popular-searches"><span>Thử tìm:</span>{[{ label: "Lập trình viên", q: "Developer" }, { label: "Tiếp thị", q: "Marketing" }, { label: "Kế toán", q: "Kế toán" }].map(({ label, q }) => <Link prefetch={false} key={q} href={`/candidate/jobs?q=${encodeURIComponent(q)}`}>{label}</Link>)}</div>
       </div>
       <aside className="career-preview" aria-label="Hành trình nghề nghiệp">
         <div className="preview-orbit" aria-hidden="true" /><div className="preview-heading"><span className="preview-symbol"><BriefcaseBusiness size={26} /></span><span>HÀNH TRÌNH CỦA BẠN<strong>Bước tiếp theo, rõ ràng hơn.</strong></span></div>

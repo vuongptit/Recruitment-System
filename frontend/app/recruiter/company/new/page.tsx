@@ -92,7 +92,7 @@ export default function NewCompanyPage() {
           </div>
 
           <div className="field">
-            <label className="label" htmlFor="company-create-website">Website (không bắt buộc)</label>
+            <label className="label" htmlFor="company-create-website">Trang web (không bắt buộc)</label>
             <input id="company-create-website" name="website" className="input" type="url" inputMode="url" autoComplete="url" placeholder="https://example.vn" value={values.website} onChange={(event) => update("website", event.target.value)} aria-invalid={!!errors.website} aria-describedby={errors.website ? "company-create-website-error" : undefined} />
             {errors.website ? <span id="company-create-website-error" className="form-error">{errors.website}</span> : null}
           </div>

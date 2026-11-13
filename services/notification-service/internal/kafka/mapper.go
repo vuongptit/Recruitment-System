@@ -53,28 +53,32 @@ func mapApplicationEvent(event model.ApplicationEvent) *notificationDraft {
 	switch {
 	case event.Action == "OFFER_SENT":
 		notifType = model.TypeOfferReceived
-		title = "New offer received"
-		body = fmt.Sprintf("You received an offer for %s.", event.JobTitle)
+		title = "Bạn có thư mời nhận việc mới"
+		body = fmt.Sprintf("Bạn nhận được thư mời nhận việc cho vị trí %s.", event.JobTitle)
 
 	case initialSubmission:
 		notifType = model.TypeApplicationReceived
-		title = "New application received"
-		body = fmt.Sprintf("A candidate applied for %s.", event.JobTitle)
+		title = "Có hồ sơ ứng tuyển mới"
+		body = fmt.Sprintf("Một ứng viên đã ứng tuyển vị trí %s.", event.JobTitle)
 
 	case event.OfferStatus != nil && *event.OfferStatus == "ACCEPTED":
 		notifType = model.TypeOfferAccepted
-		title = "Offer accepted"
-		body = fmt.Sprintf("The candidate accepted the offer for %s.", event.JobTitle)
+		title = "Ứng viên đã chấp nhận thư mời nhận việc"
+		body = fmt.Sprintf("Ứng viên đã chấp nhận thư mời nhận việc cho vị trí %s.", event.JobTitle)
 
 	case event.OfferStatus != nil && *event.OfferStatus == "DECLINED":
 		notifType = model.TypeOfferDeclined
-		title = "Offer declined"
-		body = fmt.Sprintf("The candidate declined the offer for %s.", event.JobTitle)
+		title = "Ứng viên đã từ chối thư mời nhận việc"
+		body = fmt.Sprintf("Ứng viên đã từ chối thư mời nhận việc cho vị trí %s.", event.JobTitle)
 
 	default:
 		notifType = model.TypeApplicationStatusChanged
-		title = "Application status updated"
-		body = fmt.Sprintf("The application for %s is now %s.", event.JobTitle, event.ToStatus)
+		title = "Trạng thái hồ sơ ứng tuyển đã cập nhật"
+		if label, ok := applicationStatusLabel(event.ToStatus); ok {
+			body = fmt.Sprintf("Hồ sơ ứng tuyển vị trí %s đã chuyển sang trạng thái: %s.", event.JobTitle, label)
+		} else {
+			body = fmt.Sprintf("Hồ sơ ứng tuyển vị trí %s vừa được cập nhật.", event.JobTitle)
+		}
 	}
 
 	metadata := map[string]string{
@@ -116,8 +120,8 @@ func mapInterviewEvent(event model.InterviewEvent) *notificationDraft {
 		return nil
 	}
 
-	title := "Interview scheduled"
-	body := "A new interview has been scheduled. Open the app for details."
+	title := "Lịch phỏng vấn mới"
+	body := "Bạn có lịch phỏng vấn mới. Mở chi tiết để xem thời gian và địa điểm."
 	switch event.Action {
 	case "CONFIRMED":
 		title = "Ứng viên đã xác nhận lịch phỏng vấn"
@@ -161,4 +165,13 @@ func mapInterviewEvent(event model.InterviewEvent) *notificationDraft {
 		Body:     body,
 		Metadata: metadataJSON,
 	}
+}
+
+func applicationStatusLabel(status string) (string, bool) {
+	labels := map[string]string{
+		"APPLIED": "Đã ứng tuyển", "REVIEWING": "Đang xem xét", "INTERVIEW": "Phỏng vấn",
+		"OFFER": "Chờ phản hồi thư mời", "HIRED": "Đã tuyển", "REJECTED": "Đã từ chối", "WITHDRAWN": "Đã rút hồ sơ",
+	}
+	label, ok := labels[status]
+	return label, ok
 }

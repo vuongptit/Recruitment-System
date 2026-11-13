@@ -34,7 +34,7 @@ const general: Field[] = [
   { name: "address", label: "Địa chỉ", max: 500 },
   { name: "githubUrl", label: "GitHub", type: "url" },
   { name: "linkedinUrl", label: "LinkedIn", type: "url" },
-  { name: "portfolioUrl", label: "Portfolio", type: "url" },
+  { name: "portfolioUrl", label: "Trang giới thiệu cá nhân", type: "url" },
 ];
 const blocks: {
   key: "educations" | "experiences" | "skills" | "certificates" | "projects";

@@ -18,7 +18,7 @@ const RECRUITER_ACTIONS: Record<ApplicationStatus, RecruiterApplicationAction[]>
     { kind: "STATUS", status: "REJECTED", label: "Từ chối", requiresReason: true },
   ],
   INTERVIEW: [
-    { kind: "SEND_OFFER", label: "Soạn Offer" },
+    { kind: "SEND_OFFER", label: "Soạn thư mời nhận việc" },
     { kind: "STATUS", status: "REJECTED", label: "Từ chối", requiresReason: true },
   ],
   OFFER: [{ kind: "STATUS", status: "REJECTED", label: "Thu hồi và từ chối", requiresReason: true }],
@@ -36,7 +36,7 @@ export function recruiterApplicationActions(status: ApplicationStatus): Recruite
 export function candidateApplicationActions(status: ApplicationStatus): CandidateApplicationAction[] {
   if (!ACTIVE_CANDIDATE_STATUSES.has(status)) return [];
   return status === "OFFER"
-    ? [{ kind: "RESPOND_OFFER", label: "Phản hồi Offer" }, { kind: "WITHDRAW", label: "Rút hồ sơ" }]
+    ? [{ kind: "RESPOND_OFFER", label: "Phản hồi thư mời nhận việc" }, { kind: "WITHDRAW", label: "Rút hồ sơ" }]
     : [{ kind: "WITHDRAW", label: "Rút hồ sơ" }];
 }
 

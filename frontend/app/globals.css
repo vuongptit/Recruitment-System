@@ -765,6 +765,10 @@ body:has(.auth-page) .content-wrap > * { width: 100%; }
 .candidate-avatar-feedback p { margin:8px 0 0; font-size:13px; line-height:1.6; }
 .upload-progress { display:grid; gap:8px; margin-top:12px; font-size:14px; line-height:1.5; color:var(--primary); }
 .upload-progress progress { display:block; width:100%; max-width:420px; height:6px; accent-color:var(--primary); }
+.file-picker { display:flex; align-items:center; gap:12px; min-width:0; flex-wrap:wrap; }
+.file-picker .btn { flex-shrink:0; }
+.file-picker-name { flex:1; min-width:120px; overflow-wrap:anywhere; font-size:14px; }
+.file-picker:focus-within { outline:2px solid var(--primary); outline-offset:2px; }
 .candidate-profile-identity { align-self:center; padding-top:28px; }
 .candidate-profile-identity h2 { margin:0 0 3px; color:#151c27; font:700 20px/1.3 var(--font-sans); }
 .candidate-profile-identity p { margin:0 0 12px; }

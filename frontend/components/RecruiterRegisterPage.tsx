@@ -87,14 +87,14 @@ export default function RecruiterRegisterPage() {
   }
 
   const otpStage = !!registrationId;
-  if (verified) return <AuthFrame portal="RECRUITER" title="Tài khoản Recruiter đã xác minh" description="Tài khoản của bạn đã sẵn sàng để quản lý hoạt động tuyển dụng.">
+  if (verified) return <AuthFrame portal="RECRUITER" title="Tài khoản nhà tuyển dụng đã xác minh" description="Tài khoản của bạn đã sẵn sàng để quản lý hoạt động tuyển dụng.">
     {notice ? <p className="auth-message" role="status">{notice}</p> : null}
     {notice ? <button className="auth-submit" type="button" onClick={() => void retryContact()} disabled={pending}>{pending ? "Đang lưu…" : "Lưu lại thông tin liên hệ"}</button> : null}
     {error ? <p role="alert" className="auth-error">{error}</p> : null}
     <Link className="auth-submit" href={destination}>Tiếp tục đến khu vực tuyển dụng →</Link>
   </AuthFrame>;
 
-  return <AuthFrame portal="RECRUITER" title={otpStage ? "Xác minh email Recruiter" : "Đăng ký tài khoản Recruiter"} description={otpStage ? `Nhập mã OTP 6 số đã gửi đến ${email}.` : "Tạo tài khoản để đăng tin tuyển dụng và tìm kiếm ứng viên phù hợp."}>
+  return <AuthFrame portal="RECRUITER" title={otpStage ? "Xác minh email nhà tuyển dụng" : "Đăng ký tài khoản nhà tuyển dụng"} description={otpStage ? `Nhập mã OTP 6 số đã gửi đến ${email}.` : "Tạo tài khoản để đăng tin tuyển dụng và tìm kiếm ứng viên phù hợp."}>
     <form className="auth-form" noValidate onSubmit={submit}>
       {!otpStage ? <>
         <div className="auth-field"><label htmlFor="recruiter-name">Họ và tên</label><input id="recruiter-name" autoComplete="name" maxLength={160} value={name} onChange={event => setName(event.target.value)} placeholder="Nhập họ và tên" disabled={pending} /></div>

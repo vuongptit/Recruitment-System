@@ -215,7 +215,7 @@ function InterviewConferenceStage({
         }}
       >
         <strong>Phòng phỏng vấn trực tuyến · Vòng {roundNumber}</strong>
-        <span>LiveKit WebRTC</span>
+        <span>Phỏng vấn qua video</span>
       </header>
 
       <div
@@ -487,7 +487,7 @@ export function InterviewVideoRoom({
       <section className="card stack">
         <PageHeader title="Phòng phỏng vấn trực tuyến" />
         <EmptyState
-          title="Chưa nhận được thông tin kết nối LiveKit"
+          title="Chưa nhận được thông tin kết nối phòng phỏng vấn"
           description="Hãy thử kết nối lại hoặc kiểm tra trạng thái lịch phỏng vấn."
         />
         <div className="btn-group">

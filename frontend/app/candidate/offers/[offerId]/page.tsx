@@ -63,7 +63,7 @@ export default function CandidateOfferResponsePage({ params }: { params: { offer
     }
     const normalizedReason = declineReason.trim();
     if (decision === "DECLINED" && !normalizedReason) {
-      setDeclineReasonError("Vui lòng nhập lý do từ chối Offer.");
+      setDeclineReasonError("Vui lòng nhập lý do từ chối thư mời nhận việc.");
       document.getElementById("offer-decline-reason")?.focus();
       return;
     }
@@ -88,7 +88,7 @@ export default function CandidateOfferResponsePage({ params }: { params: { offer
         applicationStatus: response.data.applicationStatus,
         responseNote: response.data.responseNote,
       } : current);
-      setSuccessMessage(decision === "ACCEPTED" ? "Đã chấp nhận Offer." : "Đã từ chối Offer.");
+      setSuccessMessage(decision === "ACCEPTED" ? "Đã chấp nhận thư mời nhận việc." : "Đã từ chối thư mời nhận việc.");
     } catch (reason: unknown) {
       setResponseError(reason);
     } finally {
@@ -99,7 +99,7 @@ export default function CandidateOfferResponsePage({ params }: { params: { offer
   }
 
   if (loading) {
-    return <main><LoadingState label="Đang tải offer" /></main>;
+    return <main><LoadingState label="Đang tải thư mời nhận việc" /></main>;
   }
 
   if (loadError) {
@@ -125,11 +125,11 @@ export default function CandidateOfferResponsePage({ params }: { params: { offer
 
   return (
     <main>
-      <PageHeader eyebrow="THƯ MỜI NHẬN VIỆC" title="Phản hồi Offer" description="Xem thông tin công việc, mức lương và hạn phản hồi trước khi quyết định." action={<Link className="btn" href="/candidate/applications">Về hồ sơ ứng tuyển</Link>} />
-      <ConfirmationDialog open={confirmDecision !== null} title={confirmDecision === "ACCEPTED" ? "Chấp nhận Offer?" : "Từ chối Offer?"} description={`Quyết định cho vị trí “${offer.jobTitle}” sẽ được gửi tới nhà tuyển dụng và kết thúc bước phản hồi này.`} confirmLabel={confirmDecision === "ACCEPTED" ? "Chấp nhận Offer" : "Từ chối Offer"} pending={phase !== null} onConfirm={() => { if (confirmDecision) void submit(confirmDecision, true); }} onCancel={() => setConfirmDecision(null)} />
+      <PageHeader eyebrow="THƯ MỜI NHẬN VIỆC" title="Phản hồi thư mời nhận việc" description="Xem thông tin công việc, mức lương và hạn phản hồi trước khi quyết định." action={<Link className="btn" href="/candidate/applications">Về hồ sơ ứng tuyển</Link>} />
+      <ConfirmationDialog open={confirmDecision !== null} title={confirmDecision === "ACCEPTED" ? "Chấp nhận thư mời nhận việc?" : "Từ chối thư mời nhận việc?"} description={`Quyết định cho vị trí “${offer.jobTitle}” sẽ được gửi tới nhà tuyển dụng và kết thúc bước phản hồi này.`} confirmLabel={confirmDecision === "ACCEPTED" ? "Chấp nhận thư mời nhận việc" : "Từ chối thư mời nhận việc"} pending={phase !== null} onConfirm={() => { if (confirmDecision) void submit(confirmDecision, true); }} onCancel={() => setConfirmDecision(null)} />
       <section className="grid-2">
         <section className="panel">
-          <h2>Thông tin Offer</h2>
+          <h2>Thông tin thư mời nhận việc</h2>
           <p className="help">Kiểm tra nội dung và hạn phản hồi trước khi đưa ra quyết định.</p>
           <div className="row-wrap">
             <span className="badge">Hạn phản hồi: {new Date(offer.expiresAt).toLocaleString("vi-VN")}</span>
@@ -140,7 +140,7 @@ export default function CandidateOfferResponsePage({ params }: { params: { offer
           <p>Gói lương: {offer.salary}</p>
           {offer.note ? <p style={{ whiteSpace: "pre-wrap" }}>{offer.note}</p> : null}
           {offer.responseNote ? <p>Lý do phản hồi: {offer.responseNote}</p> : null}
-          {attachmentUrl ? <a className="btn" href={attachmentUrl} target="_blank" rel="noreferrer">Xem file Offer</a> : null}
+          {attachmentUrl ? <a className="btn" href={attachmentUrl} target="_blank" rel="noreferrer">Xem tệp thư mời nhận việc</a> : null}
           {canRespond ? (
             <div className="field" style={{ marginTop: 12 }}>
               <label className="label" htmlFor="offer-decline-reason">Lý do nếu từ chối</label>
@@ -151,7 +151,7 @@ export default function CandidateOfferResponsePage({ params }: { params: { offer
                 <button className="btn btn-danger" type="button" disabled={phase !== null} aria-busy={phase === "DECLINED"} onClick={() => { void submit("DECLINED"); }}>{phase === "DECLINED" ? "Đang từ chối…" : "Từ chối"}</button>
               </div>
             </div>
-          ) : <p className="notice">Offer đã kết thúc, hết hạn hoặc cần được tải lại trước khi phản hồi.</p>}
+          ) : <p className="notice">Thư mời nhận việc đã kết thúc, hết hạn hoặc cần được tải lại trước khi phản hồi.</p>}
           {successMessage ? <p className="notice notice-success" role="status">{successMessage}</p> : null}
           {responseError && recoveryView ? (
             <section className="notice notice-warning" role="alert">
@@ -164,7 +164,7 @@ export default function CandidateOfferResponsePage({ params }: { params: { offer
         </section>
         <section className="panel stack">
           <h2>Bước tiếp theo</h2>
-          <p className="help">Nếu nhà tuyển dụng vừa cập nhật hồ sơ hoặc Offer, hãy tải nội dung mới trước khi quyết định.</p>
+          <p className="help">Nếu nhà tuyển dụng vừa cập nhật hồ sơ hoặc thư mời nhận việc, hãy tải nội dung mới trước khi quyết định.</p>
           <Link className="btn" href={`/candidate/applications/${offer.applicationId}`}>Xem hồ sơ ứng tuyển</Link>
           <Link className="btn" href="/candidate/jobs">
             Tìm việc mới

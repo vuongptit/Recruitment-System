@@ -13,6 +13,7 @@ import {
   interviewStartGmt7,
   interviewScheduleError,
   interviewStatusLabel,
+  interviewModeLabel,
   listApplicationInterviews,
   rescheduleInterviewByRecruiter,
   scheduleInterview,
@@ -314,7 +315,7 @@ export default function ScheduleInterviewPage({
       <PageHeader
         eyebrow="QUẢN LÝ & ĐẶT LỊCH PHỎNG VẤN"
         title={application.jobTitle}
-        description="Tạo lịch phỏng vấn trực tuyến (LiveKit Video) hoặc trực tiếp, kiểm tra khung giờ trống và đánh giá kết quả sau phỏng vấn."
+        description="Tạo lịch phỏng vấn trực tuyến hoặc trực tiếp, kiểm tra khung giờ trống và đánh giá kết quả sau phỏng vấn."
         action={
           <Link
             className="btn"
@@ -373,9 +374,8 @@ export default function ScheduleInterviewPage({
                     timeZone: "Asia/Ho_Chi_Minh",
                   })}{" "}
                   (GMT+7) · {iv.durationMinutes} phút ·{" "}
-                  {iv.mode === "ONLINE"
-                    ? "Trực tuyến (Video Room)"
-                    : `Trực tiếp (${iv.location ?? ""})`}
+                  {interviewModeLabel(iv.mode)}
+                  {iv.mode === "OFFLINE" && iv.location ? ` (${iv.location})` : ""}
                 </p>
 
                 {iv.status === "RESCHEDULE_REQUESTED" && (
@@ -437,7 +437,7 @@ export default function ScheduleInterviewPage({
                       className="btn btn-primary"
                       href={`/recruiter/applications/${params.applicationId}/interview/room?interviewId=${iv.id}`}
                     >
-                      Vào phòng phỏng vấn Video
+                      Vào phòng phỏng vấn
                     </Link>
                   )}
 
@@ -510,9 +510,9 @@ export default function ScheduleInterviewPage({
               onChange={(e) => setReschedMode(e.target.value as InterviewMode)}
             >
               <option value="ONLINE">
-                Phỏng vấn trực tuyến (LiveKit Video Room)
+                {interviewModeLabel("ONLINE")}
               </option>
-              <option value="OFFLINE">Phỏng vấn trực tiếp tại văn phòng</option>
+              <option value="OFFLINE">{interviewModeLabel("OFFLINE")}</option>
             </select>
           </label>
           <label className="field">
@@ -639,7 +639,7 @@ export default function ScheduleInterviewPage({
                 setFbConclusion(e.target.value as FeedbackConclusion)
               }
             >
-              <option value="PASS">Đạt — Đề xuất gửi Offer</option>
+              <option value="PASS">Đạt — Đề xuất gửi thư mời nhận việc</option>
               <option value="NEXT_ROUND">
                 Đạt vòng này — Lên lịch vòng tiếp theo
               </option>
@@ -685,9 +685,8 @@ export default function ScheduleInterviewPage({
               timeZone: "Asia/Ho_Chi_Minh",
             })}{" "}
             (GMT+7) ·{" "}
-            {created.mode === "ONLINE"
-              ? "Phỏng vấn trực tuyến (Video Room)"
-              : created.location}
+            {interviewModeLabel(created.mode)}
+            {created.mode === "OFFLINE" && created.location ? ` · ${created.location}` : ""}
           </p>
           <div className="btn-group">
             {created.mode === "ONLINE" && (
@@ -726,9 +725,9 @@ export default function ScheduleInterviewPage({
               disabled={pending}
             >
               <option value="ONLINE">
-                Phỏng vấn trực tuyến (Tự động tạo phòng LiveKit Video)
+                {interviewModeLabel("ONLINE")}
               </option>
-              <option value="OFFLINE">Phỏng vấn trực tiếp</option>
+              <option value="OFFLINE">{interviewModeLabel("OFFLINE")}</option>
             </select>
           </label>
 

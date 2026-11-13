@@ -1,4 +1,5 @@
 "use client";
+import { FilePicker } from "@/components/FilePicker";
 
 import { applicationStatusLabel } from "@/lib/recruitmentLabels";
 
@@ -13,9 +14,9 @@ import { getApplicationDetail, sendApplicationOffer, type CandidateApplication }
 
 // Exact 409 codes POST /applications/:id/offer can return when the page is stale.
 const OFFER_STALE_MESSAGES: Partial<Record<string, string>> = {
-  APPLICATION_CHANGED_CONCURRENTLY: "Hồ sơ vừa thay đổi. Đã tải trạng thái mới và giữ bản Offer bạn nhập; hãy kiểm tra trước khi chủ động gửi lại.",
-  APPLICATION_NOT_ELIGIBLE_FOR_OFFER: "Hồ sơ không còn ở bước phỏng vấn nên không thể gửi Offer. Đã tải trạng thái mới nhất.",
-  OFFER_ALREADY_EXISTS: "Hồ sơ này đã có Offer (có thể do đồng nghiệp vừa gửi). Đã tải trạng thái mới nhất.",
+  APPLICATION_CHANGED_CONCURRENTLY: "Hồ sơ vừa thay đổi. Đã tải trạng thái mới và giữ bản thư mời nhận việc bạn nhập; hãy kiểm tra trước khi chủ động gửi lại.",
+  APPLICATION_NOT_ELIGIBLE_FOR_OFFER: "Hồ sơ không còn ở bước phỏng vấn nên không thể gửi thư mời nhận việc. Đã tải trạng thái mới nhất.",
+  OFFER_ALREADY_EXISTS: "Hồ sơ này đã có thư mời nhận việc (có thể do đồng nghiệp vừa gửi). Đã tải trạng thái mới nhất.",
 };
 
 export default function RecruiterSendOfferPage() {
@@ -116,16 +117,16 @@ export default function RecruiterSendOfferPage() {
     }
   }
 
-  if (loading) return <main><LoadingState label="Đang tải hồ sơ để soạn Offer" /></main>;
+  if (loading) return <main><LoadingState label="Đang tải hồ sơ để soạn thư mời nhận việc" /></main>;
   if (loadError || !application) return <main><ErrorState message={loadError || "Không tìm thấy hồ sơ ứng tuyển."} onRetry={() => setReloadKey((value) => value + 1)} /></main>;
 
   return (
     <main>
-      <ConfirmationDialog open={confirmSend} title="Gửi Offer cho ứng viên?" description={`Thư mời cho vị trí “${position}” với mức lương ${salary} sẽ được gửi và hồ sơ chuyển sang bước chờ phản hồi.`} confirmLabel="Gửi Offer" pending={submitting} onConfirm={() => { void submit(undefined, true); }} onCancel={() => setConfirmSend(false)} />
-      <PageHeader eyebrow="THƯ MỜI NHẬN VIỆC" title="Soạn Offer" description="Gửi thư mời sau vòng phỏng vấn và chờ ứng viên phản hồi." action={<Link className="btn" href={`/recruiter/jobs/${application.jobId}`}>Về hồ sơ theo tin</Link>} />
+      <ConfirmationDialog open={confirmSend} title="Gửi thư mời nhận việc cho ứng viên?" description={`Thư mời cho vị trí “${position}” với mức lương ${salary} sẽ được gửi và hồ sơ chuyển sang bước chờ phản hồi.`} confirmLabel="Gửi thư mời nhận việc" pending={submitting} onConfirm={() => { void submit(undefined, true); }} onCancel={() => setConfirmSend(false)} />
+      <PageHeader eyebrow="THƯ MỜI NHẬN VIỆC" title="Soạn thư mời nhận việc" description="Gửi thư mời sau vòng phỏng vấn và chờ ứng viên phản hồi." action={<Link className="btn" href={`/recruiter/jobs/${application.jobId}`}>Về hồ sơ theo tin</Link>} />
       {submitted ? (
         <section className="panel">
-          <EmptyState title="Đã gửi Offer" description="Hồ sơ đã chuyển sang bước chờ ứng viên phản hồi thư mời." />
+          <EmptyState title="Đã gửi thư mời nhận việc" description="Hồ sơ đã chuyển sang bước chờ ứng viên phản hồi thư mời." />
           <div className="btn-group"><StatusBadge tone="success">Đang chờ phản hồi</StatusBadge><Link className="btn btn-primary" href={`/recruiter/jobs/${application.jobId}`}>Xem hồ sơ theo tin</Link></div>
         </section>
       ) : (
@@ -138,16 +139,16 @@ export default function RecruiterSendOfferPage() {
             <div className="field"><label className="label" htmlFor="offer-expires">Hạn phản hồi</label><input id="offer-expires" className="input" type="datetime-local" disabled={submitting} value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} /></div>
             <div className="field span-2"><label className="label" htmlFor="offer-note">Ghi chú</label><textarea id="offer-note" className="textarea resize-none" maxLength={2000} disabled={submitting} value={note} onChange={(event) => setNote(event.target.value)} /></div>
             <div className="field span-2">
-              <label className="label" htmlFor="offer-file">File Offer (tùy chọn)</label>
-              <input id="offer-file" className="input" type="file" accept="application/pdf,.pdf" disabled aria-describedby="offer-file-support" />
+              <label className="label" htmlFor="offer-file">Tệp thư mời nhận việc (tùy chọn)</label>
+              <FilePicker id="offer-file" accept="application/pdf,.pdf" disabled aria-describedby="offer-file-support" />
               <div id="offer-file-support" className="notice notice-warning" role="status">
                 <strong>{OFFER_ATTACHMENT_SUPPORT.title}.</strong> {OFFER_ATTACHMENT_SUPPORT.description}
               </div>
             </div>
           </div>
           {formError ? <p className="form-error" role="alert">{formError}</p> : null}
-          {submitError ? <p className="notice notice-danger" role="alert"><strong>Chưa gửi được Offer.</strong> {submitError}</p> : null}
-          <div className="btn-group"><button className="btn btn-primary" type="submit" disabled={submitting || application.status !== "INTERVIEW"} aria-busy={submitting}>{submitting ? "Đang gửi Offer…" : "Gửi Offer"}</button><Link className="btn" href={`/recruiter/jobs/${application.jobId}`}>Hủy</Link></div>
+          {submitError ? <p className="notice notice-danger" role="alert"><strong>Chưa gửi được thư mời nhận việc.</strong> {submitError}</p> : null}
+          <div className="btn-group"><button className="btn btn-primary" type="submit" disabled={submitting || application.status !== "INTERVIEW"} aria-busy={submitting}>{submitting ? "Đang gửi thư mời nhận việc…" : "Gửi thư mời nhận việc"}</button><Link className="btn" href={`/recruiter/jobs/${application.jobId}`}>Hủy</Link></div>
         </form>
       )}
     </main>

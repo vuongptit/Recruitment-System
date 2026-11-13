@@ -15,6 +15,7 @@ import {
   interviewScheduleError,
   interviewStartGmt7,
   interviewStatusLabel,
+  interviewModeLabel,
   listMyInterviews,
   requestRescheduleInterview,
   type Interview,
@@ -344,9 +345,7 @@ export default function CandidateInterviewsPage() {
                 (GMT+7) · {iv.durationMinutes} phút
               </p>
               <p>
-                {isOnline
-                  ? "Phỏng vấn trực tuyến (Video Room)"
-                  : "Phỏng vấn trực tiếp"}
+                {interviewModeLabel(iv.mode)}
                 {iv.location ? ` · ${iv.location}` : ""}
               </p>
               {iv.rescheduleReason && (

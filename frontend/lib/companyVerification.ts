@@ -29,9 +29,9 @@ export function companyVerificationView(
     return {
       tone: "danger",
       title: "Cần bổ sung hồ sơ",
-      description: "Cập nhật thông tin theo lý do bên dưới rồi gửi lại để Admin xem xét.",
+      description: "Cập nhật thông tin theo lý do bên dưới rồi gửi lại để quản trị viên xem xét.",
       canResubmit: true,
-      rejectReason: rejectReason?.trim() || "Admin chưa cung cấp lý do cụ thể.",
+      rejectReason: rejectReason?.trim() || "Quản trị viên chưa cung cấp lý do cụ thể.",
     };
   }
 
@@ -48,7 +48,7 @@ export function companyVerificationView(
   return {
     tone: "warning",
     title: "Đang chờ xác minh",
-    description: "Hồ sơ đã được gửi và đang chờ Admin xem xét.",
+    description: "Hồ sơ đã được gửi và đang chờ quản trị viên xem xét.",
     canResubmit: false,
     rejectReason: null,
   };

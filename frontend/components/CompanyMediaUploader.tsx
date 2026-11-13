@@ -7,6 +7,7 @@ import { prepareUploadImage } from "../lib/avatarImage";
 import { ApiClientError, toUserMessage } from "../lib/apiClient";
 import type { UploadStep } from "../lib/signedFileUpload";
 import { UploadProgress } from "./UploadProgress";
+import { FilePicker } from "./FilePicker";
 import { type Company, confirmCompanyMediaUpload, createCompanyMediaUploadIntent,
   isDemoPerson2Api, updateCompany } from "../lib/person2Api";
 
@@ -121,8 +122,8 @@ export function CompanyMediaUploader({ company, onCompanyChange }: {
       </select>
     </div>
     <div className="field">
-      <label className="label" htmlFor="company-media-file">File cần tải</label>
-      <input ref={fileInput} id="company-media-file" className="input" type="file" disabled={pending}
+      <label className="label" htmlFor="company-media-file">Tệp cần tải</label>
+      <FilePicker ref={fileInput} id="company-media-file" fileName={file?.name} disabled={pending}
         accept={type === "COMPANY_VIDEO" ? ".mp4,video/mp4" : ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"}
         aria-describedby="company-media-help" onChange={event => select(event.target.files?.[0] ?? null)} />
       <p className="help" id="company-media-help">{type === "COMPANY_VIDEO" ? "Video MP4 tối đa 50 MiB. Video được giữ nguyên nội dung."

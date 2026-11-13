@@ -3,6 +3,7 @@ import Link from "next/link";
 import { EmptyState, LoadingState, PageHeader, StatusBadge } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { UploadProgress } from "../../../../components/UploadProgress";
+import { FilePicker } from "../../../../components/FilePicker";
 import type { UploadStep } from "../../../../lib/signedFileUpload";
 import { requestApi } from "../../../../lib/apiClient";
 import {
@@ -157,11 +158,11 @@ export default function CvsPage() {
               onChange={(e) => setTitle(e.target.value)}
             />
           </label>
-          <label className="field">
-            Tệp PDF, tối đa 5 MB
-            <input
-              className="input"
-              type="file"
+          <div className="field">
+            <label htmlFor="candidate-cv-file">Tệp PDF, tối đa 5 MB</label>
+            <FilePicker
+              id="candidate-cv-file"
+              fileName={file?.name}
               ref={fileInput}
               accept="application/pdf,.pdf"
               onChange={(e) => {
@@ -170,7 +171,7 @@ export default function CvsPage() {
                 checkpoint.current = null;
               }}
             />
-          </label>
+          </div>
           <div className="btn-group span-2"><button className="btn btn-primary" disabled={!file}>
             {pending ? "Đang lưu…" : "Tải lên và lưu CV"}
           </button></div>

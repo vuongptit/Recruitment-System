@@ -30,11 +30,11 @@ export default function CandidateProfileRecruiterViewPage({
         </div>
         
         <div className="card stack" style={{ width: 320, padding: "24px", background: "var(--surface)" }}>
-          <h3>Điểm AI Đánh giá</h3>
-          <p>Mức độ phù hợp với các job đang mở của bạn:</p>
+          <h3>Đánh giá độ phù hợp bằng AI</h3>
+          <p>Mức độ phù hợp với các vị trí đang tuyển của bạn:</p>
           <div style={{ padding: "12px", background: "white", borderRadius: "8px", border: "1px solid var(--line)" }}>
             <p style={{ margin: "0 0 4px" }}><strong>Backend Dev</strong></p>
-            <StatusBadge tone="success">92% Match</StatusBadge>
+            <StatusBadge tone="success">Phù hợp 92%</StatusBadge>
           </div>
         </div>
       </div>

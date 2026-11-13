@@ -4,6 +4,8 @@ const jobStatuses: Record<string, string> = {
   PUBLISHED: "Đang tuyển",
   CLOSED: "Đã đóng",
   EXPIRED: "Hết hạn",
+  REJECTED: "Đã từ chối",
+  SUSPENDED: "Đã gỡ",
 };
 
 const applicationStatuses: Record<string, string> = {
@@ -33,22 +35,26 @@ const jobTypes: Record<string, string> = {
   REMOTE: "Làm việc từ xa",
   INTERNSHIP: "Thực tập",
   CONTRACT: "Hợp đồng",
+  ONSITE: "Làm việc tại văn phòng",
+  HYBRID: "Kết hợp tại văn phòng và từ xa",
 };
 
+function key(value: string): string { return value.trim().toUpperCase().replace(/[ -]+/g, "_"); }
+
 export function jobStatusLabel(status: string): string {
-  return jobStatuses[status] ?? status;
+  return jobStatuses[key(status)] ?? "Chưa rõ trạng thái";
 }
 
 export function applicationStatusLabel(status: string): string {
-  return applicationStatuses[status] ?? status;
+  return applicationStatuses[key(status)] ?? "Chưa rõ trạng thái";
 }
 
 export function offerStatusLabel(status: string): string {
-  return offerStatuses[status] ?? status;
+  return offerStatuses[key(status)] ?? "Chưa rõ trạng thái";
 }
 
 export function jobTypeLabel(type: string): string {
-  return jobTypes[type] ?? type;
+  return jobTypes[key(type)] ?? "Chưa rõ hình thức làm việc";
 }
 
 export function companyMemberRoleLabel(role: "OWNER" | "MEMBER" | null | undefined): string {

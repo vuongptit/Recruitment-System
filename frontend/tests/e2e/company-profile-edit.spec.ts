@@ -89,7 +89,7 @@ test("company profile validates and saves all fields with the loaded version and
   await page.getByLabel("Lĩnh vực", { exact: true }).fill("Sản phẩm");
   await page.getByLabel("Quy mô", { exact: true }).fill("201–500");
   await page.getByLabel("Địa chỉ", { exact: true }).fill("Thành phố Hồ Chí Minh");
-  await page.getByLabel("Website (không bắt buộc)", { exact: true }).fill("");
+  await page.getByLabel("Trang web (không bắt buộc)", { exact: true }).fill("");
   await page.getByRole("button", { name: "Lưu thay đổi", exact: true }).click();
   await expect(page.getByText("Đã lưu thông tin công ty.", { exact: true })).toBeVisible();
   expect(state.writes).toEqual([{
@@ -211,7 +211,7 @@ test("company logo uploads in one action, preserves transparency and resumes wit
     const ctx = canvas.getContext("2d")!; ctx.fillStyle = "#087f46"; ctx.fillRect(600, 400, 600, 400);
     return canvas.toDataURL("image/png").split(",")[1];
   });
-  await page.getByLabel("File cần tải", { exact: true }).setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: Buffer.from(encoded, "base64") });
+  await page.getByLabel("Tệp cần tải", { exact: true }).setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: Buffer.from(encoded, "base64") });
   const uploader = page.locator(".company-media-uploader");
   await uploader.getByRole("button", { name: "Tải lên và lưu", exact: true }).click();
   await expect(uploader.getByRole("alert")).toContainText("Tệp đã được gửi");
@@ -231,7 +231,7 @@ test("company logo uploads in one action, preserves transparency and resumes wit
     return [ctx.getImageData(0, 0, 1, 1).data[3], ctx.getImageData(canvas.width - 1, canvas.height - 1, 1, 1).data[3]];
   }, sent!.toString("base64"));
   expect(alpha).toEqual([0, 255]);
-  await expect(page.getByLabel("File cần tải", { exact: true })).toHaveValue("");
+  await expect(page.getByLabel("Tệp cần tải", { exact: true })).toHaveValue("");
 });
 
 test("company video keeps original bytes throughout the automatic upload flow", async ({ page }) => {
@@ -255,7 +255,7 @@ test("company video keeps original bytes throughout the automatic upload flow", 
     return reply(route, { ...baseCompany, aggregateVersion: 8, media: [{ fileId, type: "VIDEO", sortOrder: 0, url: "https://example.vn/video.mp4" }] });
   });
   await page.getByLabel("Loại tệp", { exact: true }).selectOption("COMPANY_VIDEO");
-  await page.getByLabel("File cần tải", { exact: true }).setInputFiles({ name: "intro.mp4", mimeType: "video/mp4", buffer: source });
+  await page.getByLabel("Tệp cần tải", { exact: true }).setInputFiles({ name: "intro.mp4", mimeType: "video/mp4", buffer: source });
   await page.locator(".company-media-uploader").getByRole("button", { name: "Tải lên và lưu", exact: true }).click();
   await expect(page.locator(".company-media-uploader").getByRole("status")).toHaveText("Đã lưu tệp vào hồ sơ công ty.");
 });

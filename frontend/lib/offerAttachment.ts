@@ -7,9 +7,9 @@ export interface ConfirmedOfferAttachment {
 
 export const OFFER_ATTACHMENT_SUPPORT = Object.freeze({
   available: false,
-  title: "File Offer chưa khả dụng",
+  title: "Tệp thư mời nhận việc chưa khả dụng",
   description:
-    "Media Service chưa có policy OFFER_LETTER nên chưa thể xác nhận file và URL canonical. Bạn vẫn có thể gửi Offer không đính kèm file.",
+    "Chức năng đính kèm tệp vào thư mời nhận việc chưa được hỗ trợ. Bạn vẫn có thể gửi nội dung thư mời mà không cần tệp đính kèm.",
 });
 
 export function normalizeOfferAttachment(input: {

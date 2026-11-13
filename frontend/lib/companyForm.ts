@@ -46,12 +46,12 @@ export function validateCompanyCreate(values: CompanyCreateValues): CompanyCreat
 
   const website = values.website.trim();
   if (website.length > 2_048) {
-    errors.website = "Website không được quá 2.048 ký tự.";
+    errors.website = "Địa chỉ trang web không được quá 2.048 ký tự.";
   } else if (website) {
     try {
       const url = new URL(website);
       if (url.protocol !== "http:" && url.protocol !== "https:") {
-        errors.website = "Website phải bắt đầu bằng http:// hoặc https://.";
+        errors.website = "Địa chỉ trang web phải bắt đầu bằng http:// hoặc https://.";
       }
     } catch {
       errors.website = "Nhập địa chỉ website hợp lệ, gồm cả http:// hoặc https://.";

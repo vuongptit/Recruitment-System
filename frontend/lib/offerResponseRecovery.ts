@@ -12,23 +12,23 @@ export interface OfferResponseRecoveryView {
 
 const RECOVERY_BY_CODE: Record<string, OfferResponseRecoveryView> = {
   OFFER_EXPIRED: {
-    title: "Offer đã hết hạn",
+    title: "Thư mời nhận việc đã hết hạn",
     description: "Thời hạn phản hồi đã qua nên hệ thống không thể ghi nhận quyết định này.",
     action: { kind: "LINK", label: "Tìm cơ hội khác", href: "/candidate/jobs" },
   },
   OFFER_ALREADY_RESPONDED: {
-    title: "Offer đã được phản hồi",
+    title: "Thư mời nhận việc đã được phản hồi",
     description: "Một quyết định đã được ghi nhận trước đó. Hãy xem trạng thái hồ sơ hiện tại.",
     action: { kind: "LINK", label: "Xem hồ sơ đã cập nhật", href: "/candidate/applications" },
   },
   OFFER_CHANGED_CONCURRENTLY: {
-    title: "Nội dung Offer vừa thay đổi",
-    description: "Phiên bản Offer bạn đang xem không còn mới nhất. Không gửi lại quyết định trên dữ liệu cũ.",
-    action: { kind: "RELOAD", label: "Tải lại Offer mới nhất" },
+    title: "Nội dung thư mời nhận việc vừa thay đổi",
+    description: "Phiên bản thư mời nhận việc bạn đang xem không còn mới nhất. Không gửi lại quyết định trên dữ liệu cũ.",
+    action: { kind: "RELOAD", label: "Tải lại thư mời nhận việc mới nhất" },
   },
   APPLICATION_CHANGED_CONCURRENTLY: {
     title: "Hồ sơ ứng tuyển vừa thay đổi",
-    description: "Trạng thái hồ sơ không còn khớp với Offer này. Hãy kiểm tra pipeline trước khi quyết định.",
+    description: "Trạng thái hồ sơ không còn khớp với thư mời nhận việc này. Hãy kiểm tra quy trình tuyển dụng trước khi quyết định.",
     action: { kind: "LINK", label: "Kiểm tra trạng thái hồ sơ", href: "/candidate/applications" },
   },
 };

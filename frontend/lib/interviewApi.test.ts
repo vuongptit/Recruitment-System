@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   confirmInterview,
+  feedbackConclusionLabel,
+  interviewModeLabel,
   interviewStartGmt7,
   joinInterviewRoom,
   requestRescheduleInterview,
@@ -11,6 +13,14 @@ import {
 } from "./interviewApi";
 import { listChatMessages, mergeConversationMessages, parseCallMessage, sendChatMessage, type ChatMessage } from "./chatApi";
 import { mergeNotifications, notificationDestination } from "./notificationState";
+
+test("interview labels use Vietnamese without exposing internal enum values", () => {
+  assert.equal(interviewModeLabel("ONLINE"), "Phỏng vấn trực tuyến");
+  assert.equal(interviewModeLabel("OFFLINE"), "Phỏng vấn trực tiếp");
+  assert.equal(interviewModeLabel("FUTURE_MODE"), "Chưa rõ hình thức phỏng vấn");
+  assert.equal(feedbackConclusionLabel("NEXT_ROUND"), "Đạt vòng này — Lên lịch vòng tiếp");
+  assert.equal(feedbackConclusionLabel("FUTURE_CONCLUSION"), "Chưa có kết luận");
+});
 
 test("interview local time preserves GMT+7 regardless of browser or host timezone", () => {
   assert.equal(interviewStartGmt7("2027-01-15T09:30"), "2027-01-15T09:30:00+07:00");

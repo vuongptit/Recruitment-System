@@ -50,7 +50,7 @@ export default function CreateJobPage() {
 
   return (
     <main>
-      <PageHeader eyebrow="TIN TUYỂN DỤNG" title="Tạo tin tuyển dụng" description="Tin mới được lưu ở trạng thái bản nháp. Bạn sẽ chủ động gửi admin duyệt sau khi kiểm tra." />
+      <PageHeader eyebrow="TIN TUYỂN DỤNG" title="Tạo tin tuyển dụng" description="Tin mới được lưu ở trạng thái bản nháp. Bạn sẽ chủ động gửi quản trị viên duyệt sau khi kiểm tra." />
       {createdJob ? (
         <section className="notice notice-success" role="status">
           <strong>Đã lưu bản nháp “{createdJob.title}”.</strong>

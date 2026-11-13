@@ -390,7 +390,7 @@ func (c *Consumer) handleVideoCallStarted(ctx context.Context, event model.Kafka
 				UserID:    hostID,
 				Type:      "VIDEO_CALL_OFFLINE",
 				Title:     "Người dùng không trực tuyến",
-				Body:      "Người nhận hiện không online để nhận cuộc gọi.",
+				Body:      "Người nhận hiện không trực tuyến để nhận cuộc gọi.",
 				Metadata:  metadataJSON,
 				IsRead:    false,
 				CreatedAt: time.Now(),

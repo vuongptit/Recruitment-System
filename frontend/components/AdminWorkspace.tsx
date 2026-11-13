@@ -392,7 +392,7 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
                 {tab === "companies" ? <>
                   <option value="PENDING">Chờ xác minh</option><option value="VERIFIED">Đã xác minh</option><option value="REJECTED">Từ chối</option><option value="ALL">Tất cả</option>
                 </> : <>
-                  <option value="PENDING_APPROVAL">Chờ duyệt</option><option value="PUBLISHED">Đang đăng</option><option value="DRAFT">Bản nháp</option><option value="CLOSED">Đã đóng</option><option value="EXPIRED">Hết hạn</option><option value="ALL">Tất cả</option>
+                  <option value="PENDING_APPROVAL">Chờ duyệt</option><option value="PUBLISHED">Đang tuyển</option><option value="DRAFT">Bản nháp</option><option value="CLOSED">Đã đóng</option><option value="EXPIRED">Hết hạn</option><option value="ALL">Tất cả</option>
                 </>}
               </select>
             </label>

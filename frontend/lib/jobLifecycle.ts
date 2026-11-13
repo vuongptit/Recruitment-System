@@ -9,7 +9,7 @@ export function recruiterJobActions(status: JobStatus): RecruiterJobAction[] {
 }
 
 export function recruiterJobActionLabel(action: RecruiterJobAction): string {
-  return action === "SUBMIT_FOR_APPROVAL" ? "Gửi admin duyệt" : "Đóng tin";
+  return action === "SUBMIT_FOR_APPROVAL" ? "Gửi quản trị viên duyệt" : "Đóng tin";
 }
 
 export function nextRecruiterJobStatus(action: RecruiterJobAction): JobStatus {

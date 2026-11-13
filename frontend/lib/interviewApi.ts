@@ -2,6 +2,11 @@ import { ApiClientError, requestApi, toUserMessage } from "./apiClientCore";
 
 export type InterviewMode = "OFFLINE" | "ONLINE";
 
+export function interviewModeLabel(mode: string): string {
+  return mode === "ONLINE" ? "Phỏng vấn trực tuyến"
+    : mode === "OFFLINE" ? "Phỏng vấn trực tiếp" : "Chưa rõ hình thức phỏng vấn";
+}
+
 export type InterviewStatus =
   | "SCHEDULED"
   | "CONFIRMED"
@@ -315,10 +320,10 @@ export function interviewStatusLabel(status: string): string {
 export function feedbackConclusionLabel(conclusion: string): string {
   return (
     ({
-      PASS: "Đạt — Đề xuất gửi Offer",
+      PASS: "Đạt — Đề xuất gửi thư mời nhận việc",
       FAIL: "Chưa phù hợp — Từ chối",
       NEXT_ROUND: "Đạt vòng này — Lên lịch vòng tiếp",
-    } as Record<string, string>)[conclusion] ?? conclusion
+    } as Record<string, string>)[conclusion] ?? "Chưa có kết luận"
   );
 }
 

@@ -40,7 +40,7 @@ export default function CandidateApplicationDetailPage({ params }: { params: { a
         {application.coverLetter ? <div><h3>Thư ứng tuyển</h3><p style={{ whiteSpace: "pre-wrap" }}>{application.coverLetter}</p></div> : null}
         <div className="btn-group">
           <Link className="btn" href={`/candidate/jobs/${application.jobId}`}>Xem việc làm</Link>
-          {application.offerId ? <Link className="btn btn-primary" href={`/candidate/offers/${application.offerId}`}>Xem và phản hồi Offer</Link> : null}
+          {application.offerId ? <Link className="btn btn-primary" href={`/candidate/offers/${application.offerId}`}>Xem và phản hồi thư mời nhận việc</Link> : null}
         </div>
       </section>
       <section className="panel">

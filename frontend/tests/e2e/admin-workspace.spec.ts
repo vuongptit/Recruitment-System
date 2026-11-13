@@ -158,14 +158,15 @@ test("details close with Escape and return focus to their trigger", async ({
   page,
 }) => {
   await session(page);
-  await page.route(api + "/admin/companies/pending**", (route) =>
+  await page.route(api + "/admin/companies**", (route) =>
     reply(
       route,
       [
         {
           id: jobId,
           name: "Công ty Kiểm thử",
-          description: "Thông tin doanh nghiệp ".repeat(100),
+          description: "Thông tin doanh nghiệp ".repeat(100) + "PENDING",
+          verifiedStatus: "PENDING",
           taxCode: "0101234567",
           industry: "Công nghệ",
           website: "https://example.test",
@@ -184,6 +185,8 @@ test("details close with Escape and return focus to their trigger", async ({
   await expect(
     dialog.getByRole("heading", { name: "Công ty Kiểm thử" }),
   ).toBeVisible();
+  await expect(dialog.getByText("Chờ xác minh", { exact: true })).toBeVisible();
+  await expect(dialog.locator("dd").filter({ hasText: "Thông tin doanh nghiệp" })).toContainText("PENDING");
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
   await expect(trigger).toBeFocused();

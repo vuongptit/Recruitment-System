@@ -2,6 +2,15 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 const api = "http://127.0.0.1:4173/api";
 const accountId = "1795c0de-7908-4ab5-9bed-4c4f1cf9c211";
+
+test("homepage search suggestions are Vietnamese while preserving the original search keywords", async ({ page }) => {
+  await page.route(`${api}/auth/me`, route => reply(route, { code: "AUTH_INVALID" }, 401));
+  await page.route(`${api}/auth-cookie/refresh`, route => reply(route, { code: "AUTH_INVALID" }, 401));
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "Lập trình viên", exact: true })).toHaveAttribute("href", "/candidate/jobs?q=Developer");
+  await expect(page.getByRole("link", { name: "Tiếp thị", exact: true })).toHaveAttribute("href", "/candidate/jobs?q=Marketing");
+  await expect(page.getByRole("link", { name: "Kinh doanh & Tiếp thị", exact: true })).toHaveAttribute("href", "/candidate/jobs?q=Marketing");
+});
 const job = {
   id: "2795c0de-7908-4ab5-9bed-4c4f1cf9c211",
   companyId: "3795c0de-7908-4ab5-9bed-4c4f1cf9c212",

@@ -6,6 +6,7 @@ import { useCurrentAccount } from "@/components/SessionGate";
 import { useNotifications } from "@/components/NotificationProvider";
 import { PageHeader, EmptyState, ErrorState, LoadingState, StatusBadge } from "@/components/ui";
 import { notificationDestination } from "@/lib/notificationState";
+import { notificationPresentation } from "@/lib/notificationPresentation";
 
 function NotificationsList({ role }: { role: string }) {
   const { notifications, loading, error, marking, refresh, hasMore, loadMore, markAsRead, markAllAsRead, unreadCount } = useNotifications();
@@ -19,9 +20,10 @@ function NotificationsList({ role }: { role: string }) {
       {!notifications.length && !loading && !error && <EmptyState title="Chưa có thông báo" description="Các cập nhật mới sẽ hiển thị tại đây." />}
       {notifications.map(notification => {
         const destination = notificationDestination(notification, role);
+        const presentation = notificationPresentation(notification);
         return <article key={notification.id} style={{ padding: "16px 0", borderBottom: "1px solid var(--line)", overflowWrap: "anywhere" }}>
-          <div className="section-head"><h2>{notification.title}</h2><StatusBadge tone={notification.is_read ? "neutral" : "success"}>{notification.is_read ? "Đã đọc" : "Chưa đọc"}</StatusBadge></div>
-          <p>{notification.body}</p>
+          <div className="section-head"><h2>{presentation.title}</h2><StatusBadge tone={notification.is_read ? "neutral" : "success"}>{notification.is_read ? "Đã đọc" : "Chưa đọc"}</StatusBadge></div>
+          <p>{presentation.body}</p>
           <p className="muted"><time dateTime={notification.created_at}>{new Date(notification.created_at).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" })}</time></p>
           <div className="btn-group">
             {destination && <Link className="btn" href={destination} onClick={() => { if (!notification.is_read) void markAsRead(notification.id); }}>Xem chi tiết</Link>}

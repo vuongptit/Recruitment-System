@@ -12,7 +12,7 @@ type Portal = "RECRUITER" | "ADMIN";
 
 const portalContent: Record<Portal, { title: string; subtitle: string; home: string; emailLabel: string }> = {
   RECRUITER: {
-    title: "Đăng nhập Recruiter",
+    title: "Đăng nhập nhà tuyển dụng",
     subtitle: "Đăng nhập để quản lý tin tuyển dụng và ứng viên.",
     home: "/recruiter/jobs",
     emailLabel: "Email công việc",

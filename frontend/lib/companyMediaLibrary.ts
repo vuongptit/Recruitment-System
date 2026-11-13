@@ -20,7 +20,7 @@ export function validateCompanyMediaLibrary(
   if (imageCount > 10) return "Thư viện chỉ được có tối đa 10 ảnh.";
   if (videoCount > 1) return "Thư viện chỉ được có tối đa 1 video.";
   const ids = [...(logoFileId ? [logoFileId] : []), ...items.map((item) => item.fileId)];
-  if (new Set(ids).size !== ids.length) return "Mỗi file chỉ được dùng một lần, kể cả logo.";
+  if (new Set(ids).size !== ids.length) return "Mỗi tệp chỉ được dùng một lần, kể cả logo.";
   return null;
 }
 

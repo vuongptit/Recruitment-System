@@ -8,6 +8,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { StatusBadge } from "../ui";
+import { jobStatusLabel } from "../../lib/recruitmentLabels";
 
 export type AdminRow = Record<string, unknown>;
 export type AdminTab = "companies" | "jobs" | "users" | "reports" | "audit";
@@ -28,13 +29,6 @@ export const targetLabels: Record<string, string> = {
   USER: "Tài khoản",
   AUTH: "Tài khoản",
   REPORT: "Báo cáo vi phạm",
-};
-const jobStatusLabels: Record<string, string> = {
-  DRAFT: "Bản nháp",
-  PENDING_APPROVAL: "Chờ duyệt",
-  PUBLISHED: "Đang đăng",
-  CLOSED: "Đã đóng",
-  EXPIRED: "Hết hạn",
 };
 const outcomes: Record<string, string> = {
   SUCCESS: "Thành công",
@@ -60,7 +54,7 @@ const actionLabels: Record<string, string> = {
   RESTORE_COMPANY: "Khôi phục công ty",
 };
 const auditTitle = (row: AdminRow) =>
-  actionLabels[String(row.action)] || text(row.action, "Hoạt động quản trị");
+  actionLabels[String(row.action)] || "Hoạt động quản trị";
 const text = (value: unknown, fallback = "Chưa cập nhật") =>
   typeof value === "string" && value.trim()
     ? value
@@ -217,7 +211,7 @@ export function AdminDataTable({
                   <>
                     <td>
                       <StatusBadge tone="neutral">
-                        {roleLabels[String(row.role)] || text(row.role)}
+                        {roleLabels[String(row.role)] || "Chưa rõ vai trò"}
                       </StatusBadge>
                     </td>
                     <td>
@@ -264,7 +258,7 @@ export function AdminDataTable({
                                 : "neutral"
                         }
                       >
-                        {outcomes[String(row.outcome)] || text(row.outcome)}
+                        {outcomes[String(row.outcome)] || "Chưa xác định kết quả"}
                       </StatusBadge>
                     </td>
                     <td className="admin-nowrap">
@@ -275,7 +269,7 @@ export function AdminDataTable({
                   <>
                     <td>
                       {targetLabels[String(row.target_type)] ||
-                        text(row.target_type)}
+                        "Chưa rõ loại đối tượng"}
                     </td>
                     <td>
                       <StatusBadge
@@ -285,7 +279,7 @@ export function AdminDataTable({
                             : "neutral"
                         }
                       >
-                        {reportLabels[String(row.status)] || text(row.status)}
+                        {reportLabels[String(row.status)] || "Chưa rõ trạng thái"}
                       </StatusBadge>
                     </td>
                     <td className="admin-nowrap">{date(row.created_at)}</td>
@@ -308,7 +302,7 @@ export function AdminDataTable({
                     <td className="admin-nowrap">{date(row.deadline)}</td>
                     <td>
                       <StatusBadge tone={row.isSuspended ? "danger" : row.status === "PUBLISHED" ? "success" : row.status === "REJECTED" ? "danger" : "warning"}>
-                        {row.isSuspended ? "Đã gỡ" : jobStatusLabels[String(row.status)] || text(row.status, "Chưa rõ trạng thái")}
+                        {row.isSuspended ? "Đã gỡ" : jobStatusLabel(String(row.status))}
                       </StatusBadge>
                     </td>
                   </>
@@ -482,7 +476,7 @@ export function AdminDetail({ row, tab }: { row: AdminRow; tab: AdminTab }) {
           ["industry", "Lĩnh vực"],
           ["size", "Quy mô"],
           ["address", "Địa chỉ"],
-          ["website", "Website"],
+          ["website", "Trang web"],
           ["taxCode", "Mã số thuế"],
           ["verifiedStatus", "Trạng thái"],
           ["rejectReason", "Lý do từ chối"],
@@ -549,12 +543,17 @@ export function AdminDetail({ row, tab }: { row: AdminRow; tab: AdminTab }) {
                   ? date(row[key], true)
                   : typeof row[key] === "boolean"
                     ? row[key] ? "Có" : "Không"
-                  : roleLabels[String(row[key])] ||
-                    targetLabels[String(row[key])] ||
-                    jobStatusLabels[String(row[key])] ||
-                    reportLabels[String(row[key])] ||
-                    outcomes[String(row[key])] ||
-                    text(row[key])}
+                  : key === "role" || key === "target_role"
+                    ? roleLabels[String(row[key])] || "Chưa rõ vai trò"
+                  : key === "target_type"
+                    ? targetLabels[String(row[key])] || "Chưa rõ loại đối tượng"
+                  : key === "verifiedStatus"
+                    ? ({ VERIFIED: "Đã xác minh", PENDING: "Chờ xác minh", REJECTED: "Đã từ chối", UNVERIFIED: "Chưa xác minh" } as Record<string, string>)[String(row[key])] || "Chưa rõ trạng thái"
+                  : key === "status"
+                    ? tab === "reports" ? reportLabels[String(row[key])] || "Chưa rõ trạng thái" : jobStatusLabel(String(row[key]))
+                  : key === "outcome"
+                    ? outcomes[String(row[key])] || "Chưa xác định kết quả"
+                  : text(row[key])}
             </dd>
           </div>
         ))}

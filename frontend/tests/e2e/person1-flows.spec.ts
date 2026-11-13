@@ -168,7 +168,11 @@ test("CV retries resume confirmation and saving without sending the same PDF aga
   });
   await login(page, "CANDIDATE", "/candidate/profile/cvs");
   await page.getByLabel("Tên CV", { exact: true }).fill(cv.title);
-  await page.locator('input[type="file"]').setInputFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7\nunchanged-document") });
+  await expect(page.getByText("Chưa chọn tệp", { exact: true })).toBeVisible();
+  const picker = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Chọn tệp", exact: true }).press("Enter");
+  await (await picker).setFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7\nunchanged-document") });
+  await expect(page.locator(".file-picker-name")).toHaveText("cv.pdf");
   const submit = page.getByRole("button", { name: "Tải lên và lưu CV", exact: true });
   await submit.click();
   await expect(page.getByRole("alert")).toBeVisible();
@@ -181,6 +185,7 @@ test("CV retries resume confirmation and saving without sending the same PDF aga
   await expect(page.getByRole("heading", { name: cv.title, exact: true })).toBeVisible();
   expect([signatures, uploads, confirms, saves]).toEqual([1, 1, 2, 2]);
   await expect(page.locator('input[type="file"]')).toHaveValue("");
+  await expect(page.locator(".file-picker-name")).toHaveText("Chưa chọn tệp");
 });
 test("password login waits for slow anonymous hydration instead of cancelling the new session", async ({ page }) => {
   await base(page);
@@ -691,7 +696,7 @@ test("recruiter registration saves contact in Auth and can retry after a tempora
   await page.getByRole("button", { name: "Đăng ký", exact: true }).click();
   await page.getByLabel("Mã xác minh OTP").fill("123456");
   await page.getByRole("button", { name: "Xác minh tài khoản", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Tài khoản Recruiter đã xác minh" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tài khoản nhà tuyển dụng đã xác minh" })).toBeVisible();
   expect(contacts).toBe(1);
   await page.getByRole("button", { name: "Lưu lại thông tin liên hệ" }).click();
   await expect(page).toHaveURL(/\/recruiter\/jobs$/);
