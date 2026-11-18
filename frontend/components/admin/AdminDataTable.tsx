@@ -1,11 +1,23 @@
 import {
+  Ban,
   BriefcaseBusiness,
   Building2,
-  Ban,
+  CalendarDays,
+  CheckCircle2,
+  ExternalLink,
   Eye,
+  FileText,
   Flag,
+  Globe,
+  Image as ImageIcon,
+  Info,
   LockKeyhole,
+  MapPin,
   RotateCcw,
+  UsersRound,
+  Video as VideoIcon,
+  X,
+  XCircle,
 } from "lucide-react";
 import { StatusBadge } from "../ui";
 import { jobStatusLabel } from "../../lib/recruitmentLabels";
@@ -468,61 +480,543 @@ export function AdminDataTable({
   );
 }
 
-export function AdminDetail({ row, tab }: { row: AdminRow; tab: AdminTab }) {
+export function AdminCompanyDetail({
+  row,
+  pending = false,
+  onChoose,
+  onClose,
+}: {
+  row: AdminRow;
+  pending?: boolean;
+  onChoose?: (
+    path: string,
+    body: AdminRow,
+    label: string,
+    needsReason?: boolean,
+    subject?: string,
+  ) => void;
+  onClose?: () => void;
+}) {
+  const id = String(row.id || "");
+  const name = String(row.name || "Doanh nghiệp");
+  const taxCode = text(row.taxCode);
+  const industry = text(row.industry);
+  const size = text(row.size);
+  const address = text(row.address);
+  const website =
+    typeof row.website === "string" && row.website.trim()
+      ? row.website.trim()
+      : null;
+  const description = text(row.description);
+  const verifiedStatus = String(row.verifiedStatus || "PENDING");
+  const rejectReason =
+    typeof row.rejectReason === "string" && row.rejectReason.trim()
+      ? row.rejectReason.trim()
+      : null;
+  const suspensionReason =
+    typeof row.suspensionReason === "string" && row.suspensionReason.trim()
+      ? row.suspensionReason.trim()
+      : null;
+  const isSuspended = Boolean(row.isSuspended);
+  const ownerName = text(
+    row.ownerName || row.ownerEmail || row.email,
+    "Đang đồng bộ thành viên",
+  );
+  const createdAt = row.createdAt;
+  const updatedAt = row.updatedAt;
+
+  const logoUrl =
+    (row.logo as { url?: string } | undefined)?.url ||
+    (typeof row.logoUrl === "string" ? row.logoUrl : null);
+
+  const rawMedia = Array.isArray(row.media)
+    ? (row.media as Array<{
+        url: string;
+        type?: string;
+        sortOrder?: number;
+      }>)
+    : [];
+
+  const verifiedStatusLabels: Record<string, string> = {
+    VERIFIED: "Đã xác minh",
+    PENDING: "Chờ xác minh",
+    REJECTED: "Đã từ chối",
+    UNVERIFIED: "Chưa xác minh",
+  };
+
+  const statusTone: "warning" | "success" | "danger" | "neutral" =
+    isSuspended
+      ? "danger"
+      : row.verifiedStatus === "VERIFIED"
+        ? "success"
+        : row.verifiedStatus === "REJECTED"
+          ? "danger"
+          : "warning";
+
+  const statusLabel = isSuspended
+    ? "Đã đình chỉ"
+    : verifiedStatusLabels[verifiedStatus] || "Chờ xác minh";
+
+  return (
+    <div className="admin-company-detail">
+      {/* 4 Overview metric cards */}
+      <section className="admin-company-metrics" aria-label="Tóm tắt công ty">
+        <div className="admin-company-metric-card">
+          <span className="metric-label">Trạng thái</span>
+          <strong className={`metric-value tone-${statusTone}`}>
+            {statusLabel}
+          </strong>
+          <span className="metric-sub">Xác minh doanh nghiệp</span>
+        </div>
+        <div className="admin-company-metric-card">
+          <span className="metric-label">Lĩnh vực</span>
+          <strong className="metric-value">{industry}</strong>
+          <span className="metric-sub">Thông tin doanh nghiệp</span>
+        </div>
+        <div className="admin-company-metric-card">
+          <span className="metric-label">Người đại diện / Sở hữu</span>
+          <strong className="metric-value">{ownerName}</strong>
+          <span className="metric-sub">Quyền quản lý công ty</span>
+        </div>
+        <div className="admin-company-metric-card">
+          <span className="metric-label">Quy mô</span>
+          <strong className="metric-value">
+            {size !== "Chưa cập nhật" ? `${size} nhân sự` : "Chưa cập nhật"}
+          </strong>
+          <span className="metric-sub">Quy mô nhân sự</span>
+        </div>
+      </section>
+
+      {/* Main 2-column layout */}
+      <div className="admin-company-layout">
+        {/* Left Column */}
+        <div className="admin-company-main">
+          {/* Header */}
+          <div className="admin-company-header">
+            <div className="admin-company-brand">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={`Logo ${name}`}
+                  className="admin-company-logo-avatar"
+                />
+              ) : (
+                <div className="admin-company-logo-fallback" aria-hidden="true">
+                  <Building2 size={32} />
+                </div>
+              )}
+              <div className="admin-company-title-wrap">
+                <h2>{name}</h2>
+                <p className="admin-company-meta">
+                  MST {taxCode} · Chủ sở hữu {ownerName}
+                </p>
+              </div>
+            </div>
+            <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+          </div>
+
+          {/* Legal Notice */}
+          <div className="admin-company-notice admin-notice-legal">
+            <strong>Hồ sơ pháp lý</strong>
+            <p>
+              Đổi tên hoặc mã số thuế khi đã xác minh sẽ đưa công ty về trạng
+              thái chờ duyệt.
+            </p>
+          </div>
+
+          {/* Status Notice */}
+          {verifiedStatus === "PENDING" && !isSuspended && (
+            <div
+              className="admin-company-notice admin-notice-pending"
+              aria-live="polite"
+            >
+              <strong>Đang chờ xác minh</strong>
+              <p>Hồ sơ đã được gửi và đang chờ Admin xem xét.</p>
+            </div>
+          )}
+          {verifiedStatus === "VERIFIED" && !isSuspended && (
+            <div
+              className="admin-company-notice admin-notice-verified"
+              aria-live="polite"
+            >
+              <strong>Đã xác minh</strong>
+              <p>
+                Hồ sơ công ty đã được kiểm duyệt và xác thực hợp lệ trên hệ thống.
+              </p>
+            </div>
+          )}
+          {verifiedStatus === "REJECTED" && !isSuspended && (
+            <div
+              className="admin-company-notice admin-notice-rejected"
+              aria-live="polite"
+            >
+              <strong>Đã từ chối xác minh</strong>
+              <p>Hồ sơ doanh nghiệp đã bị từ chối yêu cầu xác thực.</p>
+              {rejectReason && (
+                <p className="admin-notice-reason">
+                  <strong>Lý do từ chối:</strong> {rejectReason}
+                </p>
+              )}
+            </div>
+          )}
+          {isSuspended && (
+            <div
+              className="admin-company-notice admin-notice-suspended"
+              aria-live="polite"
+            >
+              <strong>Doanh nghiệp đang bị đình chỉ</strong>
+              <p>Công ty đang tạm thời bị ẩn khỏi hệ thống.</p>
+              {suspensionReason && (
+                <p className="admin-notice-reason">
+                  <strong>Lý do đình chỉ:</strong> {suspensionReason}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Fact items list */}
+          <dl className="admin-company-facts">
+            <div className="admin-fact-row">
+              <dt>
+                <Building2 size={16} aria-hidden="true" /> Lĩnh vực
+              </dt>
+              <dd>{industry}</dd>
+            </div>
+            <div className="admin-fact-row">
+              <dt>
+                <UsersRound size={16} aria-hidden="true" /> Quy mô
+              </dt>
+              <dd>
+                {size !== "Chưa cập nhật"
+                  ? `${size} nhân sự`
+                  : "Chưa cập nhật"}
+              </dd>
+            </div>
+            <div className="admin-fact-row">
+              <dt>
+                <MapPin size={16} aria-hidden="true" /> Địa chỉ
+              </dt>
+              <dd>{address}</dd>
+            </div>
+            <div className="admin-fact-row">
+              <dt>
+                <Globe size={16} aria-hidden="true" /> Trang web
+              </dt>
+              <dd>
+                {website ? (
+                  <a
+                    href={
+                      website.startsWith("http")
+                        ? website
+                        : `https://${website}`
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    className="admin-text-link"
+                  >
+                    {website} <ExternalLink size={13} aria-hidden="true" />
+                  </a>
+                ) : (
+                  "Chưa cập nhật"
+                )}
+              </dd>
+            </div>
+            <div className="admin-fact-row">
+              <dt>
+                <FileText size={16} aria-hidden="true" /> Mã số thuế
+              </dt>
+              <dd>{taxCode}</dd>
+            </div>
+            <div className="admin-fact-row full-width">
+              <dt>
+                <Info size={16} aria-hidden="true" /> Giới thiệu
+              </dt>
+              <dd className="admin-company-description">{description}</dd>
+            </div>
+            {createdAt && (
+              <div className="admin-fact-row">
+                <dt>
+                  <CalendarDays size={16} aria-hidden="true" /> Ngày gửi hồ sơ
+                </dt>
+                <dd>{date(createdAt, true)}</dd>
+              </div>
+            )}
+            {updatedAt && (
+              <div className="admin-fact-row">
+                <dt>
+                  <CalendarDays size={16} aria-hidden="true" /> Cập nhật gần nhất
+                </dt>
+                <dd>{date(updatedAt, true)}</dd>
+              </div>
+            )}
+            {typeof row.aggregateVersion === "number" && (
+              <div className="admin-fact-row">
+                <dt>
+                  <FileText size={16} aria-hidden="true" /> Phiên bản dữ liệu
+                </dt>
+                <dd>{String(row.aggregateVersion)}</dd>
+              </div>
+            )}
+          </dl>
+        </div>
+
+        {/* Right Column: Media */}
+        <div className="admin-company-side">
+          <div className="admin-side-card">
+            <div className="admin-side-head">
+              <h3>Thư viện hình ảnh và video</h3>
+              <p>Ảnh đại diện, không gian làm việc và tư liệu công ty.</p>
+            </div>
+
+            {/* Logo Preview */}
+            <div className="admin-media-group">
+              <span className="admin-media-group-label">Logo công ty</span>
+              {logoUrl ? (
+                <div className="admin-logo-card">
+                  <img
+                    src={logoUrl}
+                    alt={`Logo ${name}`}
+                    className="admin-logo-large-preview"
+                  />
+                  <a
+                    href={logoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="admin-icon-link"
+                  >
+                    Xem ảnh gốc <ExternalLink size={13} />
+                  </a>
+                </div>
+              ) : (
+                <div className="admin-media-empty-item">
+                  <Building2 size={24} aria-hidden="true" />
+                  <span>Chưa cập nhật logo</span>
+                </div>
+              )}
+            </div>
+
+            {/* Gallery */}
+            <div className="admin-media-group">
+              <div className="admin-media-group-head">
+                <span className="admin-media-group-label">
+                  Hình ảnh & Video ({rawMedia.length})
+                </span>
+              </div>
+              {rawMedia.length > 0 ? (
+                <div className="admin-media-grid">
+                  {rawMedia.map((item, idx) => (
+                    <div key={item.url || idx} className="admin-media-item">
+                      {item.type === "VIDEO" ? (
+                        <video
+                          controls
+                          preload="metadata"
+                          className="admin-media-video"
+                        >
+                          <source src={item.url} />
+                        </video>
+                      ) : (
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="admin-media-thumb-link"
+                          title="Xem ảnh gốc"
+                        >
+                          <img
+                            src={item.url}
+                            alt={`Ảnh ${idx + 1}`}
+                            loading="lazy"
+                            className="admin-media-thumb"
+                          />
+                          <span className="admin-media-zoom">
+                            <ExternalLink size={14} />
+                          </span>
+                        </a>
+                      )}
+                      <span className="admin-media-tag">
+                        {item.type === "VIDEO" ? (
+                          <>
+                            <VideoIcon size={11} /> Video
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon size={11} /> Ảnh
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="admin-media-empty-state">
+                  <ImageIcon size={28} aria-hidden="true" />
+                  <p>Doanh nghiệp chưa bổ sung ảnh hoặc video giới thiệu.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Bar */}
+      <div className="admin-detail-actions-bar">
+        <div className="admin-detail-action-buttons">
+          {onChoose && verifiedStatus === "PENDING" && (
+            <>
+              <button
+                type="button"
+                className="btn admin-approve"
+                disabled={pending}
+                onClick={() =>
+                  onChoose(
+                    `companies/${id}/verify`,
+                    { decision: "APPROVE" },
+                    "Duyệt công ty",
+                    false,
+                    name,
+                  )
+                }
+              >
+                <CheckCircle2 size={16} aria-hidden="true" />
+                Duyệt công ty
+              </button>
+              <button
+                type="button"
+                className="btn admin-danger"
+                disabled={pending}
+                onClick={() =>
+                  onChoose(
+                    `companies/${id}/verify`,
+                    { decision: "REJECT" },
+                    "Từ chối công ty",
+                    true,
+                    name,
+                  )
+                }
+              >
+                <XCircle size={16} aria-hidden="true" />
+                Từ chối
+              </button>
+            </>
+          )}
+          {onChoose && (
+            <button
+              type="button"
+              className={`btn ${isSuspended ? "admin-approve" : "admin-danger"}`}
+              disabled={pending || typeof row.aggregateVersion !== "number"}
+              title={
+                typeof row.aggregateVersion !== "number"
+                  ? "Thiếu phiên bản dữ liệu để cập nhật an toàn"
+                  : undefined
+              }
+              onClick={() => {
+                const suspended = !isSuspended;
+                onChoose(
+                  `companies/${id}/moderation`,
+                  {
+                    suspended,
+                    expectedVersion: row.aggregateVersion,
+                    operationId: crypto.randomUUID(),
+                  },
+                  suspended ? "Đình chỉ công ty" : "Khôi phục công ty",
+                  true,
+                  name,
+                );
+              }}
+            >
+              {isSuspended ? (
+                <RotateCcw size={15} aria-hidden="true" />
+              ) : (
+                <Ban size={15} aria-hidden="true" />
+              )}
+              {isSuspended ? "Khôi phục" : "Đình chỉ"}
+            </button>
+          )}
+        </div>
+        {onClose && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onClose}
+          >
+            Đóng chi tiết
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function AdminDetail({
+  row,
+  tab,
+  pending = false,
+  onChoose,
+  onClose,
+}: {
+  row: AdminRow;
+  tab: AdminTab;
+  pending?: boolean;
+  onChoose?: (
+    path: string,
+    body: AdminRow,
+    label: string,
+    needsReason?: boolean,
+    subject?: string,
+  ) => void;
+  onClose?: () => void;
+}) {
+  if (tab === "companies") {
+    return (
+      <AdminCompanyDetail
+        row={row}
+        pending={pending}
+        onChoose={onChoose}
+        onClose={onClose}
+      />
+    );
+  }
+
   const fields =
-    tab === "companies"
+    tab === "jobs"
       ? [
-          ["description", "Giới thiệu"],
-          ["industry", "Lĩnh vực"],
-          ["size", "Quy mô"],
-          ["address", "Địa chỉ"],
-          ["website", "Trang web"],
-          ["taxCode", "Mã số thuế"],
-          ["verifiedStatus", "Trạng thái"],
-          ["rejectReason", "Lý do từ chối"],
-          ["isSuspended", "Đang đình chỉ"],
-          ["suspensionReason", "Lý do đình chỉ"],
+          ["description", "Mô tả công việc"],
+          ["requirements", "Yêu cầu"],
+          ["benefits", "Quyền lợi"],
+          ["location", "Địa điểm"],
+          ["deadline", "Hạn ứng tuyển"],
+          ["status", "Trạng thái"],
+          ["rejectionReason", "Lý do từ chối"],
+          ["companyId", "Mã công ty"],
+          ["isSuspended", "Đang gỡ"],
+          ["suspensionReason", "Lý do gỡ"],
           ["aggregateVersion", "Phiên bản dữ liệu"],
         ]
-      : tab === "jobs"
+      : tab === "users"
         ? [
-            ["description", "Mô tả công việc"],
-            ["requirements", "Yêu cầu"],
-            ["benefits", "Quyền lợi"],
-            ["location", "Địa điểm"],
-            ["deadline", "Hạn ứng tuyển"],
-            ["status", "Trạng thái"],
-            ["rejectionReason", "Lý do từ chối"],
-            ["companyId", "Mã công ty"],
-            ["isSuspended", "Đang gỡ"],
-            ["suspensionReason", "Lý do gỡ"],
-            ["aggregateVersion", "Phiên bản dữ liệu"],
+            ["email", "Email"],
+            ["role", "Vai trò"],
+            ["locked_reason", "Lý do khóa"],
           ]
-        : tab === "users"
+        : tab === "reports"
           ? [
-              ["email", "Email"],
-              ["role", "Vai trò"],
-              ["locked_reason", "Lý do khóa"],
+              ["target_type", "Đối tượng"],
+              ["target_id", "Mã đối tượng"],
+              ["description", "Nội dung"],
+              ["resolution", "Kết quả xử lý"],
+              ["status", "Trạng thái"],
             ]
-          : tab === "reports"
-            ? [
-                ["target_type", "Đối tượng"],
-                ["target_id", "Mã đối tượng"],
-                ["description", "Nội dung"],
-                ["resolution", "Kết quả xử lý"],
-                ["status", "Trạng thái"],
-              ]
-            : [
-                ["target_label", "Tên đối tượng / email"],
-                ["target_type", "Loại đối tượng"],
-                ...(row.target_role
-                  ? [["target_role", "Vai trò tài khoản"]]
-                  : []),
-                ["admin_label", "Người thực hiện"],
-                ["reason", "Lý do / ghi chú"],
-                ["outcome", "Kết quả"],
-                ["created_at", "Thời gian"],
-              ];
+          : [
+              ["target_label", "Tên đối tượng / email"],
+              ["target_type", "Loại đối tượng"],
+              ...(row.target_role
+                ? [["target_role", "Vai trò tài khoản"]]
+                : []),
+              ["admin_label", "Người thực hiện"],
+              ["reason", "Lý do / ghi chú"],
+              ["outcome", "Kết quả"],
+              ["created_at", "Thời gian"],
+            ];
   return (
     <div className="admin-detail-body">
       <h3>{tab === "audit" ? auditTitle(row) : rowTitle(row)}</h3>
@@ -542,18 +1036,23 @@ export function AdminDetail({ row, tab }: { row: AdminRow; tab: AdminTab }) {
                 : key === "created_at"
                   ? date(row[key], true)
                   : typeof row[key] === "boolean"
-                    ? row[key] ? "Có" : "Không"
-                  : key === "role" || key === "target_role"
-                    ? roleLabels[String(row[key])] || "Chưa rõ vai trò"
-                  : key === "target_type"
-                    ? targetLabels[String(row[key])] || "Chưa rõ loại đối tượng"
-                  : key === "verifiedStatus"
-                    ? ({ VERIFIED: "Đã xác minh", PENDING: "Chờ xác minh", REJECTED: "Đã từ chối", UNVERIFIED: "Chưa xác minh" } as Record<string, string>)[String(row[key])] || "Chưa rõ trạng thái"
-                  : key === "status"
-                    ? tab === "reports" ? reportLabels[String(row[key])] || "Chưa rõ trạng thái" : jobStatusLabel(String(row[key]))
-                  : key === "outcome"
-                    ? outcomes[String(row[key])] || "Chưa xác định kết quả"
-                  : text(row[key])}
+                    ? row[key]
+                      ? "Có"
+                      : "Không"
+                    : key === "role" || key === "target_role"
+                      ? roleLabels[String(row[key])] || "Chưa rõ vai trò"
+                      : key === "target_type"
+                        ? targetLabels[String(row[key])] ||
+                          "Chưa rõ loại đối tượng"
+                        : key === "status"
+                          ? tab === "reports"
+                            ? reportLabels[String(row[key])] ||
+                              "Chưa rõ trạng thái"
+                            : jobStatusLabel(String(row[key]))
+                          : key === "outcome"
+                            ? outcomes[String(row[key])] ||
+                              "Chưa xác định kết quả"
+                            : text(row[key])}
             </dd>
           </div>
         ))}
@@ -587,6 +1086,13 @@ export function AdminDetail({ row, tab }: { row: AdminRow; tab: AdminTab }) {
           Khi chấp nhận báo cáo này, tin tuyển dụng sẽ được gỡ khỏi phần công khai
           hoặc công ty sẽ bị đình chỉ. Dữ liệu và lịch sử ứng tuyển được giữ lại.
         </p>
+      )}
+      {onClose && (
+        <div className="admin-dialog-footer">
+          <button type="button" className="btn" onClick={onClose}>
+            Đóng chi tiết
+          </button>
+        </div>
       )}
     </div>
   );

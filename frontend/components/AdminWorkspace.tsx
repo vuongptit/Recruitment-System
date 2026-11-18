@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  X,
 } from "lucide-react";
 import { requestApi } from "../lib/apiClient";
 import { person1Error } from "../lib/person1Api";
@@ -85,6 +86,46 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
   const [command, setCommand] = useState<Command | null>(null);
   const [detail, setDetail] = useState<Row | null>(null);
   const [commandError, setCommandError] = useState("");
+  const lastTriggerRef = useRef<HTMLElement | null>(null);
+
+  function handleOpenDetail(row: Row) {
+    lastTriggerRef.current = document.activeElement as HTMLElement | null;
+    setDetail(row);
+    if (tab === "companies" && row.id) {
+      requestApi<Row>(`/api/admin/companies/${row.id}`, { privateData: true })
+        .then((res) => {
+          if (res.data) {
+            setDetail((current) =>
+              current && current.id === row.id
+                ? { ...current, ...res.data }
+                : current,
+            );
+          }
+        })
+        .catch(() => {});
+    }
+    setTimeout(() => {
+      document
+        .getElementById("admin-detail-panel")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
+  function handleCloseDetail() {
+    setDetail(null);
+    lastTriggerRef.current?.focus();
+  }
+
+  useEffect(() => {
+    if (!detail) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        handleCloseDetail();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [detail]);
   useEffect(() => {
     setEmail(query);
   }, [query]);
@@ -523,7 +564,7 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
                 tab={tab}
                 rows={displayedRows}
                 pending={pending}
-                onDetail={setDetail}
+                onDetail={handleOpenDetail}
                 onChoose={choose}
               />
             </>
@@ -545,6 +586,55 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
               }
             />
           )}
+          {detail && (
+            <div
+              id="admin-detail-panel"
+              role="dialog"
+              aria-label={
+                tab === "companies"
+                  ? "Hồ sơ doanh nghiệp"
+                  : tab === "jobs"
+                    ? "Nội dung tin tuyển dụng"
+                    : tab === "users"
+                      ? "Thông tin tài khoản"
+                      : tab === "reports"
+                        ? "Chi tiết báo cáo"
+                        : "Chi tiết hoạt động"
+              }
+              tabIndex={-1}
+              className="admin-detail-panel-wrapper"
+            >
+              <div className="admin-detail-panel-heading">
+                <h2>
+                  {tab === "companies"
+                    ? "Hồ sơ doanh nghiệp"
+                    : tab === "jobs"
+                      ? "Nội dung tin tuyển dụng"
+                      : tab === "users"
+                        ? "Thông tin tài khoản"
+                        : tab === "reports"
+                          ? "Chi tiết báo cáo"
+                          : "Chi tiết hoạt động"}
+                </h2>
+                <button
+                  type="button"
+                  className="admin-icon-button"
+                  aria-label="Đóng chi tiết"
+                  title="Đóng chi tiết"
+                  onClick={handleCloseDetail}
+                >
+                  <X size={18} aria-hidden="true" />
+                </button>
+              </div>
+              <AdminDetail
+                row={detail}
+                tab={tab}
+                pending={pending}
+                onChoose={choose}
+                onClose={handleCloseDetail}
+              />
+            </div>
+          )}
           {!loading && !error && (
             <div className="admin-pagination">
               <span>
@@ -554,54 +644,43 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
                     : `${count((page - 1) * 20 + 1)}–${count((page - 1) * 20 + displayedRows.length)} trên ${count(total)} kết quả`
                   : "0 kết quả"}
               </span>
-              <div>
+              <div className="admin-pagination-controls">
                 <button
-                  className="admin-icon-button"
+                  type="button"
+                  className="btn btn-secondary admin-pagination-btn"
                   aria-label="Trang trước"
                   disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
+                  onClick={() => {
+                    setPage((p) => p - 1);
+                    setDetail(null);
+                  }}
                 >
-                  <ChevronLeft size={18} aria-hidden="true" />
+                  <ChevronLeft size={16} aria-hidden="true" />
+                  <span>Trang trước</span>
                 </button>
-                <span aria-live="polite">Trang {page}</span>
+                <span className="admin-pagination-current" aria-live="polite">
+                  Trang {page}
+                </span>
                 <button
-                  className="admin-icon-button"
+                  type="button"
+                  className="btn btn-secondary admin-pagination-btn"
                   aria-label="Trang sau"
                   disabled={
                     tab === "audit" ? rows.length < 20 : page * 20 >= total
                   }
-                  onClick={() => setPage((p) => p + 1)}
+                  onClick={() => {
+                    setPage((p) => p + 1);
+                    setDetail(null);
+                  }}
                 >
-                  <ChevronRight size={18} aria-hidden="true" />
+                  <span>Trang sau</span>
+                  <ChevronRight size={16} aria-hidden="true" />
                 </button>
               </div>
             </div>
           )}
         </section>
       </>
-      {detail && (
-        <AdminDialog
-          title={
-            tab === "companies"
-              ? "Hồ sơ doanh nghiệp"
-              : tab === "jobs"
-                ? "Nội dung tin tuyển dụng"
-                : tab === "users"
-                  ? "Thông tin tài khoản"
-                  : tab === "reports"
-                    ? "Chi tiết báo cáo"
-                    : "Chi tiết hoạt động"
-          }
-          onClose={() => setDetail(null)}
-        >
-          <AdminDetail row={detail} tab={tab} />
-          <div className="admin-dialog-footer">
-            <button className="btn" onClick={() => setDetail(null)}>
-              Đóng chi tiết
-            </button>
-          </div>
-        </AdminDialog>
-      )}
       {command && (
         <AdminDialog
           title={command.label}
