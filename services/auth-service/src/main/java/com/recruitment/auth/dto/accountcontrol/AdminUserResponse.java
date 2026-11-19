@@ -13,4 +13,17 @@ public record AdminUserResponse(
     @JsonProperty("is_verified") boolean verified,
     @JsonProperty("is_locked") boolean locked,
     @JsonProperty("locked_reason") String lockedReason,
-    @JsonProperty("created_at") Timestamp createdAt) {}
+    @JsonProperty("created_at") Timestamp createdAt,
+    @JsonProperty("full_name") String fullName) {
+
+  public AdminUserResponse(
+      UUID id,
+      String email,
+      UserRole role,
+      boolean verified,
+      boolean locked,
+      String lockedReason,
+      Timestamp createdAt) {
+    this(id, email, role, verified, locked, lockedReason, createdAt, null);
+  }
+}

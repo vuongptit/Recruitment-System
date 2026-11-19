@@ -115,7 +115,14 @@ export function AdminDataTable({
 }) {
   const columns =
     tab === "users"
-      ? ["Tài khoản", "Vai trò", "Trạng thái", "Xác minh", "Thao tác"]
+      ? [
+          "Tài khoản",
+          "Tên người dùng",
+          "Vai trò",
+          "Trạng thái",
+          "Xác minh",
+          "Thao tác",
+        ]
       : tab === "audit"
         ? ["Hoạt động", "Đối tượng", "Kết quả", "Thời gian", "Chi tiết"]
         : tab === "reports"
@@ -221,6 +228,12 @@ export function AdminDataTable({
                 </td>
                 {tab === "users" ? (
                   <>
+                    <td>
+                      {text(
+                        row.fullName ?? row.full_name ?? row.name,
+                        "Chưa cập nhật",
+                      )}
+                    </td>
                     <td>
                       <StatusBadge tone="neutral">
                         {roleLabels[String(row.role)] || "Chưa rõ vai trò"}
@@ -995,6 +1008,7 @@ export function AdminDetail({
       : tab === "users"
         ? [
             ["email", "Email"],
+            ["fullName", "Tên người dùng"],
             ["role", "Vai trò"],
             ["locked_reason", "Lý do khóa"],
           ]
@@ -1031,7 +1045,12 @@ export function AdminDetail({
           <div key={key}>
             <dt>{label}</dt>
             <dd>
-              {key === "deadline"
+              {key === "fullName"
+                ? text(
+                    row.fullName ?? row.full_name ?? row.name,
+                    "Chưa cập nhật",
+                  )
+                : key === "deadline"
                 ? date(row[key])
                 : key === "created_at"
                   ? date(row[key], true)

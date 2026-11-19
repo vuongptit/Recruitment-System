@@ -18,7 +18,7 @@ public class AdminUserDirectoryRepository {
   private static final RowMapper<AdminUserResponse> USER_ROW = (row, index) -> new AdminUserResponse(
       row.getObject("id", UUID.class), row.getString("email"), UserRole.valueOf(row.getString("role")),
       row.getBoolean("is_verified"), row.getBoolean("is_locked"), row.getString("locked_reason"),
-      row.getTimestamp("created_at"));
+      row.getTimestamp("created_at"), row.getString("recruiter_full_name"));
 
   private final JdbcTemplate db;
 
@@ -43,7 +43,7 @@ public class AdminUserDirectoryRepository {
     args.add(pageable.getPageSize());
     args.add(pageable.getOffset());
     List<AdminUserResponse> users = db.query(
-        "SELECT id,email,role,is_verified,is_locked,locked_reason,created_at FROM auth.users"
+        "SELECT id,email,role,is_verified,is_locked,locked_reason,created_at,recruiter_full_name FROM auth.users"
             + where + " ORDER BY created_at DESC,id LIMIT ? OFFSET ?",
         USER_ROW, args.toArray());
     return new PageImpl<>(users, pageable, total == null ? 0 : total);

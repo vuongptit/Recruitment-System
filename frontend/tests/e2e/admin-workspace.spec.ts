@@ -75,6 +75,9 @@ test("admin filters and pagination survive reload without crossing portals", asy
     page.getByRole("combobox", { name: "Vai trò", exact: true }),
   ).toHaveValue("RECRUITER");
   await expect(page.getByLabel("Tìm theo email")).toHaveValue("recruiter");
+  await expect(
+    page.getByRole("columnheader", { name: "Tên người dùng", exact: true }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Trang sau", exact: true }).click();
   await expect(page).toHaveURL(/page=2/);
   await expect(page.getByText("21–21 trên 21 kết quả")).toBeVisible();
