@@ -3,7 +3,7 @@ import {
   CompanyMemberRole,
   CompanyVerificationStatus,
 } from '@prisma/client';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CompanyMemberDto {
   @ApiProperty({ format: 'uuid' })
@@ -14,6 +14,15 @@ export class CompanyMemberDto {
 
   @ApiProperty({ format: 'date-time' })
   joinedAt!: string;
+
+  @ApiPropertyOptional({ description: 'Recruiter full name' })
+  fullName?: string;
+
+  @ApiPropertyOptional({ description: 'Recruiter email' })
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Recruiter avatar URL' })
+  avatarUrl?: string;
 }
 
 export class CompanyInvitationDto {

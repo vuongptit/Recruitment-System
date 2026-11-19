@@ -4,6 +4,7 @@ import { companyMemberRoleLabel } from "@/lib/recruitmentLabels";
 
 import { useEffect, useState } from "react";
 import { ConfirmationDialog } from "./ConfirmationDialog";
+import { useCurrentAccount } from "./SessionGate";
 import { ErrorState, LoadingState, StatusBadge } from "./ui";
 import { toUserMessage } from "../lib/apiClient";
 import { canManageCompanyAsOwner, roleAfterOwnershipTransfer, withoutRemovedMember } from "../lib/companyMembership";
@@ -22,6 +23,7 @@ export function CompanyMemberManagement({ companyId, onRoleChange }: {
   companyId: string;
   onRoleChange: (role: CompanyMemberRole | null) => void;
 }) {
+  const account = useCurrentAccount();
   const [role, setRole] = useState<CompanyMemberRole | null>(null);
   const [members, setMembers] = useState<CompanyMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,7 +108,15 @@ export function CompanyMemberManagement({ companyId, onRoleChange }: {
       <ConfirmationDialog
         open={pendingAction !== null}
         title={pendingAction?.kind === "TRANSFER" ? "Chuyển quyền sở hữu?" : "Xóa thành viên?"}
-        description={pendingAction?.kind === "TRANSFER" ? "Sau xác nhận, bạn sẽ trở thành thành viên và không còn quyền quản lý của chủ sở hữu." : "Thành viên sẽ mất quyền truy cập dữ liệu công ty."}
+        description={
+          pendingAction?.kind === "TRANSFER"
+            ? `Sau xác nhận, bạn sẽ chuyển quyền quản lý công ty cho ${
+                pendingAction.member.fullName || pendingAction.member.email || "thành viên này"
+              } và bạn sẽ trở thành thành viên.`
+            : `Thành viên ${
+                pendingAction?.member.fullName || pendingAction?.member.email || ""
+              } sẽ mất quyền truy cập dữ liệu công ty.`
+        }
         confirmLabel={pendingAction?.kind === "TRANSFER" ? "Chuyển quyền sở hữu" : "Xóa thành viên"}
         pending={pending}
         onConfirm={() => { void confirmAction(); }}
@@ -121,17 +131,71 @@ export function CompanyMemberManagement({ companyId, onRoleChange }: {
         <div className="table-wrap">
           <table className="data-table">
             <thead><tr><th>Người dùng</th><th>Vai trò</th><th>Tham gia</th><th>Thao tác</th></tr></thead>
-            <tbody>{members.map((member) => (
-              <tr key={member.userId}>
-                <td><code>{member.userId}</code></td>
-                <td><StatusBadge tone={member.role === "OWNER" ? "success" : "neutral"}>{companyMemberRoleLabel(member.role)}</StatusBadge></td>
-                <td>{new Date(member.joinedAt).toLocaleDateString("vi-VN")}</td>
-                <td>{member.role === "MEMBER" ? <div className="btn-group">
-                  <button className="btn btn-secondary" type="button" onClick={() => setPendingAction({ kind: "TRANSFER", member })}>Chuyển quyền sở hữu</button>
-                  <button className="btn btn-danger" type="button" onClick={() => setPendingAction({ kind: "REMOVE", member })}>Xóa</button>
-                </div> : <span className="help">Chủ sở hữu hiện tại</span>}</td>
-              </tr>
-            ))}</tbody>
+            <tbody>{members.map((member) => {
+              const displayName =
+                member.fullName?.trim() ||
+                (member.userId === account?.id ? account?.email : undefined) ||
+                member.email ||
+                member.userId;
+              const subText =
+                member.email && member.fullName && member.fullName.trim() !== member.email
+                  ? member.email
+                  : member.userId === displayName
+                    ? null
+                    : member.userId;
+              const initial = (member.fullName?.trim() || member.email || "U")
+                .slice(0, 1)
+                .toUpperCase();
+
+              return (
+                <tr key={member.userId}>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                      {member.avatarUrl ? (
+                        <img
+                          src={member.avatarUrl}
+                          alt=""
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <span
+                          className="account-avatar"
+                          aria-hidden="true"
+                          style={{ flexShrink: 0 }}
+                        >
+                          {initial}
+                        </span>
+                      )}
+                      <div style={{ minWidth: 0 }}>
+                        <strong style={{ display: "block", wordBreak: "break-word" }}>
+                          {displayName}
+                        </strong>
+                        {subText ? (
+                          <span
+                            className="help"
+                            style={{ display: "block", fontSize: "12px", wordBreak: "break-all" }}
+                          >
+                            {subText}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </td>
+                  <td><StatusBadge tone={member.role === "OWNER" ? "success" : "neutral"}>{companyMemberRoleLabel(member.role)}</StatusBadge></td>
+                  <td>{new Date(member.joinedAt).toLocaleDateString("vi-VN")}</td>
+                  <td>{member.role === "MEMBER" ? <div className="btn-group">
+                    <button className="btn btn-secondary" type="button" onClick={() => setPendingAction({ kind: "TRANSFER", member })}>Chuyển quyền sở hữu</button>
+                    <button className="btn btn-danger" type="button" onClick={() => setPendingAction({ kind: "REMOVE", member })}>Xóa</button>
+                  </div> : <span className="help">Chủ sở hữu hiện tại</span>}</td>
+                </tr>
+              );
+            })}</tbody>
           </table>
         </div>
       ) : null}

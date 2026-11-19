@@ -538,4 +538,40 @@ describe('CompanyMemberService', () => {
       code: 'RECRUITER_COMPANY_ACCESS_DENIED',
     });
   });
+
+  it('lists company members and enriches with user profile information when available', async () => {
+    transaction.companyMember.findUnique.mockResolvedValue(
+      memberRecord(OWNER_ID, CompanyMemberRole.OWNER),
+    );
+    transaction.companyMember.findMany.mockResolvedValue([
+      memberRecord(OWNER_ID, CompanyMemberRole.OWNER),
+      memberRecord(MEMBER_ID, CompanyMemberRole.MEMBER),
+    ]);
+    (prisma as any).$queryRaw = jest.fn().mockResolvedValue([
+      {
+        id: OWNER_ID,
+        email: 'owner@example.com',
+        recruiter_full_name: 'Nguyễn Văn Owner',
+        recruiter_avatar_url: 'https://example.com/owner.png',
+      },
+      {
+        id: MEMBER_ID,
+        email: 'member@example.com',
+        recruiter_full_name: 'Nguyễn Văn Member',
+        recruiter_avatar_url: null,
+      },
+    ]);
+
+    const result = await service.listMembers(OWNER_ID, COMPANY_ID);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].userId).toBe(OWNER_ID);
+    expect(result[0].fullName).toBe('Nguyễn Văn Owner');
+    expect(result[0].email).toBe('owner@example.com');
+    expect(result[0].avatarUrl).toBe('https://example.com/owner.png');
+    expect(result[1].userId).toBe(MEMBER_ID);
+    expect(result[1].fullName).toBe('Nguyễn Văn Member');
+    expect(result[1].email).toBe('member@example.com');
+    expect(result[1].avatarUrl).toBeUndefined();
+  });
 });

@@ -106,7 +106,7 @@ export class CompanyMemberService {
       },
     );
 
-    return members.map((member) => this.toMember(member));
+    return this.enrichMembersWithUserInfo(members);
   }
 
   async accept(
@@ -370,7 +370,7 @@ export class CompanyMemberService {
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
 
-      return members.map((member) => this.toMember(member));
+      return this.enrichMembersWithUserInfo(members);
     } catch (error) {
       this.throwPersistenceError(error);
     }
@@ -457,6 +457,63 @@ export class CompanyMemberService {
       role: member.role,
       joinedAt: member.joinedAt.toISOString(),
     };
+  }
+
+  private async enrichMembersWithUserInfo(
+    members: CompanyMember[],
+  ): Promise<CompanyMemberDto[]> {
+    if (members.length === 0) {
+      return [];
+    }
+
+    const userMap = new Map<
+      string,
+      { email?: string; fullName?: string; avatarUrl?: string }
+    >();
+
+    if (this.prisma && typeof (this.prisma as any).$queryRaw === 'function') {
+      try {
+        const userIds = members.map((m) => m.userId);
+        const rows = await this.prisma.$queryRaw<
+          Array<{
+            id: string;
+            email: string;
+            recruiter_full_name: string | null;
+            recruiter_avatar_url: string | null;
+          }>
+        >(Prisma.sql`
+          SELECT id, email, recruiter_full_name, recruiter_avatar_url
+          FROM auth.users
+          WHERE id = ANY(${userIds}::uuid[])
+        `);
+
+        if (Array.isArray(rows)) {
+          for (const row of rows) {
+            userMap.set(row.id, {
+              email: row.email,
+              fullName: row.recruiter_full_name
+                ? row.recruiter_full_name.trim()
+                : undefined,
+              avatarUrl: row.recruiter_avatar_url || undefined,
+            });
+          }
+        }
+      } catch {
+        // Fall back gracefully if cross-schema query fails
+      }
+    }
+
+    return members.map((member) => {
+      const userInfo = userMap.get(member.userId);
+      return {
+        userId: member.userId,
+        role: member.role,
+        joinedAt: member.joinedAt.toISOString(),
+        fullName: userInfo?.fullName,
+        email: userInfo?.email,
+        avatarUrl: userInfo?.avatarUrl,
+      };
+    });
   }
 
   private toInvitation(
