@@ -613,8 +613,20 @@ textarea, .resize-none { resize: none; }
 /* Person 1: identity, profile, CV and administration. */
 .person1-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
 .person1-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,260px),1fr)); gap: 1rem; }
-.person1-items { list-style: none; padding: 0; margin: 0; }
-.person1-items > li, .person1-builder-section { border-bottom: 1px solid #dce2f3; padding: 1rem 0; }
+.person1-items { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.person1-items > li { border: 1px solid #dce2f3; border-radius: 10px; padding: 14px 16px; background: #ffffff; transition: border-color .15s ease, box-shadow .15s ease; }
+.person1-items > li:hover { border-color: #bccbb9; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04); }
+.person1-items > li.person1-item-editing { border-color: #006e2e; box-shadow: 0 0 0 2px rgba(0, 110, 46, 0.15); background: #fbfdfb; }
+.person1-builder-section { border-bottom: 1px solid #dce2f3; padding: 1rem 0; }
+.person1-item-details { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.person1-item-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 14px; line-height: 1.5; color: #151c27; }
+.person1-item-row.person1-item-desc { flex-direction: column; align-items: flex-start; gap: 4px; }
+.person1-item-label { font-weight: 600; color: #555f6f; min-width: 95px; flex-shrink: 0; font-size: 13px; }
+.person1-item-value { color: #151c27; word-break: break-word; }
+.person1-item-text { margin: 0; color: #374151; white-space: pre-wrap; font-size: 13.5px; line-height: 1.5; background: #f8fafc; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; width: 100%; box-sizing: border-box; }
+.person1-item-link { color: #006e2e; text-decoration: underline; word-break: break-all; font-weight: 500; }
+.person1-item-link:hover { color: #005b26; }
+.person1-badge-pill { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 12px; background: #eef2ff; color: #1e40af; font-weight: 500; font-size: 12.5px; }
 .person1-pdf { width: 100%; height: 75vh; border: 1px solid #dce2f3; }
 .person1-number { font-size: 2rem; color: #006e2e; }
 .person1-chart { width: 100%; max-height: 220px; }
