@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { ApiSessionBoundary } from "@/components/ApiSessionBoundary";
 import { NotificationProvider } from "@/components/NotificationProvider";
+import { SiteSettingsProvider } from "@/components/SiteSettingsContext";
 import "./globals.css";
 import "./portal.css";
 
@@ -14,11 +15,13 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="vi">
       <body>
-        <NotificationProvider>
-          <ApiSessionBoundary>
-            {children}
-          </ApiSessionBoundary>
-        </NotificationProvider>
+        <SiteSettingsProvider>
+          <NotificationProvider>
+            <ApiSessionBoundary>
+              {children}
+            </ApiSessionBoundary>
+          </NotificationProvider>
+        </SiteSettingsProvider>
       </body>
     </html>
   );
