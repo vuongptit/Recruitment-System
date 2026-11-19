@@ -1251,7 +1251,7 @@ export function AdminJobDetail({
         <div className="admin-company-notice admin-notice-rejected" aria-live="polite">
           <strong>❌ Tin tuyển dụng đã bị từ chối</strong>
           <p>Tin không đạt tiêu chuẩn phê duyệt hoặc vi phạm chính sách đăng tuyển.</p>
-          {row.rejectionReason && (
+          {Boolean(row.rejectionReason) && (
             <p className="admin-notice-reason">
               <strong>Lý do từ chối:</strong> {String(row.rejectionReason)}
             </p>
@@ -1262,7 +1262,7 @@ export function AdminJobDetail({
         <div className="admin-company-notice admin-notice-suspended" aria-live="polite">
           <strong>🚫 Tin tuyển dụng đang bị gỡ bỏ</strong>
           <p>Tin đã bị tạm dừng hiển thị đối với ứng viên và cộng đồng.</p>
-          {row.suspensionReason && (
+          {Boolean(row.suspensionReason) && (
             <p className="admin-notice-reason">
               <strong>Lý do gỡ:</strong> {String(row.suspensionReason)}
             </p>
@@ -1407,7 +1407,7 @@ export function AdminJobDetail({
               <dt>Mã tin tuyển dụng</dt>
               <dd><code>{id}</code></dd>
 
-              {companyId && (
+              {Boolean(companyId) && (
                 <>
                   <dt>Mã công ty</dt>
                   <dd><code>{companyId}</code></dd>
@@ -1580,46 +1580,32 @@ export function AdminDetail({
   }
 
   const fields =
-    tab === "jobs"
+    tab === "users"
       ? [
-          ["description", "Mô tả công việc"],
-          ["requirements", "Yêu cầu"],
-          ["benefits", "Quyền lợi"],
-          ["location", "Địa điểm"],
-          ["deadline", "Hạn ứng tuyển"],
-          ["status", "Trạng thái"],
-          ["rejectionReason", "Lý do từ chối"],
-          ["companyId", "Mã công ty"],
-          ["isSuspended", "Đang gỡ"],
-          ["suspensionReason", "Lý do gỡ"],
-          ["aggregateVersion", "Phiên bản dữ liệu"],
+          ["email", "Email"],
+          ["fullName", "Tên người dùng"],
+          ["role", "Vai trò"],
+          ["locked_reason", "Lý do khóa"],
         ]
-      : tab === "users"
+      : tab === "reports"
         ? [
-            ["email", "Email"],
-            ["fullName", "Tên người dùng"],
-            ["role", "Vai trò"],
-            ["locked_reason", "Lý do khóa"],
+            ["target_type", "Đối tượng"],
+            ["target_id", "Mã đối tượng"],
+            ["description", "Nội dung"],
+            ["resolution", "Kết quả xử lý"],
+            ["status", "Trạng thái"],
           ]
-        : tab === "reports"
-          ? [
-              ["target_type", "Đối tượng"],
-              ["target_id", "Mã đối tượng"],
-              ["description", "Nội dung"],
-              ["resolution", "Kết quả xử lý"],
-              ["status", "Trạng thái"],
-            ]
-          : [
-              ["target_label", "Tên đối tượng / email"],
-              ["target_type", "Loại đối tượng"],
-              ...(row.target_role
-                ? [["target_role", "Vai trò tài khoản"]]
-                : []),
-              ["admin_label", "Người thực hiện"],
-              ["reason", "Lý do / ghi chú"],
-              ["outcome", "Kết quả"],
-              ["created_at", "Thời gian"],
-            ];
+        : [
+            ["target_label", "Tên đối tượng / email"],
+            ["target_type", "Loại đối tượng"],
+            ...(row.target_role
+              ? [["target_role", "Vai trò tài khoản"]]
+              : []),
+            ["admin_label", "Người thực hiện"],
+            ["reason", "Lý do / ghi chú"],
+            ["outcome", "Kết quả"],
+            ["created_at", "Thời gian"],
+          ];
   return (
     <div className="admin-detail-body">
       <h3>{tab === "audit" ? auditTitle(row) : rowTitle(row)}</h3>
