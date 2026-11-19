@@ -44,6 +44,8 @@ function job(status: JobStatus, overrides: Partial<Job> = {}): Job {
     reviewedAt: null,
     createdAt: new Date('2026-08-24T00:00:00.000Z'),
     updatedAt: new Date('2026-08-24T00:00:00.000Z'),
+    isSuspended: false,
+    suspensionReason: null,
     ...overrides,
   };
 }
@@ -87,6 +89,7 @@ describe('JobService publishing lifecycle', () => {
     } as unknown as PrismaService;
     const companies = {
       getRecruiterCompany,
+      suspendedCompanyIds: jest.fn().mockResolvedValue([]),
     } as unknown as CompanyClientService;
     const indexing = {
       append: indexAppend,
@@ -163,6 +166,29 @@ describe('JobService publishing lifecycle', () => {
     expect(updateMany).not.toHaveBeenCalled();
   });
 
+  it('allows a MEMBER to list all company jobs for viewing', async () => {
+    getRecruiterCompany.mockResolvedValue({
+      companyId: COMPANY_ID,
+      memberRole: 'MEMBER',
+      verifiedStatus: 'VERIFIED',
+    });
+    const companyJob = job(JobStatus.PUBLISHED, {
+      createdBy: '55555555-5555-4555-8555-555555555555',
+    });
+    findMany.mockResolvedValue([companyJob]);
+
+    const result = await service.listManaged(RECRUITER_ID, 'Bearer token');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe(JOB_ID);
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        companyId: COMPANY_ID,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
   it('reports a current PUBLISHED job as accepting applications', async () => {
     findUnique.mockResolvedValue(job(JobStatus.PUBLISHED));
 
@@ -191,7 +217,9 @@ describe('JobService publishing lifecycle', () => {
     });
     expect(count).toHaveBeenCalledWith({
       where: {
+        AND: [{ companyId: { notIn: [] } }],
         companyId: COMPANY_ID,
+        isSuspended: false,
         status: JobStatus.PUBLISHED,
         deadline: { gte: new Date('2026-08-24T00:00:00.000Z') },
       },

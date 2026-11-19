@@ -106,9 +106,6 @@ export class JobService {
     const jobs = await this.prisma.job.findMany({
       where: {
         companyId: company.companyId,
-        ...(company.memberRole === 'MEMBER'
-          ? { createdBy: recruiterId }
-          : {}),
       },
       orderBy: { createdAt: 'desc' },
     });

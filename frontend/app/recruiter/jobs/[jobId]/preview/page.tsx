@@ -2,16 +2,28 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useCurrentAccount } from "@/components/SessionGate";
 import { ErrorState, LoadingState, PageHeader, StatusBadge } from "@/components/ui";
 import { ApiClientError, toUserMessage } from "@/lib/apiClient";
-import { getRecruiterJob, type Job } from "@/lib/person2Api";
+import { getCurrentCompanyMembership, getRecruiterJob, type CompanyMemberRole, type Job } from "@/lib/person2Api";
 import { jobStatusLabel, jobTypeLabel } from "@/lib/recruitmentLabels";
 
 export default function JobPreviewPage({ params }: { params: { jobId: string } }) {
+  const account = useCurrentAccount();
+  const [membershipRole, setMembershipRole] = useState<CompanyMemberRole | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    getCurrentCompanyMembership(controller.signal)
+      .then((res) => { if (active) setMembershipRole(res.data.memberRole); })
+      .catch(() => { if (active) setMembershipRole(null); });
+    return () => { active = false; controller.abort(); };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -30,6 +42,8 @@ export default function JobPreviewPage({ params }: { params: { jobId: string } }
     return () => { active = false; controller.abort(); };
   }, [params.jobId, reloadKey]);
 
+  const canManage = Boolean(membershipRole === "OWNER" || (account?.id && job?.createdBy === account.id));
+
   const salary = job
     ? job.isNegotiable
       ? "Thỏa thuận"
@@ -44,7 +58,8 @@ export default function JobPreviewPage({ params }: { params: { jobId: string } }
         description="Kiểm tra nội dung đã lưu trước khi quay lại quản lý và gửi duyệt tin."
         action={
           <div className="btn-group">
-            {job ? <Link className="btn btn-secondary" href={`/recruiter/jobs/${params.jobId}/edit`}>Quay lại sửa</Link> : null}
+            {job && canManage ? <Link className="btn btn-secondary" href={`/recruiter/jobs/${params.jobId}/edit`}>Quay lại sửa</Link> : null}
+            <Link className="btn btn-ghost" href={`/recruiter/jobs/${params.jobId}`}>Hồ sơ ứng tuyển</Link>
             <Link className="btn btn-primary" href="/recruiter/jobs">Quản lý tin</Link>
           </div>
         }
@@ -66,7 +81,11 @@ export default function JobPreviewPage({ params }: { params: { jobId: string } }
           <section><h3>Yêu cầu ứng viên</h3>{job.requirements.length ? <ul>{job.requirements.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="help">Chưa bổ sung yêu cầu.</p>}</section>
           <section><h3>Quyền lợi</h3>{job.benefits.length ? <ul>{job.benefits.map((item, index) => <li key={index}>{item}</li>)}</ul> : <p className="help">Chưa bổ sung quyền lợi.</p>}</section>
           {job.skills.length ? <section><h3>Kỹ năng</h3><div className="chip-list">{job.skills.map((skill, index) => <span className="chip" key={index}>{skill}</span>)}</div></section> : null}
-          <p className="notice">Đây là bản xem trước nội dung đã lưu. Bạn có thể chỉnh sửa hoặc quản lý trạng thái tin ở bước tiếp theo.</p>
+          {canManage ? (
+            <p className="notice">Đây là bản xem trước nội dung đã lưu. Bạn có thể chỉnh sửa hoặc quản lý trạng thái tin ở bước tiếp theo.</p>
+          ) : (
+            <p className="notice notice-info">Bạn đang xem chi tiết tin tuyển dụng do thành viên khác trong công ty tạo (chế độ chỉ xem).</p>
+          )}
         </article>
       ) : null}
     </main>
