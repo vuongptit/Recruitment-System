@@ -4,6 +4,7 @@ import {
   ApiClientError, clearApiSession, configureApiSessionRefresh, getApiSessionAccountId,
   getApiSessionRevision, requestApi, setApiSession,
 } from "./apiClientCore";
+import { followCompany, getCompanyFollowStatus, unfollowCompany } from "./person2Api";
 import { getCurrentAccount, refreshAuthSession, signIn, signOut } from "./authSession";
 
 process.env.NEXT_PUBLIC_API_MODE = "gateway";
@@ -259,4 +260,39 @@ test("caller cancellation during JSON decoding preserves the current session", a
   release({ data: [], meta: null });
   await assert.rejects(pending, (error: unknown) => error instanceof ApiClientError && error.code === "REQUEST_CANCELLED");
   assert.equal(getApiSessionAccountId(), "candidate");
+});
+
+test("candidate follow, unfollow and follow status preserve contract", async () => {
+  setApiSession({ token: "candidate-token", accountId: "candidate-id" });
+  let lastMethod = "";
+  let lastUrl = "";
+  globalThis.fetch = async (input, init) => {
+    lastUrl = String(input);
+    lastMethod = init?.method ?? "GET";
+    if (lastMethod === "POST") {
+      return json({ isFollowing: true, followersCount: 1 });
+    }
+    if (lastMethod === "DELETE") {
+      return json({ isFollowing: false, followersCount: 0 });
+    }
+    return json({ isFollowing: true, followersCount: 1 });
+  };
+
+  const status = await getCompanyFollowStatus(companyId);
+  assert.equal(status.data.isFollowing, true);
+  assert.equal(status.data.followersCount, 1);
+  assert.equal(lastMethod, "GET");
+  assert.ok(lastUrl.includes(`/api/companies/${companyId}/follow-status`));
+
+  const followed = await followCompany(companyId);
+  assert.equal(followed.data.isFollowing, true);
+  assert.equal(followed.data.followersCount, 1);
+  assert.equal(lastMethod, "POST");
+  assert.ok(lastUrl.includes(`/api/companies/${companyId}/follow`));
+
+  const unfollowed = await unfollowCompany(companyId);
+  assert.equal(unfollowed.data.isFollowing, false);
+  assert.equal(unfollowed.data.followersCount, 0);
+  assert.equal(lastMethod, "DELETE");
+  assert.ok(lastUrl.includes(`/api/companies/${companyId}/follow`));
 });

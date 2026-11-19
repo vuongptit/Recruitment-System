@@ -46,6 +46,9 @@ export class PublicCompanyProfileDto {
   @ApiProperty({ type: [PublicCompanyMediaDto] })
   media!: PublicCompanyMediaDto[];
 
+  @ApiPropertyOptional({ minimum: 0, example: 10 })
+  followersCount?: number;
+
   @ApiProperty({ format: 'date-time' })
   createdAt!: string;
 

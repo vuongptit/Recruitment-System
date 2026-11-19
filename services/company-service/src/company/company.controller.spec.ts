@@ -60,4 +60,47 @@ describe('CompanyController', () => {
       expect.anything(),
     );
   });
+
+  it('forwards candidate follow and unfollow requests', async () => {
+    const candidateUser: AuthUser = {
+      id: 'candidate-123',
+      systemRole: SystemRole.CANDIDATE,
+      claims: {},
+    };
+    const followStatus = { isFollowing: true, followersCount: 1 };
+    const companyService = {
+      followCompany: jest.fn().mockResolvedValue(followStatus),
+      unfollowCompany: jest
+        .fn()
+        .mockResolvedValue({ isFollowing: false, followersCount: 0 }),
+      getFollowStatus: jest.fn().mockResolvedValue(followStatus),
+    };
+    const controller = new CompanyController(
+      companyService as unknown as CompanyService,
+    );
+
+    await expect(
+      controller.follow(COMPANY_ID, candidateUser),
+    ).resolves.toEqual(followStatus);
+    expect(companyService.followCompany).toHaveBeenCalledWith(
+      'candidate-123',
+      COMPANY_ID,
+    );
+
+    await expect(
+      controller.unfollow(COMPANY_ID, candidateUser),
+    ).resolves.toEqual({ isFollowing: false, followersCount: 0 });
+    expect(companyService.unfollowCompany).toHaveBeenCalledWith(
+      'candidate-123',
+      COMPANY_ID,
+    );
+
+    await expect(
+      controller.getFollowStatus(COMPANY_ID, candidateUser),
+    ).resolves.toEqual(followStatus);
+    expect(companyService.getFollowStatus).toHaveBeenCalledWith(
+      COMPANY_ID,
+      'candidate-123',
+    );
+  });
 });

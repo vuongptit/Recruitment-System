@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Headers,
@@ -61,6 +62,7 @@ import {
   PublicCompanyMediaDto,
   PublicCompanyProfileDto,
 } from './dto/public-company-profile.dto';
+import { CompanyFollowStatusDto } from './dto/company-follow.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { VerifyCompanyDto } from './dto/verify-company.dto';
 
@@ -157,6 +159,15 @@ const COMPANY_MEDIA_UPLOAD_RESULT_ENVELOPE = {
   },
 };
 
+const COMPANY_FOLLOW_STATUS_ENVELOPE = {
+  type: 'object',
+  required: ['data', 'meta'],
+  properties: {
+    data: { $ref: getSchemaPath(CompanyFollowStatusDto) },
+    meta: { type: 'object', nullable: true, example: null },
+  },
+};
+
 @ApiTags('companies')
 @ApiExtraModels(
   CompanyProfileDto,
@@ -167,6 +178,7 @@ const COMPANY_MEDIA_UPLOAD_RESULT_ENVELOPE = {
   CompanyMediaResponseDto,
   CompanyMediaUploadCapabilityDto,
   CompanyMediaUploadResultDto,
+  CompanyFollowStatusDto,
 )
 @Controller()
 export class CompanyController {
@@ -325,6 +337,47 @@ export class CompanyController {
     @Param('id', COMPANY_ID_PIPE) companyId: string,
   ): Promise<PublicCompanyProfileDto> {
     return this.companyService.getPublicById(companyId);
+  }
+
+  @Post(':id/follow')
+  @Roles(SystemRole.CANDIDATE)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Follow a verified company as a candidate' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ schema: COMPANY_FOLLOW_STATUS_ENVELOPE })
+  follow(
+    @Param('id', COMPANY_ID_PIPE) companyId: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<CompanyFollowStatusDto> {
+    return this.companyService.followCompany(user.id, companyId);
+  }
+
+  @Delete(':id/follow')
+  @Roles(SystemRole.CANDIDATE)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Unfollow a company as a candidate' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ schema: COMPANY_FOLLOW_STATUS_ENVELOPE })
+  unfollow(
+    @Param('id', COMPANY_ID_PIPE) companyId: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<CompanyFollowStatusDto> {
+    return this.companyService.unfollowCompany(user.id, companyId);
+  }
+
+  @Get(':id/follow-status')
+  @Roles(SystemRole.CANDIDATE)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get follow status of a company for current candidate',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ schema: COMPANY_FOLLOW_STATUS_ENVELOPE })
+  getFollowStatus(
+    @Param('id', COMPANY_ID_PIPE) companyId: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<CompanyFollowStatusDto> {
+    return this.companyService.getFollowStatus(companyId, user.id);
   }
 
   @Post(':id/media/signature')

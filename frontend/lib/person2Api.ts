@@ -112,9 +112,15 @@ export interface PublicCompanyProfile {
   website: string | null;
   taxCode: string;
   logoUrl: string | null;
+  followersCount?: number;
   media: PublicCompanyMedia[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CompanyFollowStatus {
+  isFollowing: boolean;
+  followersCount: number;
 }
 
 export interface CreatedCompanyInvitation {
@@ -140,6 +146,9 @@ export interface CompanyMember {
   userId: string;
   role: CompanyMemberRole;
   joinedAt: string;
+  fullName?: string;
+  email?: string;
+  avatarUrl?: string;
 }
 
 interface BackendJob {
@@ -747,6 +756,70 @@ export async function getPublicCompany(
   return requestApi<PublicCompanyProfile>(`${API_PATHS.companies}${id}`, { signal });
 }
 
+const demoFollowState = new Map<string, boolean>();
+
+export async function getCompanyFollowStatus(
+  companyId: string,
+  signal?: AbortSignal,
+): Promise<ApiEnvelope<CompanyFollowStatus>> {
+  if (isDemoPerson2Api) {
+    const isFollowing = Boolean(demoFollowState.get(companyId));
+    return {
+      data: {
+        isFollowing,
+        followersCount: isFollowing ? 1 : 0,
+      },
+      meta: null,
+    };
+  }
+  assertCanonicalUuidV4(companyId, "companyId");
+  return requestApi<CompanyFollowStatus>(`${API_PATHS.companies}${companyId}/follow-status`, {
+    method: "GET",
+    privateData: true,
+    signal,
+  });
+}
+
+export async function followCompany(
+  companyId: string,
+  signal?: AbortSignal,
+): Promise<ApiEnvelope<CompanyFollowStatus>> {
+  if (isDemoPerson2Api) {
+    demoFollowState.set(companyId, true);
+    return {
+      data: { isFollowing: true, followersCount: 1 },
+      meta: null,
+    };
+  }
+  assertCanonicalUuidV4(companyId, "companyId");
+  return requestApi<CompanyFollowStatus>(`${API_PATHS.companies}${companyId}/follow`, {
+    method: "POST",
+    privateData: true,
+    signal,
+    maxRetries: 0,
+  });
+}
+
+export async function unfollowCompany(
+  companyId: string,
+  signal?: AbortSignal,
+): Promise<ApiEnvelope<CompanyFollowStatus>> {
+  if (isDemoPerson2Api) {
+    demoFollowState.set(companyId, false);
+    return {
+      data: { isFollowing: false, followersCount: 0 },
+      meta: null,
+    };
+  }
+  assertCanonicalUuidV4(companyId, "companyId");
+  return requestApi<CompanyFollowStatus>(`${API_PATHS.companies}${companyId}/follow`, {
+    method: "DELETE",
+    privateData: true,
+    signal,
+    maxRetries: 0,
+  });
+}
+
 export async function inviteCompanyMember(
   companyId: string,
   email: string,
@@ -836,8 +909,8 @@ export async function getCompanyMembers(
   if (isDemoPerson2Api) {
     return {
       data: [
-        { userId: "demo-owner", role: demoMembershipRole, joinedAt: new Date(2025, 0, 8).toISOString() },
-        { userId: "demo-member", role: demoMembershipRole === "OWNER" ? "MEMBER" : "OWNER", joinedAt: new Date(2025, 4, 12).toISOString() },
+        { userId: "demo-owner", fullName: "Nguyễn Văn A", email: "owner@example.com", role: demoMembershipRole, joinedAt: new Date(2025, 0, 8).toISOString() },
+        { userId: "demo-member", fullName: "Nguyễn Văn B", email: "member@example.com", role: demoMembershipRole === "OWNER" ? "MEMBER" : "OWNER", joinedAt: new Date(2025, 4, 12).toISOString() },
       ],
       meta: null,
     };

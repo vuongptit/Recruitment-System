@@ -183,6 +183,12 @@ describe('CompanyService', () => {
       findUnique: jest.Mock;
       updateMany: jest.Mock;
     };
+    companyFollower: {
+      count: jest.Mock;
+      upsert: jest.Mock;
+      deleteMany: jest.Mock;
+      findUnique: jest.Mock;
+    };
   };
   let transaction: {
     companyMember: { findUnique: jest.Mock };
@@ -303,6 +309,12 @@ describe('CompanyService', () => {
             : null;
           return { count: storedUploadIntent ? 1 : 0 };
         }),
+      },
+      companyFollower: {
+        count: jest.fn().mockResolvedValue(0),
+        upsert: jest.fn().mockResolvedValue({}),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUnique: jest.fn().mockResolvedValue(null),
       },
     };
     media = {
@@ -1407,6 +1419,7 @@ describe('CompanyService', () => {
         where: {
           id: COMPANY_ID,
           verifiedStatus: CompanyVerificationStatus.VERIFIED,
+          isSuspended: false,
         },
       }),
     );
@@ -1763,5 +1776,88 @@ describe('CompanyService', () => {
       ),
     ).rejects.toMatchObject({ code: 'COMPANY_OWNER_REQUIRED' });
     expect(media.createCompanyUploadIntent).not.toHaveBeenCalled();
+  });
+
+  describe('follow / unfollow / follow status', () => {
+    const CANDIDATE_ID = '33c604a4-4be6-4c3d-85ea-c1f45daf17c8';
+
+    it('allows a candidate to follow a verified company', async () => {
+      prisma.company.findFirst.mockResolvedValue({ id: COMPANY_ID });
+      prisma.companyFollower.count.mockResolvedValue(5);
+
+      const result = await service.followCompany(CANDIDATE_ID, COMPANY_ID);
+
+      expect(prisma.company.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: COMPANY_ID,
+          verifiedStatus: CompanyVerificationStatus.VERIFIED,
+          isSuspended: false,
+        },
+        select: { id: true },
+      });
+      expect(prisma.companyFollower.upsert).toHaveBeenCalledWith({
+        where: {
+          companyId_userId: {
+            companyId: COMPANY_ID,
+            userId: CANDIDATE_ID,
+          },
+        },
+        create: {
+          companyId: COMPANY_ID,
+          userId: CANDIDATE_ID,
+        },
+        update: {},
+      });
+      expect(result).toEqual({
+        isFollowing: true,
+        followersCount: 5,
+      });
+    });
+
+    it('rejects follow when company is not verified or not found', async () => {
+      prisma.company.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.followCompany(CANDIDATE_ID, COMPANY_ID),
+      ).rejects.toMatchObject({
+        code: 'COMPANY_NOT_FOUND',
+      });
+      expect(prisma.companyFollower.upsert).not.toHaveBeenCalled();
+    });
+
+    it('allows a candidate to unfollow a company', async () => {
+      prisma.company.findFirst.mockResolvedValue({ id: COMPANY_ID });
+      prisma.companyFollower.count.mockResolvedValue(4);
+
+      const result = await service.unfollowCompany(CANDIDATE_ID, COMPANY_ID);
+
+      expect(prisma.companyFollower.deleteMany).toHaveBeenCalledWith({
+        where: {
+          companyId: COMPANY_ID,
+          userId: CANDIDATE_ID,
+        },
+      });
+      expect(result).toEqual({
+        isFollowing: false,
+        followersCount: 4,
+      });
+    });
+
+    it('returns follow status for candidate', async () => {
+      prisma.company.findFirst.mockResolvedValue({ id: COMPANY_ID });
+      prisma.companyFollower.count.mockResolvedValue(3);
+      prisma.companyFollower.findUnique.mockResolvedValue({
+        id: 'follower-1',
+        companyId: COMPANY_ID,
+        userId: CANDIDATE_ID,
+      });
+
+      const result = await service.getFollowStatus(COMPANY_ID, CANDIDATE_ID);
+
+      expect(result).toEqual({
+        isFollowing: true,
+        followersCount: 3,
+      });
+    });
   });
 });
