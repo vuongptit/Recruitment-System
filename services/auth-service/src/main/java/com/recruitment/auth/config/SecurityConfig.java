@@ -104,7 +104,7 @@ class SecurityConfig {
   CorsConfigurationSource corsConfigurationSource(AuthCorsProperties properties) {
     CorsConfiguration configuration = new CorsConfiguration();
     configuration.setAllowedOrigins(properties.allowedOrigins());
-    configuration.setAllowedMethods(List.of("GET", "HEAD", "POST", "OPTIONS"));
+    configuration.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     configuration.setAllowedHeaders(List.of(
         HttpHeaders.AUTHORIZATION,
         HttpHeaders.CONTENT_TYPE,
@@ -113,9 +113,6 @@ class SecurityConfig {
     configuration.setAllowCredentials(true);
     configuration.setMaxAge(600L);
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-    CorsConfiguration contact = new CorsConfiguration(configuration);
-    contact.setAllowedMethods(List.of("GET", "HEAD", "PUT", "OPTIONS"));
-    source.registerCorsConfiguration("/auth/me/recruiter-contact", contact);
     source.registerCorsConfiguration("/auth/**", configuration);
     return source;
   }
