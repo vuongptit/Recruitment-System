@@ -1,9 +1,12 @@
 import {
+  Award,
   Ban,
+  Banknote,
   BriefcaseBusiness,
   Building2,
   CalendarDays,
   CheckCircle2,
+  Clock3,
   ExternalLink,
   Eye,
   FileText,
@@ -14,6 +17,8 @@ import {
   LockKeyhole,
   MapPin,
   RotateCcw,
+  ShieldCheck,
+  Tag,
   UsersRound,
   Video as VideoIcon,
   X,
@@ -960,6 +965,579 @@ export function AdminCompanyDetail({
   );
 }
 
+function formatJobContent(value: unknown) {
+  if (!value) {
+    return <p className="admin-job-empty">Chưa có thông tin</p>;
+  }
+  if (Array.isArray(value)) {
+    return (
+      <div className="admin-job-prose">
+        {value.map((item, idx) => (
+          <div key={idx} className="admin-job-line admin-job-bullet">
+            <span className="admin-job-dot" aria-hidden="true">•</span>
+            <span>{String(item)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const text = String(value).trim();
+  if (!text) {
+    return <p className="admin-job-empty">Chưa có thông tin</p>;
+  }
+  const lines = text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) {
+    return <p className="admin-job-empty">Chưa có thông tin</p>;
+  }
+
+  return (
+    <div className="admin-job-prose">
+      {lines.map((line, idx) => {
+        const isBullet = /^[•\-*+]\s*/.test(line);
+        const cleanLine = isBullet ? line.replace(/^[•\-*+]\s*/, "") : line;
+        return (
+          <div
+            key={idx}
+            className={
+              isBullet
+                ? "admin-job-line admin-job-bullet"
+                : "admin-job-line admin-job-paragraph"
+            }
+          >
+            {isBullet && (
+              <span className="admin-job-dot" aria-hidden="true">
+                •
+              </span>
+            )}
+            <span>{cleanLine}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function formatSalary(row: AdminRow): string {
+  if (row.isNegotiable) return "Lương thỏa thuận";
+  const numMin =
+    row.salaryMin !== null && row.salaryMin !== undefined
+      ? Number(row.salaryMin)
+      : null;
+  const numMax =
+    row.salaryMax !== null && row.salaryMax !== undefined
+      ? Number(row.salaryMax)
+      : null;
+  const currency = String(row.currency || "VND");
+
+  if (numMin && numMax) {
+    if (currency === "VND" && numMin >= 1000000 && numMax >= 1000000) {
+      return `${(numMin / 1000000).toLocaleString("vi-VN")} - ${(numMax / 1000000).toLocaleString("vi-VN")} triệu ${currency}`;
+    }
+    return `${numMin.toLocaleString("vi-VN")} – ${numMax.toLocaleString("vi-VN")} ${currency}`;
+  }
+  if (numMin) {
+    if (currency === "VND" && numMin >= 1000000) {
+      return `Từ ${(numMin / 1000000).toLocaleString("vi-VN")} triệu ${currency}`;
+    }
+    return `Từ ${numMin.toLocaleString("vi-VN")} ${currency}`;
+  }
+  if (numMax) {
+    if (currency === "VND" && numMax >= 1000000) {
+      return `Lên đến ${(numMax / 1000000).toLocaleString("vi-VN")} triệu ${currency}`;
+    }
+    return `Lên đến ${numMax.toLocaleString("vi-VN")} ${currency}`;
+  }
+  return "Lương thỏa thuận";
+}
+
+function formatExperience(years: unknown): string {
+  if (years === undefined || years === null || years === "")
+    return "Chưa cập nhật";
+  const num = Number(years);
+  if (isNaN(num)) return String(years);
+  if (num === 0) return "Không yêu cầu KN";
+  return `Từ ${num} năm kinh nghiệm`;
+}
+
+function formatDeadline(val: unknown): string {
+  if (!val) return "Chưa cập nhật";
+  const s = String(val).slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return s.split("-").reverse().join("/");
+  }
+  return String(val);
+}
+
+export function AdminJobDetail({
+  row,
+  pending = false,
+  onChoose,
+  onClose,
+}: {
+  row: AdminRow;
+  pending?: boolean;
+  onChoose?: (
+    path: string,
+    body: AdminRow,
+    label: string,
+    needsReason?: boolean,
+    subject?: string,
+  ) => void;
+  onClose?: () => void;
+}) {
+  const id = String(row.id || "");
+  const title = String(row.title || row.name || "Tin tuyển dụng");
+  const companyName = row.companyName ? String(row.companyName) : null;
+  const companyId = row.companyId ? String(row.companyId) : null;
+  const isSuspended = Boolean(row.isSuspended);
+  const status = String(row.status || "PENDING_APPROVAL");
+
+  const statusLabels: Record<string, string> = {
+    PUBLISHED: "Đang xuất bản",
+    PENDING_APPROVAL: "Chờ phê duyệt",
+    REJECTED: "Đã từ chối",
+    DRAFT: "Bản nháp",
+    CLOSED: "Đã đóng",
+  };
+
+  const statusTone: "warning" | "success" | "danger" | "neutral" =
+    isSuspended
+      ? "danger"
+      : status === "PUBLISHED"
+        ? "success"
+        : status === "REJECTED"
+          ? "danger"
+          : status === "PENDING_APPROVAL"
+            ? "warning"
+            : "neutral";
+
+  const statusLabel = isSuspended
+    ? "Đã gỡ bỏ"
+    : statusLabels[status] || "Chờ phê duyệt";
+
+  const rawSkills: string[] = Array.isArray(row.skills)
+    ? (row.skills as string[])
+    : typeof row.skills === "string"
+      ? (row.skills as string).split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+
+  const jobTypeMap: Record<string, string> = {
+    FULL_TIME: "Toàn thời gian",
+    PART_TIME: "Bán thời gian",
+    CONTRACT: "Hợp đồng",
+    INTERNSHIP: "Thực tập sinh",
+    FREELANCE: "Tự do",
+    REMOTE: "Làm việc từ xa",
+  };
+
+  const jobTypeDisplay =
+    jobTypeMap[String(row.jobType || row.type || "")] ||
+    String(row.jobType || row.type || "Toàn thời gian");
+
+  return (
+    <div className="admin-job-detail">
+      {/* 1. Hero Header */}
+      <div className="admin-job-hero">
+        <div className="admin-job-hero-main">
+          <div className="admin-job-icon-wrap" aria-hidden="true">
+            <BriefcaseBusiness size={28} />
+          </div>
+          <div className="admin-job-hero-content">
+            <div className="admin-job-title-row">
+              <h2>{title}</h2>
+              <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+            </div>
+            <div className="admin-job-hero-meta">
+              {companyName ? (
+                <span className="admin-job-company">
+                  <Building2 size={15} aria-hidden="true" />
+                  <strong>{companyName}</strong>
+                </span>
+              ) : null}
+              {companyId ? (
+                <span className="admin-job-code">
+                  Mã công ty: <code>{companyId}</code>
+                </span>
+              ) : null}
+              <span className="admin-job-code">
+                Mã tin: <code>{id}</code>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. TopCV 4 Highlight Metric Cards */}
+      <section className="admin-job-metrics" aria-label="Điểm nhấn tin tuyển dụng">
+        <div className="admin-job-metric-card">
+          <div className="admin-job-metric-icon icon-salary">
+            <Banknote size={22} aria-hidden="true" />
+          </div>
+          <div className="admin-job-metric-body">
+            <span className="admin-job-metric-label">Mức lương</span>
+            <strong className="admin-job-metric-value salary-highlight">
+              {formatSalary(row)}
+            </strong>
+            <span className="admin-job-metric-sub">
+              {row.isNegotiable ? "Có thể thương lượng" : "Thu nhập cạnh tranh"}
+            </span>
+          </div>
+        </div>
+
+        <div className="admin-job-metric-card">
+          <div className="admin-job-metric-icon icon-location">
+            <MapPin size={22} aria-hidden="true" />
+          </div>
+          <div className="admin-job-metric-body">
+            <span className="admin-job-metric-label">Địa điểm</span>
+            <strong className="admin-job-metric-value">
+              {row.location ? String(row.location) : "Chưa cập nhật"}
+            </strong>
+            <span className="admin-job-metric-sub">{jobTypeDisplay}</span>
+          </div>
+        </div>
+
+        <div className="admin-job-metric-card">
+          <div className="admin-job-metric-icon icon-exp">
+            <BriefcaseBusiness size={22} aria-hidden="true" />
+          </div>
+          <div className="admin-job-metric-body">
+            <span className="admin-job-metric-label">Kinh nghiệm</span>
+            <strong className="admin-job-metric-value">
+              {formatExperience(row.experienceYears)}
+            </strong>
+            <span className="admin-job-metric-sub">Yêu cầu kinh nghiệm</span>
+          </div>
+        </div>
+
+        <div className="admin-job-metric-card">
+          <div className="admin-job-metric-icon icon-deadline">
+            <CalendarDays size={22} aria-hidden="true" />
+          </div>
+          <div className="admin-job-metric-body">
+            <span className="admin-job-metric-label">Hạn ứng tuyển</span>
+            <strong className="admin-job-metric-value">
+              {formatDeadline(row.deadline)}
+            </strong>
+            <span className="admin-job-metric-sub">Hạn nộp hồ sơ</span>
+          </div>
+        </div>
+      </section>
+
+      {/* 3. Moderation Notice Alerts */}
+      {status === "PENDING_APPROVAL" && !isSuspended && (
+        <div className="admin-company-notice admin-notice-pending" aria-live="polite">
+          <strong>⏳ Tin tuyển dụng đang chờ phê duyệt</strong>
+          <p>
+            Tin tuyển dụng do nhà tuyển dụng đăng tải đang chờ Quản trị viên xem
+            xét nội dung và phê duyệt để xuất bản công khai.
+          </p>
+        </div>
+      )}
+      {status === "PUBLISHED" && !isSuspended && (
+        <div className="admin-company-notice admin-notice-verified" aria-live="polite">
+          <strong>✅ Tin tuyển dụng đang hoạt động</strong>
+          <p>
+            Tin đã được duyệt và đang xuất bản trên hệ thống. Ứng viên có thể xem
+            và nộp hồ sơ ứng tuyển.
+          </p>
+        </div>
+      )}
+      {status === "REJECTED" && !isSuspended && (
+        <div className="admin-company-notice admin-notice-rejected" aria-live="polite">
+          <strong>❌ Tin tuyển dụng đã bị từ chối</strong>
+          <p>Tin không đạt tiêu chuẩn phê duyệt hoặc vi phạm chính sách đăng tuyển.</p>
+          {row.rejectionReason && (
+            <p className="admin-notice-reason">
+              <strong>Lý do từ chối:</strong> {String(row.rejectionReason)}
+            </p>
+          )}
+        </div>
+      )}
+      {isSuspended && (
+        <div className="admin-company-notice admin-notice-suspended" aria-live="polite">
+          <strong>🚫 Tin tuyển dụng đang bị gỡ bỏ</strong>
+          <p>Tin đã bị tạm dừng hiển thị đối với ứng viên và cộng đồng.</p>
+          {row.suspensionReason && (
+            <p className="admin-notice-reason">
+              <strong>Lý do gỡ:</strong> {String(row.suspensionReason)}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 4. TopCV 2-Column Body Layout */}
+      <div className="admin-job-layout">
+        {/* Left Column: Job Description, Requirements, Benefits */}
+        <div className="admin-job-main-column">
+          {/* Section: Mô tả công việc */}
+          <div className="admin-job-card">
+            <h3 className="admin-job-section-title">
+              <FileText size={18} aria-hidden="true" />
+              Mô tả công việc
+            </h3>
+            {formatJobContent(row.description)}
+          </div>
+
+          {/* Section: Yêu cầu ứng viên */}
+          <div className="admin-job-card">
+            <h3 className="admin-job-section-title">
+              <CheckCircle2 size={18} aria-hidden="true" />
+              Yêu cầu ứng viên
+            </h3>
+            {formatJobContent(row.requirements)}
+          </div>
+
+          {/* Section: Quyền lợi được hưởng */}
+          <div className="admin-job-card">
+            <h3 className="admin-job-section-title">
+              <Award size={18} aria-hidden="true" />
+              Quyền lợi được hưởng
+            </h3>
+            {formatJobContent(row.benefits)}
+          </div>
+
+          {/* Section: Địa điểm làm việc */}
+          {Boolean(row.location) && (
+            <div className="admin-job-card">
+              <h3 className="admin-job-section-title">
+                <MapPin size={18} aria-hidden="true" />
+                Địa điểm làm việc
+              </h3>
+              <p style={{ margin: 0, fontSize: "14.5px", color: "#334155" }}>
+                {String(row.location)}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Key facts, Skills, Admin Audit */}
+        <div className="admin-job-side-column">
+          {/* Thông tin chung */}
+          <div className="admin-job-card">
+            <h3 className="admin-job-section-title">
+              <Info size={18} aria-hidden="true" />
+              Thông tin chung
+            </h3>
+            <dl className="admin-job-facts-list">
+              <div className="admin-job-fact-item">
+                <div className="admin-job-fact-icon">
+                  <UsersRound size={17} aria-hidden="true" />
+                </div>
+                <div className="admin-job-fact-content">
+                  <dt>Số lượng tuyển dụng</dt>
+                  <dd>
+                    {row.quantity ? `${row.quantity} người` : "Không giới hạn"}
+                  </dd>
+                </div>
+              </div>
+
+              <div className="admin-job-fact-item">
+                <div className="admin-job-fact-icon">
+                  <Clock3 size={17} aria-hidden="true" />
+                </div>
+                <div className="admin-job-fact-content">
+                  <dt>Hình thức làm việc</dt>
+                  <dd>{jobTypeDisplay}</dd>
+                </div>
+              </div>
+
+              <div className="admin-job-fact-item">
+                <div className="admin-job-fact-icon">
+                  <BriefcaseBusiness size={17} aria-hidden="true" />
+                </div>
+                <div className="admin-job-fact-content">
+                  <dt>Cấp bậc</dt>
+                  <dd>{row.level ? String(row.level) : "Nhân viên"}</dd>
+                </div>
+              </div>
+
+              <div className="admin-job-fact-item">
+                <div className="admin-job-fact-icon">
+                  <CalendarDays size={17} aria-hidden="true" />
+                </div>
+                <div className="admin-job-fact-content">
+                  <dt>Hạn nộp hồ sơ</dt>
+                  <dd>{formatDeadline(row.deadline)}</dd>
+                </div>
+              </div>
+
+              {Boolean(row.publishedAt) && (
+                <div className="admin-job-fact-item">
+                  <div className="admin-job-fact-icon">
+                    <CalendarDays size={17} aria-hidden="true" />
+                  </div>
+                  <div className="admin-job-fact-content">
+                    <dt>Ngày xuất bản</dt>
+                    <dd>{date(row.publishedAt)}</dd>
+                  </div>
+                </div>
+              )}
+            </dl>
+          </div>
+
+          {/* Kỹ năng liên quan */}
+          {rawSkills.length > 0 && (
+            <div className="admin-job-card">
+              <h3 className="admin-job-section-title">
+                <Tag size={18} aria-hidden="true" />
+                Kỹ năng chuyên môn
+              </h3>
+              <div className="admin-job-skills-wrap">
+                {rawSkills.map((skill, idx) => (
+                  <span key={idx} className="admin-job-skill-pill">
+                    #{skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Thông tin đối soát & Quản trị */}
+          <div className="admin-job-card">
+            <h3 className="admin-job-section-title">
+              <ShieldCheck size={18} aria-hidden="true" />
+              Thông tin kiểm duyệt & Đối soát
+            </h3>
+            <dl className="admin-job-audit-table">
+              <dt>Mã tin tuyển dụng</dt>
+              <dd><code>{id}</code></dd>
+
+              {companyId && (
+                <>
+                  <dt>Mã công ty</dt>
+                  <dd><code>{companyId}</code></dd>
+                </>
+              )}
+
+              {Boolean(row.createdBy) && (
+                <>
+                  <dt>Người đăng</dt>
+                  <dd><code>{String(row.createdBy)}</code></dd>
+                </>
+              )}
+
+              <dt>Phiên bản dữ liệu</dt>
+              <dd>v{typeof row.aggregateVersion === "number" ? row.aggregateVersion : 1}</dd>
+
+              {Boolean(row.createdAt) && (
+                <>
+                  <dt>Ngày tạo</dt>
+                  <dd>{date(row.createdAt, true)}</dd>
+                </>
+              )}
+
+              {Boolean(row.updatedAt) && (
+                <>
+                  <dt>Cập nhật lần cuối</dt>
+                  <dd>{date(row.updatedAt, true)}</dd>
+                </>
+              )}
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Moderation Action Bar */}
+      <div className="admin-detail-actions-bar">
+        <div className="admin-detail-action-buttons">
+          {onChoose && status === "PENDING_APPROVAL" && (
+            <>
+              <button
+                type="button"
+                className="btn admin-approve"
+                disabled={pending}
+                onClick={() =>
+                  onChoose(
+                    `jobs/${id}/approve`,
+                    {},
+                    "Duyệt tin tuyển dụng",
+                    false,
+                    title,
+                  )
+                }
+              >
+                <CheckCircle2 size={16} aria-hidden="true" />
+                Duyệt tin tuyển dụng
+              </button>
+              <button
+                type="button"
+                className="btn admin-danger"
+                disabled={pending}
+                onClick={() =>
+                  onChoose(
+                    `jobs/${id}/reject`,
+                    {},
+                    "Từ chối tin tuyển dụng",
+                    true,
+                    title,
+                  )
+                }
+              >
+                <XCircle size={16} aria-hidden="true" />
+                Từ chối tin
+              </button>
+            </>
+          )}
+
+          {onChoose && (
+            <button
+              type="button"
+              className={`btn ${isSuspended ? "admin-approve" : "admin-danger"}`}
+              disabled={pending || typeof row.aggregateVersion !== "number"}
+              title={
+                typeof row.aggregateVersion !== "number"
+                  ? "Thiếu phiên bản dữ liệu để cập nhật an toàn"
+                  : undefined
+              }
+              onClick={() => {
+                const suspended = !isSuspended;
+                onChoose(
+                  `jobs/${id}/moderation`,
+                  {
+                    suspended,
+                    expectedVersion: row.aggregateVersion,
+                    operationId: crypto.randomUUID(),
+                  },
+                  suspended ? "Gỡ tin tuyển dụng" : "Khôi phục tin tuyển dụng",
+                  true,
+                  title,
+                );
+              }}
+            >
+              {isSuspended ? (
+                <>
+                  <RotateCcw size={14} aria-hidden="true" />
+                  Khôi phục tin
+                </>
+              ) : (
+                <>
+                  <Ban size={14} aria-hidden="true" />
+                  Gỡ tin tuyển dụng
+                </>
+              )}
+            </button>
+          )}
+        </div>
+
+        {onClose && (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onClose}
+          >
+            Đóng chi tiết
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AdminDetail({
   row,
   tab,
@@ -982,6 +1560,17 @@ export function AdminDetail({
   if (tab === "companies") {
     return (
       <AdminCompanyDetail
+        row={row}
+        pending={pending}
+        onChoose={onChoose}
+        onClose={onClose}
+      />
+    );
+  }
+
+  if (tab === "jobs") {
+    return (
+      <AdminJobDetail
         row={row}
         pending={pending}
         onChoose={onChoose}

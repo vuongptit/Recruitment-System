@@ -1566,6 +1566,388 @@
   flex-wrap: wrap;
 }
 
+/* ==========================================================================
+   Admin Job Detail - TopCV Styled Layout
+   ========================================================================== */
+.admin-job-detail {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  background: #f8fafc;
+}
+
+/* Hero Header */
+.admin-job-hero {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.admin-job-hero-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.admin-job-icon-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: #e6f7ef;
+  color: #00b14f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid #bbf7d0;
+}
+
+.admin-job-hero-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-job-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-job-title-row h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  letter-spacing: -0.3px;
+  line-height: 1.3;
+}
+
+.admin-job-hero-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.admin-job-company {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #1e293b;
+}
+
+.admin-job-company strong {
+  color: #0f172a;
+}
+
+.admin-job-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-job-code code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+}
+
+/* 4 Metric Highlight Cards across top (TopCV signature) */
+.admin-job-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.admin-job-metric-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-job-metric-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05);
+}
+
+.admin-job-metric-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-job-metric-icon.icon-salary {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.admin-job-metric-icon.icon-location {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.admin-job-metric-icon.icon-exp {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.admin-job-metric-icon.icon-deadline {
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+.admin-job-metric-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-job-metric-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.admin-job-metric-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-job-metric-value.salary-highlight {
+  color: #008744;
+  font-size: 15.5px;
+}
+
+.admin-job-metric-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 2-Column Main Layout */
+.admin-job-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.95fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-job-main-column,
+.admin-job-side-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* TopCV Signature Section Cards */
+.admin-job-card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.admin-job-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding-left: 12px;
+  border-left: 4px solid #00b14f;
+  font-size: 16.5px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.2px;
+  line-height: 1.3;
+}
+
+.admin-job-section-title svg {
+  color: #00b14f;
+}
+
+/* Formatted Prose Content */
+.admin-job-prose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #334155;
+}
+
+.admin-job-line.admin-job-bullet {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-left: 4px;
+}
+
+.admin-job-dot {
+  color: #00b14f;
+  font-size: 17px;
+  line-height: 1.2;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.admin-job-line.admin-job-paragraph {
+  margin: 3px 0;
+}
+
+.admin-job-empty {
+  margin: 0;
+  font-style: italic;
+  color: #94a3b8;
+  font-size: 13.5px;
+}
+
+/* Skill Tags */
+.admin-job-skills-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-job-skill-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #334155;
+  transition: all 0.15s ease;
+}
+
+.admin-job-skill-pill:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Sidebar Info List */
+.admin-job-facts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-job-fact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.admin-job-fact-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.admin-job-fact-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.admin-job-fact-content dt {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.admin-job-fact-content dd {
+  margin: 0;
+  font-size: 13.5px;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+/* Admin Audit Table / Key-Values */
+.admin-job-audit-table {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 10px 12px;
+  font-size: 12.5px;
+  margin: 0;
+}
+
+.admin-job-audit-table dt {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.admin-job-audit-table dd {
+  margin: 0;
+  color: #1e293b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .admin-job-metrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .admin-job-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-job-metrics {
+    grid-template-columns: 1fr;
+  }
+  .admin-job-hero-main {
+    flex-direction: column;
+  }
+}
+
 /* Pagination controls at bottom */
 .admin-pagination-controls,
 .admin-workspace .admin-pagination-controls {
