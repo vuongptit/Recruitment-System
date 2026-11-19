@@ -41,6 +41,15 @@ public class AuthUser {
   @Column(name = "recruiter_phone", length = 32)
   private String recruiterPhone;
 
+  @Column(name = "recruiter_avatar_url")
+  private String recruiterAvatarUrl;
+
+  @Column(name = "recruiter_position", length = 160)
+  private String recruiterPosition;
+
+  @Column(name = "recruiter_bio", length = 500)
+  private String recruiterBio;
+
   @Column(name = "registration_id")
   private UUID registrationId;
 
@@ -166,6 +175,14 @@ public class AuthUser {
     recruiterPhone = number;
   }
 
+  public void updateRecruiterProfile(
+      String fullName, String phone, String avatarUrl, String position, String bio) {
+    updateRecruiterContact(fullName, phone);
+    this.recruiterAvatarUrl = (avatarUrl != null && !avatarUrl.isBlank()) ? avatarUrl.trim() : null;
+    this.recruiterPosition = (position != null && !position.isBlank()) ? position.trim() : null;
+    this.recruiterBio = (bio != null && !bio.isBlank()) ? bio.trim() : null;
+  }
+
   public void changePasswordHash(String newPasswordHash) {
     passwordHash = requirePasswordHash(newPasswordHash);
   }
@@ -243,6 +260,18 @@ public class AuthUser {
 
   public String getRecruiterPhone() {
     return recruiterPhone;
+  }
+
+  public String getRecruiterAvatarUrl() {
+    return recruiterAvatarUrl;
+  }
+
+  public String getRecruiterPosition() {
+    return recruiterPosition;
+  }
+
+  public String getRecruiterBio() {
+    return recruiterBio;
   }
 
   public UUID getRegistrationId() {

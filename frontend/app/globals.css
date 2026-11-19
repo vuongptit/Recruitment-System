@@ -1212,3 +1212,268 @@ label.field .input, label.field .select, label.field .textarea { font-weight: 40
 main.form-stack { gap: 24px; }
 main.form-stack > .page-header { margin-bottom: 4px; }
 @media(max-width: 680px) { main.form-stack > .page-header { margin-bottom: 0; } }
+
+
+/* ==========================================================================
+   Account Profile & Password Management Shared Styles
+   ========================================================================== */
+.account-profile-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1080px;
+}
+
+.account-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.account-breadcrumb a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.account-breadcrumb a:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.account-breadcrumb > span {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.account-profile-layout {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.account-card {
+  background: var(--surface-1, #ffffff);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.account-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.account-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.account-card-subtitle {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Avatar Picker */
+.account-avatar-picker-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: 12px;
+  border: 1px dashed var(--line);
+}
+
+.account-avatar-display {
+  flex-shrink: 0;
+}
+
+.account-profile-avatar-img {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.account-profile-avatar-initials {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.account-avatar-controls {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-avatar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.account-avatar-url-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Form Layout */
+.account-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.account-form-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+.account-profile-form .field,
+.account-password-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.account-profile-form .field label,
+.account-password-form .field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.disabled-input {
+  background: var(--surface) !important;
+  color: var(--muted) !important;
+  cursor: not-allowed;
+}
+
+.account-form-actions {
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Password Form */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrapper .input {
+  padding-right: 42px;
+  width: 100%;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.password-toggle-btn:hover {
+  color: var(--text);
+}
+
+.password-checklist {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.password-checklist .checklist-title {
+  display: block;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.password-checklist ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.password-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.password-checklist li::before {
+  content: "•";
+  font-weight: bold;
+}
+
+.password-checklist li.valid {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.password-checklist li.valid::before {
+  content: "✓";
+  color: var(--primary);
+}
+
+@media (max-width: 900px) {
+  .account-profile-layout {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .account-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

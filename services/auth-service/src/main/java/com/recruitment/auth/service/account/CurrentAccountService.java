@@ -3,6 +3,8 @@ package com.recruitment.auth.service.account;
 import com.recruitment.auth.dto.account.CurrentAccountResponse;
 import com.recruitment.auth.dto.account.RecruiterContactRequest;
 import com.recruitment.auth.dto.account.RecruiterContactResponse;
+import com.recruitment.auth.dto.account.RecruiterProfileResponse;
+import com.recruitment.auth.dto.account.UpdateRecruiterProfileRequest;
 import com.recruitment.auth.exception.AuthBusinessException;
 import com.recruitment.auth.model.AuthUser;
 import com.recruitment.auth.model.UserRole;
@@ -57,6 +59,38 @@ public class CurrentAccountService {
     }
     users.saveAndFlush(user);
     return new RecruiterContactResponse(user.getRecruiterFullName(), user.getRecruiterPhone());
+  }
+
+  @Transactional(readOnly = true)
+  public RecruiterProfileResponse getRecruiterProfile(UUID userId) {
+    AuthUser user = requireRecruiter(userId);
+    return new RecruiterProfileResponse(
+        user.getId(),
+        user.getEmail(),
+        user.getRecruiterFullName() != null ? user.getRecruiterFullName() : "",
+        user.getRecruiterPhone() != null ? user.getRecruiterPhone() : "",
+        user.getRecruiterAvatarUrl() != null ? user.getRecruiterAvatarUrl() : "",
+        user.getRecruiterPosition() != null ? user.getRecruiterPosition() : "",
+        user.getRecruiterBio() != null ? user.getRecruiterBio() : ""
+    );
+  }
+
+  @Transactional
+  public RecruiterProfileResponse updateRecruiterProfile(UUID userId, UpdateRecruiterProfileRequest request) {
+    AuthUser user = requireRecruiter(userId);
+    try {
+      user.updateRecruiterProfile(
+          request.fullName(),
+          request.phone(),
+          request.avatarUrl(),
+          request.position(),
+          request.bio()
+      );
+    } catch (IllegalArgumentException exception) {
+      throw new AuthBusinessException("VALIDATION_ERROR", "Thông tin nhà tuyển dụng không hợp lệ", HttpStatus.BAD_REQUEST);
+    }
+    users.saveAndFlush(user);
+    return getRecruiterProfile(userId);
   }
 
   @Transactional
