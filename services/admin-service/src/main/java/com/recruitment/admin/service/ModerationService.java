@@ -32,6 +32,22 @@ public class ModerationService {
     return mutate(actor, "COMPANY", id, "VERIFY_COMPANY", "/" + id + "/verify", body, reason);
   }
 
+  public JsonNode updateCompany(Jwt actor, UUID id, JsonNode request) {
+    gateway.requireCurrentAdmin(actor);
+    UUID operation = UUID.randomUUID();
+    UUID admin = UUID.fromString(actor.getSubject());
+    store.audit(operation, admin, "UPDATE_COMPANY", "COMPANY", id, "Cập nhật hồ sơ công ty", "STARTED");
+    try {
+      JsonNode result = gateway.call("COMPANY", HttpMethod.PUT, "/admin/" + id, request, actor);
+      store.audit(operation, admin, "UPDATE_COMPANY", "COMPANY", id, "Cập nhật hồ sơ công ty", "SUCCEEDED");
+      return result;
+    } catch (AdminFailure error) {
+      store.audit(operation, admin, "UPDATE_COMPANY", "COMPANY", id, "Cập nhật hồ sơ công ty",
+          error.status() >= 500 ? "UNKNOWN" : "FAILED");
+      throw error;
+    }
+  }
+
   public JsonNode approveJob(Jwt actor, UUID id) {
     return mutate(actor, "JOB", id, "APPROVE_JOB", "/" + id + "/approve", Map.of(), null);
   }

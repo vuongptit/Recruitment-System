@@ -39,6 +39,7 @@ import { SystemRole } from '../common/auth/system-role.enum';
 import { ApiException } from '../common/errors/api-exception';
 import { ApiSuccessResponse } from '../common/http/api-response.interceptor';
 import { CompanyService } from './company.service';
+import { AdminUpdateCompanyDto } from './dto/admin-update-company.dto';
 import { ModerateCompanyDto } from './dto/moderate-company.dto';
 import {
   CompanyMediaResponseDto,
@@ -290,6 +291,18 @@ export class CompanyController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Admin: read a company in any verification/moderation state' })
   getAdminDetail(@Param('id', COMPANY_ID_PIPE) id: string) { return this.companyService.getAdminDetail(id); }
+
+  @Put('admin/:id')
+  @Roles(SystemRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Admin: update company profile' })
+  adminUpdate(
+    @CurrentUser() user: AuthUser,
+    @Param('id', COMPANY_ID_PIPE) id: string,
+    @Body() dto: AdminUpdateCompanyDto,
+  ) {
+    return this.companyService.adminUpdate(user.id, id, dto);
+  }
 
   @Patch(':id/moderation')
   @Roles(SystemRole.ADMIN)
