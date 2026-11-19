@@ -140,6 +140,9 @@ export interface CompanyMember {
   userId: string;
   role: CompanyMemberRole;
   joinedAt: string;
+  fullName?: string;
+  email?: string;
+  avatarUrl?: string;
 }
 
 interface BackendJob {
@@ -836,8 +839,8 @@ export async function getCompanyMembers(
   if (isDemoPerson2Api) {
     return {
       data: [
-        { userId: "demo-owner", role: demoMembershipRole, joinedAt: new Date(2025, 0, 8).toISOString() },
-        { userId: "demo-member", role: demoMembershipRole === "OWNER" ? "MEMBER" : "OWNER", joinedAt: new Date(2025, 4, 12).toISOString() },
+        { userId: "demo-owner", fullName: "Nguyễn Văn A", email: "owner@example.com", role: demoMembershipRole, joinedAt: new Date(2025, 0, 8).toISOString() },
+        { userId: "demo-member", fullName: "Nguyễn Văn B", email: "member@example.com", role: demoMembershipRole === "OWNER" ? "MEMBER" : "OWNER", joinedAt: new Date(2025, 4, 12).toISOString() },
       ],
       meta: null,
     };
