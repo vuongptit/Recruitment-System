@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { BadgeCheck, Building2, ExternalLink, Globe, MapPin, ShieldCheck, UsersRound, FileText, CalendarDays } from "lucide-react";
+import { BadgeCheck, Building2, ExternalLink, Globe, MapPin, ShieldCheck, UsersRound, FileText, CalendarDays, Bell } from "lucide-react";
 import { EmptyState } from "@/components/ui";
 import { ApiClientError, toUserMessage } from "@/lib/apiClient";
 import { orderPublicCompanyMedia } from "@/lib/companyPublicProfile";
 import { getPublicCompany } from "@/lib/person2Api";
 import { CompanyJobs } from "./CompanyJobs";
+import { CompanyFollowButton } from "./CompanyFollowButton";
 import { PortalReportLink } from "@/components/PortalReportLink";
 import { CompanyMark } from "./discovery/CompanyMark";
 import styles from "./discovery/Discovery.module.css";
@@ -63,8 +64,26 @@ export async function CompanyProfile({ companyId, basePath = "/companies" }: { c
         <div className={`${styles.companyCover} ${cover ? "" : styles.companyCoverFallback}`} aria-hidden="true">{cover ? <img src={cover.url} alt="" width={1240} height={300} decoding="async" /> : <Building2 />}</div>
         <div className={styles.companyHeroBody}>
           <CompanyMark name={company.name} src={company.logoUrl} large />
-          <div className={styles.companyHeroText}><span className={styles.verified}><BadgeCheck size={16} aria-hidden="true" />Doanh nghiệp đã xác minh</span><h1>{company.name}</h1><div className={styles.meta}>{company.industry ? <span><Building2 size={15} />{company.industry}</span> : null}{company.size ? <span><UsersRound size={15} />{company.size} nhân sự</span> : null}</div></div>
-          <div className={styles.companyHeroActions}><a className="btn btn-primary" href="#company-jobs">Xem việc đang tuyển</a>{website ? <a className="btn" href={website} target="_blank" rel="noreferrer">Mở website <ExternalLink size={15} aria-hidden="true" /></a> : null}</div>
+          <div className={styles.companyHeroText}>
+            <span className={styles.verified}><BadgeCheck size={16} aria-hidden="true" />Doanh nghiệp đã xác minh</span>
+            <h1>{company.name}</h1>
+            <div className={styles.meta}>
+              {company.industry ? <span><Building2 size={15} />{company.industry}</span> : null}
+              {company.size ? <span><UsersRound size={15} />{company.size} nhân sự</span> : null}
+              {typeof company.followersCount === "number" && company.followersCount > 0 ? (
+                <span><Bell size={15} />{company.followersCount} người theo dõi</span>
+              ) : null}
+            </div>
+          </div>
+          <div className={styles.companyHeroActions}>
+            <CompanyFollowButton
+              companyId={company.id}
+              initialFollowersCount={company.followersCount}
+              basePath={basePath}
+            />
+            <a className="btn btn-primary" href="#company-jobs">Xem việc đang tuyển</a>
+            {website ? <a className="btn" href={website} target="_blank" rel="noreferrer">Mở website <ExternalLink size={15} aria-hidden="true" /></a> : null}
+          </div>
         </div>
         <nav className={styles.sectionNav} aria-label="Nội dung hồ sơ công ty"><a href="#company-introduction">Giới thiệu</a><a href="#company-jobs">Tuyển dụng</a><a href="#company-gallery">Hình ảnh</a></nav>
       </section>

@@ -40,6 +40,7 @@ import {
   PublicCompanySearchSummaryDto,
 } from './dto/public-company-search.dto';
 import { PublicCompanyProfileDto } from './dto/public-company-profile.dto';
+import { CompanyFollowStatusDto } from './dto/company-follow.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { CompanyIndexingSummaryDto } from './dto/company-indexing-summary.dto';
 import {
@@ -477,14 +478,19 @@ export class CompanyService {
   }
 
   async getPublicById(companyId: string): Promise<PublicCompanyProfileDto> {
-    const company = await this.prisma.company.findFirst({
-      where: {
-        id: companyId,
-        verifiedStatus: CompanyVerificationStatus.VERIFIED,
-        isSuspended: false,
-      },
-      ...COMPANY_WITH_MEDIA,
-    });
+    const [company, followersCount] = await Promise.all([
+      this.prisma.company.findFirst({
+        where: {
+          id: companyId,
+          verifiedStatus: CompanyVerificationStatus.VERIFIED,
+          isSuspended: false,
+        },
+        ...COMPANY_WITH_MEDIA,
+      }),
+      this.prisma.companyFollower.count({
+        where: { companyId },
+      }),
+    ]);
 
     if (!company) {
       throw new ApiException(
@@ -494,7 +500,7 @@ export class CompanyService {
       );
     }
 
-    return this.toPublicProfile(company);
+    return this.toPublicProfile(company, followersCount);
   }
 
   async searchPublic(
@@ -1428,8 +1434,135 @@ export class CompanyService {
     return base + '-' + companyId.replace(/-/g, '');
   }
 
+  async followCompany(
+    candidateId: string,
+    companyId: string,
+  ): Promise<CompanyFollowStatusDto> {
+    const company = await this.prisma.company.findFirst({
+      where: {
+        id: companyId,
+        verifiedStatus: CompanyVerificationStatus.VERIFIED,
+        isSuspended: false,
+      },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new ApiException(
+        'COMPANY_NOT_FOUND',
+        'Verified company was not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    await this.prisma.companyFollower.upsert({
+      where: {
+        companyId_userId: {
+          companyId,
+          userId: candidateId,
+        },
+      },
+      create: {
+        companyId,
+        userId: candidateId,
+      },
+      update: {},
+    });
+
+    const followersCount = await this.prisma.companyFollower.count({
+      where: { companyId },
+    });
+
+    return {
+      isFollowing: true,
+      followersCount,
+    };
+  }
+
+  async unfollowCompany(
+    candidateId: string,
+    companyId: string,
+  ): Promise<CompanyFollowStatusDto> {
+    const company = await this.prisma.company.findFirst({
+      where: {
+        id: companyId,
+        verifiedStatus: CompanyVerificationStatus.VERIFIED,
+        isSuspended: false,
+      },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new ApiException(
+        'COMPANY_NOT_FOUND',
+        'Verified company was not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    await this.prisma.companyFollower.deleteMany({
+      where: {
+        companyId,
+        userId: candidateId,
+      },
+    });
+
+    const followersCount = await this.prisma.companyFollower.count({
+      where: { companyId },
+    });
+
+    return {
+      isFollowing: false,
+      followersCount,
+    };
+  }
+
+  async getFollowStatus(
+    companyId: string,
+    candidateId?: string,
+  ): Promise<CompanyFollowStatusDto> {
+    const company = await this.prisma.company.findFirst({
+      where: {
+        id: companyId,
+        verifiedStatus: CompanyVerificationStatus.VERIFIED,
+        isSuspended: false,
+      },
+      select: { id: true },
+    });
+
+    if (!company) {
+      throw new ApiException(
+        'COMPANY_NOT_FOUND',
+        'Verified company was not found',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const [followersCount, followRecord] = await Promise.all([
+      this.prisma.companyFollower.count({
+        where: { companyId },
+      }),
+      candidateId
+        ? this.prisma.companyFollower.findUnique({
+            where: {
+              companyId_userId: {
+                companyId,
+                userId: candidateId,
+              },
+            },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    return {
+      isFollowing: Boolean(followRecord),
+      followersCount,
+    };
+  }
+
   private toPublicProfile(
     company: CompanyWithMedia,
+    followersCount?: number,
   ): PublicCompanyProfileDto {
     return {
       id: company.id,
@@ -1442,6 +1575,7 @@ export class CompanyService {
       website: company.website,
       taxCode: company.taxCode,
       logoUrl: company.logoMediaReferenceId ? company.logoUrl : null,
+      followersCount: typeof followersCount === 'number' ? followersCount : 0,
       media: company.media
         .filter((item) => item.mediaReferenceId !== null)
         .map((item) => ({
