@@ -65,6 +65,13 @@ export function AccountNavigation({
       }).then(res => {
         if (active && res.data) setLoadedProfile(res.data);
       }).catch(() => {});
+    } else if (account.role === "CANDIDATE") {
+      void requestApi<{ fullName?: string; avatarUrl?: string }>(`/api/profile/${account.id}`, {
+        privateData: true,
+        timeoutMs: 5000,
+      }).then(res => {
+        if (active && res.data) setLoadedProfile(res.data);
+      }).catch(() => {});
     }
 
     const handleRecruiterUpdate = (e: Event) => {
@@ -77,12 +84,19 @@ export function AccountNavigation({
       if (customEvent.detail) setLoadedProfile(customEvent.detail);
     };
 
+    const handleCandidateUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ fullName?: string; avatarUrl?: string }>;
+      if (customEvent.detail) setLoadedProfile(customEvent.detail);
+    };
+
     window.addEventListener("recruiter-profile-updated", handleRecruiterUpdate);
     window.addEventListener("admin-profile-updated", handleAdminUpdate);
+    window.addEventListener("candidate-profile-updated", handleCandidateUpdate);
     return () => {
       active = false;
       window.removeEventListener("recruiter-profile-updated", handleRecruiterUpdate);
       window.removeEventListener("admin-profile-updated", handleAdminUpdate);
+      window.removeEventListener("candidate-profile-updated", handleCandidateUpdate);
     };
   }, [name, account?.id, account?.role]);
 
