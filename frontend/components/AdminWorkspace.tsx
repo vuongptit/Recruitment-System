@@ -18,7 +18,14 @@ import { AdminDashboard } from "./admin/AdminDashboard";
 import { useAdminFilters } from "./admin/useAdminFilters";
 import { EmptyState, LoadingState, PageHeader, StatusBadge } from "./ui";
 type Row = Record<string, unknown>;
-type Tab = "stats" | "companies" | "jobs" | "users" | "reports" | "audit";
+type Tab =
+  | "stats"
+  | "companies"
+  | "company-verifications"
+  | "jobs"
+  | "users"
+  | "reports"
+  | "audit";
 type Command = {
   path: string;
   body: Record<string, unknown>;
@@ -29,6 +36,7 @@ type Command = {
 const labels: Record<Tab, string> = {
   stats: "Thống kê",
   companies: "Quản lý công ty",
+  "company-verifications": "Duyệt công ty",
   jobs: "Quản lý tin tuyển dụng",
   users: "Quản lý người dùng",
   reports: "Báo cáo vi phạm",
@@ -88,10 +96,68 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
   const [commandError, setCommandError] = useState("");
   const lastTriggerRef = useRef<HTMLElement | null>(null);
 
+  const [editingCompany, setEditingCompany] = useState<Row | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    taxCode: "",
+    website: "",
+    industry: "",
+    size: "",
+    address: "",
+    description: "",
+  });
+  const [editError, setEditError] = useState("");
+  const [editPending, setEditPending] = useState(false);
+
+  function handleStartEdit(row: Row) {
+    setEditingCompany(row);
+    setEditError("");
+    setEditForm({
+      name: String(row.name || ""),
+      taxCode: String(row.taxCode || ""),
+      website: String(row.website || ""),
+      industry: String(row.industry || ""),
+      size: String(row.size || ""),
+      address: String(row.address || ""),
+      description: String(row.description || ""),
+    });
+  }
+
+  async function handleSaveCompany(e: FormEvent) {
+    e.preventDefault();
+    if (!editingCompany) return;
+    if (!editForm.name.trim()) {
+      setEditError("Tên công ty không được để trống.");
+      return;
+    }
+    setEditPending(true);
+    setEditError("");
+    try {
+      await requestApi(`/api/admin/companies/${editingCompany.id}`, {
+        method: "PUT",
+        privateData: true,
+        body: {
+          ...editForm,
+          expectedVersion: editingCompany.version,
+        },
+      });
+      setNotice(`Đã cập nhật thông tin công ty: ${editForm.name}`);
+      setEditingCompany(null);
+      setReload((n) => n + 1);
+      if (detail && detail.id === editingCompany.id) {
+        setDetail((current) => (current ? { ...current, ...editForm } : current));
+      }
+    } catch (err) {
+      setEditError(person1Error(err));
+    } finally {
+      setEditPending(false);
+    }
+  }
+
   function handleOpenDetail(row: Row) {
     lastTriggerRef.current = document.activeElement as HTMLElement | null;
     setDetail(row);
-    if (tab === "companies" && row.id) {
+    if ((tab === "companies" || tab === "company-verifications") && row.id) {
       requestApi<Row>(`/api/admin/companies/${row.id}`, { privateData: true })
         .then((res) => {
           if (res.data) {
@@ -137,8 +203,9 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
     setRows([]);
     setDetail(null);
     async function load() {
-      const paths = {
+      const paths: Record<Exclude<Tab, "stats">, string> = {
         companies: "companies",
+        "company-verifications": "companies",
         jobs: "jobs",
         users: "users",
         reports: "reports",
@@ -153,9 +220,15 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
           ...(tab !== "audit" ? { page, limit: 20 } : {}),
           ...(tab === "companies"
             ? {
-                status: status || "PENDING",
+                status: status || "ALL",
                 q: query,
                 suspended: suspended || undefined,
+              }
+            : {}),
+          ...(tab === "company-verifications"
+            ? {
+                status: status || "PENDING",
+                q: query,
               }
             : {}),
           ...(tab === "jobs"
@@ -262,7 +335,9 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
     stats: "Nắm bắt hoạt động tuyển dụng và theo dõi hiệu quả chuyển đổi.",
     users: "Tra cứu tài khoản, kiểm tra xác minh và quản lý quyền truy cập.",
     companies:
-      "Tra cứu hồ sơ, xác minh và quản lý trạng thái hiển thị của doanh nghiệp.",
+      "Tra cứu danh sách công ty, quản lý trạng thái hoạt động và cập nhật thông tin.",
+    "company-verifications":
+      "Kiểm tra và xử lý các hồ sơ đăng ký doanh nghiệp đang chờ xét duyệt.",
     jobs:
       "Tra cứu tin tuyển dụng, duyệt nội dung và gỡ/khôi phục tin vi phạm.",
     reports: "Xem phản ánh và xử lý các nội dung vi phạm trong hệ thống.",
@@ -391,86 +466,143 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
             )}
           </form>
         )}
-        {(tab === "companies" || tab === "jobs") && (
-          <form
-            className="admin-filters"
-            onSubmit={(event: FormEvent) => {
-              event.preventDefault();
-              setPage(1);
-              setQuery(email.trim());
-            }}
-          >
-            <label className="field admin-search-field">
-              {tab === "companies" ? "Tìm công ty" : "Tìm tin tuyển dụng"}
-              <div className="admin-search-input">
-                <Search size={17} aria-hidden="true" />
-                <input
-                  className="input"
-                  name="directory-search"
-                  type="search"
-                  autoComplete="off"
-                  spellCheck={false}
-                  maxLength={200}
-                  placeholder={
-                    tab === "companies"
-                      ? "Tên công ty hoặc mã số thuế"
-                      : "Tên tin tuyển dụng"
-                  }
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-            </label>
-            <label className="field">Trạng thái
-              <select
-                className="select"
-                value={status}
-                onChange={(e) => {
-                  setStatus(e.target.value);
-                  setPage(1);
-                }}
-              >
-                {tab === "companies" ? <>
-                  <option value="PENDING">Chờ xác minh</option><option value="VERIFIED">Đã xác minh</option><option value="REJECTED">Từ chối</option><option value="ALL">Tất cả</option>
-                </> : <>
-                  <option value="PENDING_APPROVAL">Chờ duyệt</option><option value="PUBLISHED">Đang tuyển</option><option value="DRAFT">Bản nháp</option><option value="CLOSED">Đã đóng</option><option value="EXPIRED">Hết hạn</option><option value="ALL">Tất cả</option>
-                </>}
-              </select>
-            </label>
-            <label className="field">Gỡ / đình chỉ
-              <select
-                className="select"
-                value={suspended}
-                onChange={(e) => {
-                  setSuspended(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">Tất cả</option><option value="false">Chưa gỡ / đình chỉ</option><option value="true">Đã gỡ / đình chỉ</option>
-              </select>
-            </label>
-            <button className="btn btn-primary" disabled={loading}>Tìm kiếm</button>
-            {(query ||
-              status !==
-                (tab === "companies" ? "PENDING" : "PENDING_APPROVAL") ||
-              suspended) && (
-              <button
-                className="btn"
-                type="button"
-                onClick={() => {
-                  setEmail("");
-                  setQuery("");
-                  setStatus(
-                    tab === "companies" ? "PENDING" : "PENDING_APPROVAL",
+        {(tab === "companies" || tab === "company-verifications" || tab === "jobs") && (
+          <>
+            {tab === "companies" && (
+              <div className="admin-status-tabs" role="tablist" aria-label="Lọc nhanh trạng thái công ty">
+                {[
+                  { value: "ALL", label: "Tất cả công ty" },
+                  { value: "PENDING", label: "Chờ xác minh" },
+                  { value: "VERIFIED", label: "Đã xác minh" },
+                  { value: "SUSPENDED", label: "Đang đình chỉ" },
+                  { value: "REJECTED", label: "Bị từ chối" },
+                ].map((item) => {
+                  const isActive =
+                    item.value === "SUSPENDED"
+                      ? suspended === "true"
+                      : (status || "ALL") === item.value && suspended !== "true";
+                  return (
+                    <button
+                      key={item.value}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      className={`admin-status-tab ${isActive ? "is-active admin-status-tab-active" : ""}`}
+                      onClick={() => {
+                        if (item.value === "SUSPENDED") {
+                          setSuspended("true");
+                          setStatus("ALL");
+                        } else {
+                          setSuspended("");
+                          setStatus(item.value);
+                        }
+                        setPage(1);
+                      }}
+                    >
+                      {item.label}
+                    </button>
                   );
-                  setSuspended("");
-                  setPage(1);
-                }}
-              >
-                Đặt lại
-              </button>
+                })}
+              </div>
             )}
-          </form>
+            <form
+              className="admin-filters"
+              onSubmit={(event: FormEvent) => {
+                event.preventDefault();
+                setPage(1);
+                setQuery(email.trim());
+              }}
+            >
+              <label className="field admin-search-field">
+                {tab === "jobs" ? "Tìm tin tuyển dụng" : "Tìm công ty"}
+                <div className="admin-search-input">
+                  <Search size={17} aria-hidden="true" />
+                  <input
+                    className="input"
+                    name="directory-search"
+                    type="search"
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={200}
+                    placeholder={
+                      tab === "jobs"
+                        ? "Tên tin tuyển dụng"
+                        : "Tên công ty hoặc mã số thuế"
+                    }
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+              </label>
+              {tab !== "company-verifications" && (
+                <>
+                  <label className="field">Trạng thái
+                    <select
+                      className="select"
+                      value={status}
+                      onChange={(e) => {
+                        setStatus(e.target.value);
+                        setPage(1);
+                      }}
+                    >
+                      {tab === "companies" ? <>
+                        <option value="ALL">Tất cả</option>
+                        <option value="PENDING">Chờ xác minh</option>
+                        <option value="VERIFIED">Đã xác minh</option>
+                        <option value="REJECTED">Từ chối</option>
+                      </> : <>
+                        <option value="PENDING_APPROVAL">Chờ duyệt</option>
+                        <option value="PUBLISHED">Đang tuyển</option>
+                        <option value="DRAFT">Bản nháp</option>
+                        <option value="CLOSED">Đã đóng</option>
+                        <option value="EXPIRED">Hết hạn</option>
+                        <option value="ALL">Tất cả</option>
+                      </>}
+                    </select>
+                  </label>
+                  <label className="field">Gỡ / đình chỉ
+                    <select
+                      className="select"
+                      value={suspended}
+                      onChange={(e) => {
+                        setSuspended(e.target.value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="">Tất cả</option>
+                      <option value="false">Chưa gỡ / đình chỉ</option>
+                      <option value="true">Đã gỡ / đình chỉ</option>
+                    </select>
+                  </label>
+                </>
+              )}
+              <button className="btn btn-primary" disabled={loading}>Tìm kiếm</button>
+              {(query ||
+                (tab === "companies" && (status !== "ALL" || suspended)) ||
+                (tab === "company-verifications" && (status !== "PENDING" || suspended)) ||
+                (tab === "jobs" && (status !== "PENDING_APPROVAL" || suspended))) && (
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => {
+                    setEmail("");
+                    setQuery("");
+                    setStatus(
+                      tab === "companies"
+                        ? "ALL"
+                        : tab === "company-verifications"
+                          ? "PENDING"
+                          : "PENDING_APPROVAL",
+                    );
+                    setSuspended("");
+                    setPage(1);
+                  }}
+                >
+                  Đặt lại
+                </button>
+              )}
+            </form>
+          </>
         )}
         {tab === "reports" && (
           <div className="admin-filters">
@@ -521,18 +653,26 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
             <div>
               <h2>
                 {tab === "companies"
-                  ? status === "PENDING"
-                    ? "Hồ sơ công ty chờ xác minh"
-                    : "Danh sách công ty"
-                  : tab === "jobs"
-                    ? status === "PENDING_APPROVAL"
-                      ? "Tin tuyển dụng chờ duyệt"
-                      : "Danh sách tin tuyển dụng"
-                    : tab === "users"
-                      ? "Danh sách tài khoản"
-                      : tab === "reports"
-                        ? "Danh sách báo cáo"
-                        : "Lịch sử quản trị"}
+                  ? suspended === "true"
+                    ? "Danh sách công ty đang đình chỉ"
+                    : status === "PENDING"
+                      ? "Hồ sơ công ty chờ xác minh"
+                      : status === "VERIFIED"
+                        ? "Danh sách công ty đã xác minh"
+                        : status === "REJECTED"
+                          ? "Danh sách công ty bị từ chối"
+                          : "Danh sách tất cả công ty"
+                  : tab === "company-verifications"
+                    ? "Hồ sơ công ty chờ xét duyệt"
+                    : tab === "jobs"
+                      ? status === "PENDING_APPROVAL"
+                        ? "Tin tuyển dụng chờ duyệt"
+                        : "Danh sách tin tuyển dụng"
+                      : tab === "users"
+                        ? "Danh sách tài khoản"
+                        : tab === "reports"
+                          ? "Danh sách báo cáo"
+                          : "Lịch sử quản trị"}
               </h2>
               <p>
                 {loading
@@ -566,6 +706,7 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
                 pending={pending}
                 onDetail={handleOpenDetail}
                 onChoose={choose}
+                onEdit={handleStartEdit}
               />
             </>
           ) : (
@@ -573,16 +714,20 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
               title={
                 tab === "audit"
                   ? "Chưa có kết quả xử lý trong trang này"
-                  : tab === "companies" || tab === "jobs"
-                    ? "Không có bản ghi phù hợp với bộ lọc"
-                    : "Không có dữ liệu phù hợp"
+                  : tab === "company-verifications"
+                    ? "Không có hồ sơ công ty chờ duyệt"
+                    : tab === "companies" || tab === "jobs"
+                      ? "Không có bản ghi phù hợp với bộ lọc"
+                      : "Không có dữ liệu phù hợp"
               }
               description={
                 tab === "audit" && rows.length === 20
                   ? "Chọn Trang sau để xem các nhật ký tiếp theo."
-                  : tab === "companies" || tab === "jobs"
-                    ? "Thử thay đổi trạng thái hoặc từ khóa tìm kiếm."
-                    : "Thử thay đổi bộ lọc hoặc làm mới để xem cập nhật."
+                  : tab === "company-verifications"
+                    ? "Tất cả các yêu cầu đăng ký doanh nghiệp đã được xử lý."
+                    : tab === "companies" || tab === "jobs"
+                      ? "Thử thay đổi trạng thái hoặc từ khóa tìm kiếm."
+                      : "Thử thay đổi bộ lọc hoặc làm mới để xem cập nhật."
               }
             />
           )}
@@ -591,7 +736,7 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
               id="admin-detail-panel"
               role="dialog"
               aria-label={
-                tab === "companies"
+                tab === "companies" || tab === "company-verifications"
                   ? "Hồ sơ doanh nghiệp"
                   : tab === "jobs"
                     ? "Nội dung tin tuyển dụng"
@@ -606,7 +751,7 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
             >
               <div className="admin-detail-panel-heading">
                 <h2>
-                  {tab === "companies"
+                  {tab === "companies" || tab === "company-verifications"
                     ? "Hồ sơ doanh nghiệp"
                     : tab === "jobs"
                       ? "Nội dung tin tuyển dụng"
@@ -632,6 +777,7 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
                 pending={pending}
                 onChoose={choose}
                 onClose={handleCloseDetail}
+                onEdit={handleStartEdit}
               />
             </div>
           )}
@@ -646,7 +792,6 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
               </span>
               <div className="admin-pagination-controls">
                 <button
-                  type="button"
                   className="btn btn-secondary admin-pagination-btn"
                   aria-label="Trang trước"
                   disabled={page === 1}
@@ -662,7 +807,6 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
                   Trang {page}
                 </span>
                 <button
-                  type="button"
                   className="btn btn-secondary admin-pagination-btn"
                   aria-label="Trang sau"
                   disabled={
@@ -681,6 +825,129 @@ function AdminContent({ tab }: { tab: Exclude<Tab, "stats"> }) {
           )}
         </section>
       </>
+      {editingCompany && (
+        <AdminDialog
+          title={`Chỉnh sửa thông tin: ${String(editingCompany.name || "Doanh nghiệp")}`}
+          pending={editPending}
+          onClose={() => setEditingCompany(null)}
+        >
+          <form
+            noValidate
+            onSubmit={handleSaveCompany}
+            className="admin-edit-form"
+          >
+            <div className="admin-detail-body">
+              {editError && (
+                <p className="admin-field-error" role="alert">
+                  {editError}
+                </p>
+              )}
+              <div className="admin-form-grid">
+                <label className="field">
+                  Tên công ty *
+                  <input
+                    className="input"
+                    required
+                    value={editForm.name}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, name: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="field">
+                  Mã số thuế
+                  <input
+                    className="input"
+                    value={editForm.taxCode}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, taxCode: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="field">
+                  Website
+                  <input
+                    className="input"
+                    type="url"
+                    placeholder="https://example.com"
+                    value={editForm.website}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, website: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="field">
+                  Lĩnh vực hoạt động
+                  <input
+                    className="input"
+                    placeholder="VD: Công nghệ thông tin, Bán lẻ..."
+                    value={editForm.industry}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, industry: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="field">
+                  Quy mô nhân sự
+                  <select
+                    className="select"
+                    value={editForm.size}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, size: e.target.value })
+                    }
+                  >
+                    <option value="">Chưa chọn</option>
+                    <option value="1-10">1-10 nhân viên</option>
+                    <option value="11-50">11-50 nhân viên</option>
+                    <option value="51-200">51-200 nhân viên</option>
+                    <option value="201-500">201-500 nhân viên</option>
+                    <option value="500+">500+ nhân viên</option>
+                  </select>
+                </label>
+                <label className="field" style={{ gridColumn: "1 / -1" }}>
+                  Địa chỉ trụ sở
+                  <input
+                    className="input"
+                    value={editForm.address}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, address: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="field" style={{ gridColumn: "1 / -1" }}>
+                  Mô tả công ty
+                  <textarea
+                    className="textarea"
+                    rows={4}
+                    value={editForm.description}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, description: e.target.value })
+                    }
+                  />
+                </label>
+              </div>
+            </div>
+            <div className="admin-dialog-footer">
+              <button
+                className="btn"
+                type="button"
+                disabled={editPending}
+                onClick={() => setEditingCompany(null)}
+              >
+                Hủy
+              </button>
+              <button
+                className="btn btn-primary"
+                type="submit"
+                disabled={editPending}
+                aria-busy={editPending}
+              >
+                {editPending ? "Đang lưu…" : "Lưu thay đổi"}
+              </button>
+            </div>
+          </form>
+        </AdminDialog>
+      )}
       {command && (
         <AdminDialog
           title={command.label}

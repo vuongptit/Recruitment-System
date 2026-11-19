@@ -26,7 +26,7 @@ const defaults = (tab = ""): Filters => ({
   query: "",
   role: "",
   locked: "",
-  status: tab === "companies" ? "PENDING" : tab === "jobs" ? "PENDING_APPROVAL" : tab === "reports" ? "OPEN" : "",
+  status: tab === "companies" ? "ALL" : tab === "company-verifications" ? "PENDING" : tab === "jobs" ? "PENDING_APPROVAL" : tab === "reports" ? "OPEN" : "",
   targetType: "",
   suspended: "",
 });
@@ -52,7 +52,7 @@ export function useAdminFilters(tab: string) {
         ),
         from: validDate(p.get("from"), initial.from),
         to: validDate(p.get("to"), initial.to),
-        query: (p.get(tab === "companies" || tab === "jobs" ? "q" : "email") || "").slice(0, 200),
+        query: (p.get(tab === "companies" || tab === "company-verifications" || tab === "jobs" ? "q" : "email") || "").slice(0, 200),
         role: ["CANDIDATE", "RECRUITER", "ADMIN"].includes(p.get("role") || "")
           ? p.get("role")!
           : "",
@@ -60,7 +60,7 @@ export function useAdminFilters(tab: string) {
           ? p.get("locked")!
           : "",
         status: (() => {
-          const allowed = tab === "companies"
+          const allowed = tab === "companies" || tab === "company-verifications"
             ? ["PENDING", "VERIFIED", "REJECTED", "ALL"]
             : tab === "jobs"
               ? ["DRAFT", "PENDING_APPROVAL", "PUBLISHED", "CLOSED", "EXPIRED", "ALL"]
@@ -101,7 +101,7 @@ export function useAdminFilters(tab: string) {
         status: filters.status,
         type: filters.targetType,
       });
-    if (tab === "companies" || tab === "jobs")
+    if (tab === "companies" || tab === "company-verifications" || tab === "jobs")
       Object.assign(values, {
         status: filters.status,
         q: filters.query,

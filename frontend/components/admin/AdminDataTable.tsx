@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Ban,
   BriefcaseBusiness,
@@ -13,17 +14,25 @@ import {
   Info,
   LockKeyhole,
   MapPin,
+  Pencil,
   RotateCcw,
   UsersRound,
   Video as VideoIcon,
   X,
   XCircle,
 } from "lucide-react";
+import { requestApi } from "../../lib/apiClient";
 import { StatusBadge } from "../ui";
 import { jobStatusLabel } from "../../lib/recruitmentLabels";
 
 export type AdminRow = Record<string, unknown>;
-export type AdminTab = "companies" | "jobs" | "users" | "reports" | "audit";
+export type AdminTab =
+  | "companies"
+  | "company-verifications"
+  | "jobs"
+  | "users"
+  | "reports"
+  | "audit";
 export const roleLabels: Record<string, string> = {
   CANDIDATE: "Ứng viên",
   RECRUITER: "Nhà tuyển dụng",
@@ -100,6 +109,7 @@ export function AdminDataTable({
   pending,
   onDetail,
   onChoose,
+  onEdit,
 }: {
   tab: AdminTab;
   rows: AdminRow[];
@@ -112,6 +122,7 @@ export function AdminDataTable({
     needsReason?: boolean,
     subject?: string,
   ) => void;
+  onEdit?: (row: AdminRow) => void;
 }) {
   const columns =
     tab === "users"
@@ -127,14 +138,16 @@ export function AdminDataTable({
               "Thao tác",
             ]
           : tab === "companies"
-            ? ["Doanh nghiệp", "Lĩnh vực", "Trạng thái", "Ngày gửi", "Thao tác"]
-            : [
-                "Tin tuyển dụng",
-                "Địa điểm",
-                "Hạn ứng tuyển",
-                "Trạng thái",
-                "Thao tác",
-              ];
+            ? ["Doanh nghiệp", "Lĩnh vực & Quy mô", "Trạng thái", "Ngày tạo", "Thao tác"]
+            : tab === "company-verifications"
+              ? ["Doanh nghiệp", "Lĩnh vực", "Mã số thuế", "Ngày gửi", "Thao tác"]
+              : [
+                  "Tin tuyển dụng",
+                  "Địa điểm",
+                  "Hạn ứng tuyển",
+                  "Trạng thái",
+                  "Thao tác",
+                ];
   return (
     <div
       className="admin-table-scroll"
@@ -171,10 +184,10 @@ export function AdminDataTable({
                   <div className="admin-record">
                     {tab !== "audit" && (
                       <span
-                        className={`admin-record-avatar ${tab === "companies" ? "admin-company-avatar" : ""}`}
+                        className={`admin-record-avatar ${tab === "companies" || tab === "company-verifications" ? "admin-company-avatar" : ""}`}
                         aria-hidden="true"
                       >
-                        {tab === "companies" &&
+                        {(tab === "companies" || tab === "company-verifications") &&
                         typeof (row.logoUrl ?? (row.logo as Record<string, unknown> | undefined)?.url) === "string" &&
                         /^https?:\/\//.test(String(row.logoUrl ?? (row.logo as Record<string, unknown> | undefined)?.url)) ? (
                           <img
@@ -198,7 +211,7 @@ export function AdminDataTable({
                     <div>
                       <strong>{subject}</strong>
                       <small>
-                        {tab === "companies"
+                        {tab === "companies" || tab === "company-verifications"
                           ? text(row.taxCode, "Chưa có mã số thuế")
                           : tab === "jobs"
                             ? text(
@@ -298,15 +311,33 @@ export function AdminDataTable({
                   </>
                 ) : tab === "companies" ? (
                   <>
-                    <td>{text(row.industry)}</td>
                     <td>
-                      <StatusBadge tone={row.isSuspended ? "danger" : row.verifiedStatus === "VERIFIED" ? "success" : row.verifiedStatus === "REJECTED" ? "danger" : "warning"}>
-                        {row.isSuspended ? "Đình chỉ" : row.verifiedStatus === "VERIFIED" ? "Đã xác minh" : row.verifiedStatus === "REJECTED" ? "Từ chối" : "Chờ xác minh"}
-                      </StatusBadge>
+                      <strong>{text(row.industry)}</strong>
+                      {row.size ? (
+                        <small className="admin-cell-subtitle">
+                          {String(row.size)} nhân sự
+                        </small>
+                      ) : null}
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <StatusBadge tone={row.verifiedStatus === "VERIFIED" ? "success" : row.verifiedStatus === "REJECTED" ? "danger" : "warning"}>
+                          {row.verifiedStatus === "VERIFIED" ? "Đã xác minh" : row.verifiedStatus === "REJECTED" ? "Từ chối" : "Chờ xác minh"}
+                        </StatusBadge>
+                        {row.isSuspended ? (
+                          <StatusBadge tone="danger">Đình chỉ</StatusBadge>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="admin-nowrap">
                       {date(row.createdAt ?? row.created_at)}
                     </td>
+                  </>
+                ) : tab === "company-verifications" ? (
+                  <>
+                    <td>{text(row.industry)}</td>
+                    <td><code>{text(row.taxCode)}</code></td>
+                    <td className="admin-nowrap">{date(row.createdAt ?? row.created_at)}</td>
                   </>
                 ) : (
                   <>
@@ -330,7 +361,18 @@ export function AdminDataTable({
                     >
                       <Eye size={17} aria-hidden="true" />
                     </button>
-                    {tab === "companies" && row.verifiedStatus === "PENDING" && (
+                    {(tab === "companies" || tab === "company-verifications") && onEdit && (
+                      <button
+                        type="button"
+                        className="admin-icon-button"
+                        aria-label={`Chỉnh sửa ${subject}`}
+                        title="Chỉnh sửa thông tin"
+                        onClick={() => onEdit(row)}
+                      >
+                        <Pencil size={16} aria-hidden="true" />
+                      </button>
+                    )}
+                    {(tab === "companies" || tab === "company-verifications") && row.verifiedStatus === "PENDING" && (
                       <>
                         <button
                           className="btn admin-approve"
@@ -383,7 +425,7 @@ export function AdminDataTable({
                         </button>
                       </>
                     )}
-                    {(tab === "companies" || tab === "jobs") && (
+                    {(tab === "companies" || tab === "company-verifications" || tab === "jobs") && (
                       <button
                         type="button"
                         className={`btn ${row.isSuspended ? "admin-approve" : "admin-danger"}`}
@@ -392,15 +434,15 @@ export function AdminDataTable({
                         onClick={() => {
                           const suspended = !row.isSuspended;
                           choose(
-                            `${tab}/${id}/moderation`,
+                            `${tab === "company-verifications" ? "companies" : tab}/${id}/moderation`,
                             { suspended, expectedVersion: row.aggregateVersion, operationId: crypto.randomUUID() },
-                            suspended ? (tab === "companies" ? "Đình chỉ công ty" : "Gỡ tin tuyển dụng") : (tab === "companies" ? "Khôi phục công ty" : "Khôi phục tin tuyển dụng"),
+                            suspended ? (tab === "jobs" ? "Gỡ tin tuyển dụng" : "Đình chỉ công ty") : (tab === "jobs" ? "Khôi phục tin tuyển dụng" : "Khôi phục công ty"),
                             true,
                           );
                         }}
                       >
                         {row.isSuspended ? <RotateCcw size={14} aria-hidden="true" /> : <Ban size={14} aria-hidden="true" />}
-                        {row.isSuspended ? "Khôi phục" : "Gỡ"}
+                        {row.isSuspended ? "Khôi phục" : tab === "jobs" ? "Gỡ" : "Đình chỉ"}
                       </button>
                     )}
                     {tab === "users" && (
@@ -485,6 +527,7 @@ export function AdminCompanyDetail({
   pending = false,
   onChoose,
   onClose,
+  onEdit,
 }: {
   row: AdminRow;
   pending?: boolean;
@@ -496,8 +539,39 @@ export function AdminCompanyDetail({
     subject?: string,
   ) => void;
   onClose?: () => void;
+  onEdit?: (row: AdminRow) => void;
 }) {
+  const [subTab, setSubTab] = useState<"overview" | "members" | "jobs">("overview");
+  const [jobs, setJobs] = useState<AdminRow[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+
   const id = String(row.id || "");
+
+  useEffect(() => {
+    if (subTab === "jobs" && id) {
+      setJobsLoading(true);
+      requestApi<AdminRow[] | { items?: AdminRow[] }>(
+        `/api/admin/jobs?companyId=${id}`,
+        { privateData: true },
+      )
+        .then((res) => {
+          const payload = res.data;
+          const items = Array.isArray(payload) ? payload : payload?.items ?? [];
+          setJobs(items);
+        })
+        .catch(() => setJobs([]))
+        .finally(() => setJobsLoading(false));
+    }
+  }, [subTab, id]);
+
+  const members = Array.isArray(row.members)
+    ? (row.members as Array<{
+        id: string;
+        userId: string;
+        role: string;
+        joinedAt: string;
+      }>)
+    : [];
   const name = String(row.name || "Doanh nghiệp");
   const taxCode = text(row.taxCode);
   const industry = text(row.industry);
@@ -559,304 +633,400 @@ export function AdminCompanyDetail({
 
   return (
     <div className="admin-company-detail">
-      {/* 4 Overview metric cards */}
-      <section className="admin-company-metrics" aria-label="Tóm tắt công ty">
-        <div className="admin-company-metric-card">
-          <span className="metric-label">Trạng thái</span>
-          <strong className={`metric-value tone-${statusTone}`}>
-            {statusLabel}
-          </strong>
-          <span className="metric-sub">Xác minh doanh nghiệp</span>
-        </div>
-        <div className="admin-company-metric-card">
-          <span className="metric-label">Lĩnh vực</span>
-          <strong className="metric-value">{industry}</strong>
-          <span className="metric-sub">Thông tin doanh nghiệp</span>
-        </div>
-        <div className="admin-company-metric-card">
-          <span className="metric-label">Người đại diện / Sở hữu</span>
-          <strong className="metric-value">{ownerName}</strong>
-          <span className="metric-sub">Quyền quản lý công ty</span>
-        </div>
-        <div className="admin-company-metric-card">
-          <span className="metric-label">Quy mô</span>
-          <strong className="metric-value">
-            {size !== "Chưa cập nhật" ? `${size} nhân sự` : "Chưa cập nhật"}
-          </strong>
-          <span className="metric-sub">Quy mô nhân sự</span>
-        </div>
-      </section>
-
-      {/* Main 2-column layout */}
-      <div className="admin-company-layout">
-        {/* Left Column */}
-        <div className="admin-company-main">
-          {/* Header */}
-          <div className="admin-company-header">
-            <div className="admin-company-brand">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt={`Logo ${name}`}
-                  className="admin-company-logo-avatar"
-                />
-              ) : (
-                <div className="admin-company-logo-fallback" aria-hidden="true">
-                  <Building2 size={32} />
-                </div>
-              )}
-              <div className="admin-company-title-wrap">
-                <h2>{name}</h2>
-                <p className="admin-company-meta">
-                  MST {taxCode} · Chủ sở hữu {ownerName}
-                </p>
-              </div>
-            </div>
-            <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
-          </div>
-
-          {/* Legal Notice */}
-          <div className="admin-company-notice admin-notice-legal">
-            <strong>Hồ sơ pháp lý</strong>
-            <p>
-              Đổi tên hoặc mã số thuế khi đã xác minh sẽ đưa công ty về trạng
-              thái chờ duyệt.
-            </p>
-          </div>
-
-          {/* Status Notice */}
-          {verifiedStatus === "PENDING" && !isSuspended && (
-            <div
-              className="admin-company-notice admin-notice-pending"
-              aria-live="polite"
-            >
-              <strong>Đang chờ xác minh</strong>
-              <p>Hồ sơ đã được gửi và đang chờ Admin xem xét.</p>
-            </div>
-          )}
-          {verifiedStatus === "VERIFIED" && !isSuspended && (
-            <div
-              className="admin-company-notice admin-notice-verified"
-              aria-live="polite"
-            >
-              <strong>Đã xác minh</strong>
-              <p>
-                Hồ sơ công ty đã được kiểm duyệt và xác thực hợp lệ trên hệ thống.
-              </p>
-            </div>
-          )}
-          {verifiedStatus === "REJECTED" && !isSuspended && (
-            <div
-              className="admin-company-notice admin-notice-rejected"
-              aria-live="polite"
-            >
-              <strong>Đã từ chối xác minh</strong>
-              <p>Hồ sơ doanh nghiệp đã bị từ chối yêu cầu xác thực.</p>
-              {rejectReason && (
-                <p className="admin-notice-reason">
-                  <strong>Lý do từ chối:</strong> {rejectReason}
-                </p>
-              )}
-            </div>
-          )}
-          {isSuspended && (
-            <div
-              className="admin-company-notice admin-notice-suspended"
-              aria-live="polite"
-            >
-              <strong>Doanh nghiệp đang bị đình chỉ</strong>
-              <p>Công ty đang tạm thời bị ẩn khỏi hệ thống.</p>
-              {suspensionReason && (
-                <p className="admin-notice-reason">
-                  <strong>Lý do đình chỉ:</strong> {suspensionReason}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Fact items list */}
-          <dl className="admin-company-facts">
-            <div className="admin-fact-row">
-              <dt>
-                <Building2 size={16} aria-hidden="true" /> Lĩnh vực
-              </dt>
-              <dd>{industry}</dd>
-            </div>
-            <div className="admin-fact-row">
-              <dt>
-                <UsersRound size={16} aria-hidden="true" /> Quy mô
-              </dt>
-              <dd>
-                {size !== "Chưa cập nhật"
-                  ? `${size} nhân sự`
-                  : "Chưa cập nhật"}
-              </dd>
-            </div>
-            <div className="admin-fact-row">
-              <dt>
-                <MapPin size={16} aria-hidden="true" /> Địa chỉ
-              </dt>
-              <dd>{address}</dd>
-            </div>
-            <div className="admin-fact-row">
-              <dt>
-                <Globe size={16} aria-hidden="true" /> Trang web
-              </dt>
-              <dd>
-                {website ? (
-                  <a
-                    href={
-                      website.startsWith("http")
-                        ? website
-                        : `https://${website}`
-                    }
-                    target="_blank"
-                    rel="noreferrer"
-                    className="admin-text-link"
-                  >
-                    {website} <ExternalLink size={13} aria-hidden="true" />
-                  </a>
-                ) : (
-                  "Chưa cập nhật"
-                )}
-              </dd>
-            </div>
-            <div className="admin-fact-row">
-              <dt>
-                <FileText size={16} aria-hidden="true" /> Mã số thuế
-              </dt>
-              <dd>{taxCode}</dd>
-            </div>
-            <div className="admin-fact-row full-width">
-              <dt>
-                <Info size={16} aria-hidden="true" /> Giới thiệu
-              </dt>
-              <dd className="admin-company-description">{description}</dd>
-            </div>
-            {createdAt && (
-              <div className="admin-fact-row">
-                <dt>
-                  <CalendarDays size={16} aria-hidden="true" /> Ngày gửi hồ sơ
-                </dt>
-                <dd>{date(createdAt, true)}</dd>
-              </div>
-            )}
-            {updatedAt && (
-              <div className="admin-fact-row">
-                <dt>
-                  <CalendarDays size={16} aria-hidden="true" /> Cập nhật gần nhất
-                </dt>
-                <dd>{date(updatedAt, true)}</dd>
-              </div>
-            )}
-            {typeof row.aggregateVersion === "number" && (
-              <div className="admin-fact-row">
-                <dt>
-                  <FileText size={16} aria-hidden="true" /> Phiên bản dữ liệu
-                </dt>
-                <dd>{String(row.aggregateVersion)}</dd>
-              </div>
-            )}
-          </dl>
-        </div>
-
-        {/* Right Column: Media */}
-        <div className="admin-company-side">
-          <div className="admin-side-card">
-            <div className="admin-side-head">
-              <h3>Thư viện hình ảnh và video</h3>
-              <p>Ảnh đại diện, không gian làm việc và tư liệu công ty.</p>
-            </div>
-
-            {/* Logo Preview */}
-            <div className="admin-media-group">
-              <span className="admin-media-group-label">Logo công ty</span>
-              {logoUrl ? (
-                <div className="admin-logo-card">
-                  <img
-                    src={logoUrl}
-                    alt={`Logo ${name}`}
-                    className="admin-logo-large-preview"
-                  />
-                  <a
-                    href={logoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="admin-icon-link"
-                  >
-                    Xem ảnh gốc <ExternalLink size={13} />
-                  </a>
-                </div>
-              ) : (
-                <div className="admin-media-empty-item">
-                  <Building2 size={24} aria-hidden="true" />
-                  <span>Chưa cập nhật logo</span>
-                </div>
-              )}
-            </div>
-
-            {/* Gallery */}
-            <div className="admin-media-group">
-              <div className="admin-media-group-head">
-                <span className="admin-media-group-label">
-                  Hình ảnh & Video ({rawMedia.length})
-                </span>
-              </div>
-              {rawMedia.length > 0 ? (
-                <div className="admin-media-grid">
-                  {rawMedia.map((item, idx) => (
-                    <div key={item.url || idx} className="admin-media-item">
-                      {item.type === "VIDEO" ? (
-                        <video
-                          controls
-                          preload="metadata"
-                          className="admin-media-video"
-                        >
-                          <source src={item.url} />
-                        </video>
-                      ) : (
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="admin-media-thumb-link"
-                          title="Xem ảnh gốc"
-                        >
-                          <img
-                            src={item.url}
-                            alt={`Ảnh ${idx + 1}`}
-                            loading="lazy"
-                            className="admin-media-thumb"
-                          />
-                          <span className="admin-media-zoom">
-                            <ExternalLink size={14} />
-                          </span>
-                        </a>
-                      )}
-                      <span className="admin-media-tag">
-                        {item.type === "VIDEO" ? (
-                          <>
-                            <VideoIcon size={11} /> Video
-                          </>
-                        ) : (
-                          <>
-                            <ImageIcon size={11} /> Ảnh
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="admin-media-empty-state">
-                  <ImageIcon size={28} aria-hidden="true" />
-                  <p>Doanh nghiệp chưa bổ sung ảnh hoặc video giới thiệu.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      {/* Sub tabs navigation */}
+      <div className="admin-detail-subtabs" role="tablist" aria-label="Mục chi tiết doanh nghiệp">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={subTab === "overview"}
+          className={`admin-detail-subtab ${subTab === "overview" ? "is-active" : ""}`}
+          onClick={() => setSubTab("overview")}
+        >
+          <Building2 size={15} aria-hidden="true" />
+          <span>Thông tin chung</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={subTab === "members"}
+          className={`admin-detail-subtab ${subTab === "members" ? "is-active" : ""}`}
+          onClick={() => setSubTab("members")}
+        >
+          <UsersRound size={15} aria-hidden="true" />
+          <span>Thành viên & HR {members.length ? `(${members.length})` : ""}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={subTab === "jobs"}
+          className={`admin-detail-subtab ${subTab === "jobs" ? "is-active" : ""}`}
+          onClick={() => setSubTab("jobs")}
+        >
+          <BriefcaseBusiness size={15} aria-hidden="true" />
+          <span>Tin tuyển dụng {jobs.length ? `(${jobs.length})` : ""}</span>
+        </button>
       </div>
+
+      {subTab === "overview" && (
+        <>
+          {/* 4 Overview metric cards */}
+          <section className="admin-company-metrics" aria-label="Tóm tắt công ty">
+            <div className="admin-company-metric-card">
+              <span className="metric-label">Trạng thái</span>
+              <strong className={`metric-value tone-${statusTone}`}>
+                {statusLabel}
+              </strong>
+              <span className="metric-sub">Xác minh doanh nghiệp</span>
+            </div>
+            <div className="admin-company-metric-card">
+              <span className="metric-label">Lĩnh vực</span>
+              <strong className="metric-value">{industry}</strong>
+              <span className="metric-sub">Thông tin doanh nghiệp</span>
+            </div>
+            <div className="admin-company-metric-card">
+              <span className="metric-label">Người đại diện / Sở hữu</span>
+              <strong className="metric-value">{ownerName}</strong>
+              <span className="metric-sub">Quyền quản lý công ty</span>
+            </div>
+            <div className="admin-company-metric-card">
+              <span className="metric-label">Quy mô</span>
+              <strong className="metric-value">
+                {size !== "Chưa cập nhật" ? `${size} nhân sự` : "Chưa cập nhật"}
+              </strong>
+              <span className="metric-sub">Quy mô nhân sự</span>
+            </div>
+          </section>
+
+          {/* Main 2-column layout */}
+          <div className="admin-company-layout">
+            {/* Left Column */}
+            <div className="admin-company-main">
+              {/* Header */}
+              <div className="admin-company-header">
+                <div className="admin-company-brand">
+                  {logoUrl ? (
+                    <img
+                      src={logoUrl}
+                      alt={`Logo ${name}`}
+                      className="admin-company-logo-avatar"
+                    />
+                  ) : (
+                    <div className="admin-company-logo-fallback" aria-hidden="true">
+                      <Building2 size={32} />
+                    </div>
+                  )}
+                  <div className="admin-company-title-wrap">
+                    <h2>{name}</h2>
+                    <p className="admin-company-meta">
+                      MST {taxCode} · Chủ sở hữu {ownerName}
+                    </p>
+                  </div>
+                </div>
+                <StatusBadge tone={statusTone}>{statusLabel}</StatusBadge>
+              </div>
+
+              {/* Legal Notice */}
+              <div className="admin-company-notice admin-notice-legal">
+                <strong>Hồ sơ pháp lý</strong>
+                <p>
+                  Đổi tên hoặc mã số thuế khi đã xác minh sẽ đưa công ty về trạng
+                  thái chờ duyệt.
+                </p>
+              </div>
+
+              {/* Status Notice */}
+              {verifiedStatus === "PENDING" && !isSuspended && (
+                <div
+                  className="admin-company-notice admin-notice-pending"
+                  aria-live="polite"
+                >
+                  <strong>Đang chờ xác minh</strong>
+                  <p>Hồ sơ đã được gửi và đang chờ Admin xem xét.</p>
+                </div>
+              )}
+              {verifiedStatus === "VERIFIED" && !isSuspended && (
+                <div
+                  className="admin-company-notice admin-notice-verified"
+                  aria-live="polite"
+                >
+                  <strong>Đã xác minh</strong>
+                  <p>
+                    Hồ sơ công ty đã được kiểm duyệt và xác thực hợp lệ trên hệ thống.
+                  </p>
+                </div>
+              )}
+              {verifiedStatus === "REJECTED" && !isSuspended && (
+                <div
+                  className="admin-company-notice admin-notice-rejected"
+                  aria-live="polite"
+                >
+                  <strong>Đã từ chối xác minh</strong>
+                  <p>Hồ sơ doanh nghiệp đã bị từ chối yêu cầu xác thực.</p>
+                  {rejectReason && (
+                    <p className="admin-notice-reason">
+                      <strong>Lý do từ chối:</strong> {rejectReason}
+                    </p>
+                  )}
+                </div>
+              )}
+              {isSuspended && (
+                <div
+                  className="admin-company-notice admin-notice-suspended"
+                  aria-live="polite"
+                >
+                  <strong>Doanh nghiệp đang bị đình chỉ</strong>
+                  <p>Công ty đang tạm thời bị ẩn khỏi hệ thống.</p>
+                  {suspensionReason && (
+                    <p className="admin-notice-reason">
+                      <strong>Lý do đình chỉ:</strong> {suspensionReason}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Fact items list */}
+              <dl className="admin-company-facts">
+                <div className="admin-fact-row">
+                  <dt>
+                    <Building2 size={16} aria-hidden="true" /> Lĩnh vực
+                  </dt>
+                  <dd>{industry}</dd>
+                </div>
+                <div className="admin-fact-row">
+                  <dt>
+                    <UsersRound size={16} aria-hidden="true" /> Quy mô
+                  </dt>
+                  <dd>
+                    {size !== "Chưa cập nhật"
+                      ? `${size} nhân sự`
+                      : "Chưa cập nhật"}
+                  </dd>
+                </div>
+                <div className="admin-fact-row">
+                  <dt>
+                    <MapPin size={16} aria-hidden="true" /> Địa chỉ
+                  </dt>
+                  <dd>{address}</dd>
+                </div>
+                <div className="admin-fact-row">
+                  <dt>
+                    <Globe size={16} aria-hidden="true" /> Trang web
+                  </dt>
+                  <dd>
+                    {website ? (
+                      <a
+                        href={
+                          website.startsWith("http")
+                            ? website
+                            : `https://${website}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="admin-text-link"
+                      >
+                        {website} <ExternalLink size={13} aria-hidden="true" />
+                      </a>
+                    ) : (
+                      "Chưa cập nhật"
+                    )}
+                  </dd>
+                </div>
+                <div className="admin-fact-row">
+                  <dt>
+                    <FileText size={16} aria-hidden="true" /> Mã số thuế
+                  </dt>
+                  <dd>{taxCode}</dd>
+                </div>
+                <div className="admin-fact-row full-width">
+                  <dt>
+                    <Info size={16} aria-hidden="true" /> Giới thiệu
+                  </dt>
+                  <dd className="admin-company-description">{description}</dd>
+                </div>
+                {createdAt && (
+                  <div className="admin-fact-row">
+                    <dt>
+                      <CalendarDays size={16} aria-hidden="true" /> Ngày gửi hồ sơ
+                    </dt>
+                    <dd>{date(createdAt, true)}</dd>
+                  </div>
+                )}
+                {updatedAt && (
+                  <div className="admin-fact-row">
+                    <dt>
+                      <CalendarDays size={16} aria-hidden="true" /> Cập nhật gần nhất
+                    </dt>
+                    <dd>{date(updatedAt, true)}</dd>
+                  </div>
+                )}
+                {typeof row.aggregateVersion === "number" && (
+                  <div className="admin-fact-row">
+                    <dt>
+                      <FileText size={16} aria-hidden="true" /> Phiên bản dữ liệu
+                    </dt>
+                    <dd>{String(row.aggregateVersion)}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+
+            {/* Right Column: Media */}
+            <div className="admin-company-side">
+              <div className="admin-side-card">
+                <div className="admin-side-head">
+                  <h3>Thư viện hình ảnh và video</h3>
+                  <p>Ảnh đại diện, không gian làm việc và tư liệu công ty.</p>
+                </div>
+
+                {/* Logo Preview */}
+                <div className="admin-media-group">
+                  <span className="admin-media-group-label">Logo công ty</span>
+                  {logoUrl ? (
+                    <div className="admin-logo-card">
+                      <img
+                        src={logoUrl}
+                        alt={`Logo ${name}`}
+                        className="admin-logo-large-preview"
+                      />
+                      <a
+                        href={logoUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="admin-icon-link"
+                      >
+                        Xem ảnh gốc <ExternalLink size={13} />
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="admin-media-empty-item">
+                      <Building2 size={24} aria-hidden="true" />
+                      <span>Chưa cập nhật logo</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Gallery */}
+                <div className="admin-media-group">
+                  <div className="admin-media-group-head">
+                    <span className="admin-media-group-label">
+                      Hình ảnh & Video ({rawMedia.length})
+                    </span>
+                  </div>
+                  {rawMedia.length > 0 ? (
+                    <div className="admin-media-grid">
+                      {rawMedia.map((item, idx) => (
+                        <div key={item.url || idx} className="admin-media-item">
+                          {item.type === "VIDEO" ? (
+                            <video
+                              controls
+                              preload="metadata"
+                              className="admin-media-video"
+                            >
+                              <source src={item.url} />
+                            </video>
+                          ) : (
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="admin-media-thumb-link"
+                              title="Xem ảnh gốc"
+                            >
+                              <img
+                                src={item.url}
+                                alt={`Ảnh ${idx + 1}`}
+                                loading="lazy"
+                                className="admin-media-thumb"
+                              />
+                              <span className="admin-media-zoom">
+                                <ExternalLink size={14} />
+                              </span>
+                            </a>
+                          )}
+                          <span className="admin-media-tag">
+                            {item.type === "VIDEO" ? (
+                              <>
+                                <VideoIcon size={11} /> Video
+                              </>
+                            ) : (
+                              <>
+                                <ImageIcon size={11} /> Ảnh
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="admin-media-empty-state">
+                      <ImageIcon size={28} aria-hidden="true" />
+                      <p>Doanh nghiệp chưa bổ sung ảnh hoặc video giới thiệu.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {subTab === "members" && (
+        <div className="admin-members-list">
+          {members.length > 0 ? (
+            members.map((m) => (
+              <div key={m.id} className="admin-member-card">
+                <div className="admin-member-info">
+                  <div className="admin-member-avatar" aria-hidden="true">
+                    {m.role === "OWNER" ? "👑" : "👤"}
+                  </div>
+                  <div className="admin-member-details">
+                    <strong>Mã tài khoản: {m.userId}</strong>
+                    <small>Gia nhập: {date(m.joinedAt, true)}</small>
+                  </div>
+                </div>
+                <StatusBadge tone={m.role === "OWNER" ? "primary" : "neutral"}>
+                  {m.role === "OWNER" ? "Chủ sở hữu (OWNER)" : "Thành viên (MEMBER)"}
+                </StatusBadge>
+              </div>
+            ))
+          ) : (
+            <div className="admin-media-empty-state">
+              <UsersRound size={28} aria-hidden="true" />
+              <p>Chưa có danh sách thành viên chi tiết cho doanh nghiệp này.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {subTab === "jobs" && (
+        <div className="admin-jobs-list">
+          {jobsLoading ? (
+            <div className="loading-state">
+              <span className="spinner" aria-hidden="true" />
+              <span>Đang tải tin tuyển dụng…</span>
+            </div>
+          ) : jobs.length > 0 ? (
+            jobs.map((job) => (
+              <div key={String(job.id)} className="admin-job-item">
+                <div className="admin-job-info">
+                  <strong>{String(job.title ?? job.name ?? "Tin tuyển dụng")}</strong>
+                  <small>
+                    {text(job.location, "Chưa rõ địa điểm")} · Hạn nộp: {date(job.deadline)} · Đăng ngày: {date(job.createdAt ?? job.created_at)}
+                  </small>
+                </div>
+                <StatusBadge tone={job.isSuspended ? "danger" : job.status === "PUBLISHED" ? "success" : job.status === "REJECTED" ? "danger" : "warning"}>
+                  {job.isSuspended ? "Đã gỡ" : jobStatusLabel(String(job.status))}
+                </StatusBadge>
+              </div>
+            ))
+          ) : (
+            <div className="admin-media-empty-state">
+              <BriefcaseBusiness size={28} aria-hidden="true" />
+              <p>Doanh nghiệp chưa đăng tin tuyển dụng nào.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Action Bar */}
       <div className="admin-detail-actions-bar">
@@ -932,6 +1102,16 @@ export function AdminCompanyDetail({
               {isSuspended ? "Khôi phục" : "Đình chỉ"}
             </button>
           )}
+          {onEdit && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => onEdit(row)}
+            >
+              <Pencil size={15} aria-hidden="true" />
+              Sửa thông tin
+            </button>
+          )}
         </div>
         {onClose && (
           <button
@@ -953,6 +1133,7 @@ export function AdminDetail({
   pending = false,
   onChoose,
   onClose,
+  onEdit,
 }: {
   row: AdminRow;
   tab: AdminTab;
@@ -965,14 +1146,16 @@ export function AdminDetail({
     subject?: string,
   ) => void;
   onClose?: () => void;
+  onEdit?: (row: AdminRow) => void;
 }) {
-  if (tab === "companies") {
+  if (tab === "companies" || tab === "company-verifications") {
     return (
       <AdminCompanyDetail
         row={row}
         pending={pending}
         onChoose={onChoose}
         onClose={onClose}
+        onEdit={onEdit}
       />
     );
   }

@@ -32,6 +32,7 @@ import {
   ConfirmCompanyMediaUploadDto,
   CreateCompanyMediaUploadDto,
 } from './dto/company-media-upload.dto';
+import { AdminUpdateCompanyDto } from './dto/admin-update-company.dto';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { ListCompaniesQueryDto } from './dto/list-companies-query.dto';
 import { ModerateCompanyDto } from './dto/moderate-company.dto';
@@ -236,10 +237,109 @@ export class CompanyService {
     );
   }
 
-  async getAdminDetail(companyId: string): Promise<CompanyProfileDto> {
-    const company = await this.prisma.company.findUnique({ where: { id: companyId }, ...COMPANY_WITH_MEDIA });
+  async getAdminDetail(companyId: string): Promise<CompanyProfileDto & { members?: Array<{ id: string; userId: string; role: string; joinedAt: string }> }> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      include: {
+        ...COMPANY_WITH_MEDIA.include,
+        members: {
+          select: {
+            id: true,
+            userId: true,
+            role: true,
+            joinedAt: true,
+          },
+          orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+        },
+      },
+    });
     if (!company) throw new ApiException('COMPANY_NOT_FOUND', 'Company was not found', HttpStatus.NOT_FOUND);
-    return this.toProfile(company);
+    const profile = this.toProfile(company);
+    return {
+      ...profile,
+      members: company.members.map((m) => ({
+        id: m.id,
+        userId: m.userId,
+        role: m.role,
+        joinedAt: m.joinedAt.toISOString(),
+      })),
+    };
+  }
+
+  async adminUpdate(
+    adminId: string,
+    companyId: string,
+    dto: AdminUpdateCompanyDto,
+  ): Promise<CompanyProfileDto> {
+    try {
+      return await this.prisma.$transaction(
+        async (transaction) => {
+          const company = await transaction.company.findUnique({
+            where: { id: companyId },
+            ...COMPANY_WITH_MEDIA,
+          });
+
+          if (!company) {
+            throw new ApiException(
+              'COMPANY_NOT_FOUND',
+              'Company was not found',
+              HttpStatus.NOT_FOUND,
+            );
+          }
+
+          if (
+            dto.expectedVersion !== undefined &&
+            company.aggregateVersion !== dto.expectedVersion
+          ) {
+            throw new ApiException(
+              'COMPANY_UPDATE_CONFLICT',
+              'The company changed since it was loaded; reload before saving',
+              HttpStatus.CONFLICT,
+            );
+          }
+
+          const data: Prisma.CompanyUpdateInput = {
+            aggregateVersion: { increment: 1 },
+          };
+
+          if (dto.name !== undefined) {
+            const name = this.cleanCompanyName(dto.name);
+            data.name = name;
+            data.normalizedName = this.normalizeCompanyName(name);
+            data.slug = this.createSlug(name, companyId);
+          }
+          if (dto.taxCode !== undefined) {
+            data.taxCode = this.normalizeTaxCode(dto.taxCode);
+          }
+          if (dto.description !== undefined) {
+            data.description = dto.description.trim();
+          }
+          if (dto.industry !== undefined) {
+            data.industry = dto.industry.trim();
+          }
+          if (dto.size !== undefined) {
+            data.size = dto.size.trim();
+          }
+          if (dto.address !== undefined) {
+            data.address = dto.address.trim();
+          }
+          if (dto.website !== undefined) {
+            data.website = dto.website ? dto.website.trim() : null;
+          }
+
+          const updated = await transaction.company.update({
+            where: { id: companyId },
+            data,
+            ...COMPANY_WITH_MEDIA,
+          });
+
+          return this.toProfile(updated);
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (error) {
+      this.throwPersistenceError(error);
+    }
   }
 
   async suspendedIds(after?: string) {
