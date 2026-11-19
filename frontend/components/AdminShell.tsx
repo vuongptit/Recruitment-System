@@ -58,8 +58,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
     };
   }, [account?.role]);
 
-  const displayName = profile?.fullName || account?.email;
-  const avatarUrl = profile?.avatarUrl;
+  const displayName = profile?.fullName?.trim() || account?.email;
+  const avatarUrl = profile?.avatarUrl?.trim() || null;
 
   return (
     <WorkspaceShell

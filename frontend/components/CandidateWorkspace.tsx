@@ -45,5 +45,5 @@ function CandidateWorkspaceContent({ children }: { children: ReactNode }) {
     return () => controller.abort();
   }, [account?.id, account?.role]);
   if (!isDemoPerson2Api && account?.role !== "CANDIDATE") return <PublicShell>{children}</PublicShell>;
-  return <WorkspaceShell role="candidate" title="Ứng viên" navigationLabel="Khu vực ứng viên" links={links} showNavigation variant={discovery ? "discovery" : "workspace"} name={profile?.fullName || account?.email} avatarUrl={profile?.avatarUrl}>{children}</WorkspaceShell>;
+  return <WorkspaceShell role="candidate" title="Ứng viên" navigationLabel="Khu vực ứng viên" links={links} showNavigation variant={discovery ? "discovery" : "workspace"} name={profile?.fullName?.trim() || account?.email} avatarUrl={profile?.avatarUrl?.trim() || null}>{children}</WorkspaceShell>;
 }
