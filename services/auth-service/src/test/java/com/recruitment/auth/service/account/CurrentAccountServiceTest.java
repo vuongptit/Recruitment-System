@@ -47,6 +47,58 @@ class CurrentAccountServiceTest {
     verify(users, never()).saveAndFlush(any());
   }
 
+  @Test
+  void updatesPasswordWhenCurrentPasswordMatchesAndNewPasswordIsValid() {
+    org.springframework.security.crypto.password.PasswordEncoder encoder =
+        new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(10);
+    com.recruitment.auth.security.password.RegistrationPasswordPolicy policy =
+        new com.recruitment.auth.security.password.RegistrationPasswordPolicy();
+    CurrentAccountService svc = new CurrentAccountService(users, encoder, policy);
+
+    AuthUser admin = AuthUser.registerOAuth("admin@example.com", UserRole.CANDIDATE, Instant.now());
+    admin.changePasswordHash(encoder.encode("CurrentPass123"));
+    when(users.findById(admin.getId())).thenReturn(Optional.of(admin));
+
+    svc.updatePassword(admin.getId(), "CurrentPass123", "NewSecretPass456");
+    verify(users).saveAndFlush(admin);
+    assertThat(encoder.matches("NewSecretPass456", admin.getPasswordHash())).isTrue();
+  }
+
+  @Test
+  void rejectsPasswordChangeWhenCurrentPasswordIsWrong() {
+    org.springframework.security.crypto.password.PasswordEncoder encoder =
+        new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder(10);
+    com.recruitment.auth.security.password.RegistrationPasswordPolicy policy =
+        new com.recruitment.auth.security.password.RegistrationPasswordPolicy();
+    CurrentAccountService svc = new CurrentAccountService(users, encoder, policy);
+
+    AuthUser admin = AuthUser.registerOAuth("admin@example.com", UserRole.CANDIDATE, Instant.now());
+    admin.changePasswordHash(encoder.encode("CurrentPass123"));
+    when(users.findById(admin.getId())).thenReturn(Optional.of(admin));
+
+    assertThatThrownBy(() -> svc.updatePassword(admin.getId(), "WrongPass123", "NewSecretPass456"))
+        .isInstanceOf(AuthBusinessException.class)
+        .hasMessageContaining("không chính xác");
+    verify(users, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void recruiterProfileCanBeRetrievedAndUpdated() {
+    AuthUser recruiter = active(UserRole.RECRUITER);
+    var updated = service.updateRecruiterProfile(
+        recruiter.getId(),
+        new com.recruitment.auth.dto.account.UpdateRecruiterProfileRequest(
+            "Lê Tuyển Dụng", "0987654321", "https://example.com/avatar.png", "HR Manager", "Phụ trách Tech"
+        )
+    );
+    assertThat(updated.fullName()).isEqualTo("Lê Tuyển Dụng");
+    assertThat(updated.phone()).isEqualTo("0987654321");
+    assertThat(updated.avatarUrl()).isEqualTo("https://example.com/avatar.png");
+    assertThat(updated.position()).isEqualTo("HR Manager");
+    assertThat(updated.bio()).isEqualTo("Phụ trách Tech");
+    verify(users).saveAndFlush(recruiter);
+  }
+
   private AuthUser active(UserRole role) {
     AuthUser user = AuthUser.registerOAuth("contact@example.com", role, Instant.now());
     when(users.findById(user.getId())).thenReturn(Optional.of(user));

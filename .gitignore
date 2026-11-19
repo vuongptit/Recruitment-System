@@ -36,3 +36,5 @@ start.bat
 start.ps1
 stop.bat
 stop.ps1
+env.zip
+scripts/tunnel-db.sh

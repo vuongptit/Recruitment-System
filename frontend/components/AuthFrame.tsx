@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Logo } from "./Logo";
+import { useSiteSettings } from "./SiteSettingsContext";
 import styles from "./AuthFrame.module.css";
 import { portalEntry } from "@/lib/portalRoutes";
 
@@ -26,15 +27,16 @@ const portals = {
 export function AuthFrame({ portal = "CANDIDATE", title, description, children }: {
   portal?: AuthPortal; title: string; description: string; children: ReactNode;
 }) {
+  const { siteName } = useSiteSettings();
   const context = portals[portal];
   return <main className={styles.frame} data-auth-frame={portal.toLowerCase()}>
     <header className={styles.header}>
-      <Link className={styles.brand} href={portalEntry(portal)} aria-label="CareerHub - Trang chủ"><Logo size={36} /><span>CareerHub</span></Link>
+      <Link className={styles.brand} href={portalEntry(portal)} aria-label={`${siteName} - Trang chủ`}><Logo size={36} /><span>{siteName}</span></Link>
       <Link className={styles.explore} href={portal === "CANDIDATE" ? "/candidate/jobs" : portalEntry(portal)}>{portal === "CANDIDATE" ? "Khám phá việc làm" : portal === "RECRUITER" ? "Trang chủ tuyển dụng" : "Khu vực quản trị"} <span aria-hidden="true">↗</span></Link>
     </header>
     <div className={styles.layout}>
       <aside className={styles.context}>
-        <span className={styles.contextLabel}>CAREERHUB · {context.label.toLocaleUpperCase("vi-VN")}</span>
+        <span className={styles.contextLabel}>{siteName.toUpperCase()} · {context.label.toLocaleUpperCase("vi-VN")}</span>
         <h2>{context.heading}</h2>
         <p>{context.description}</p>
         <ul>{context.steps.map(step => <li key={step}><span aria-hidden="true">✓</span>{step}</li>)}</ul>
@@ -46,7 +48,7 @@ export function AuthFrame({ portal = "CANDIDATE", title, description, children }
         <div className={styles.content}>{children}</div>
       </section>
     </div>
-    <footer className={styles.footer}><span>© 2026 CareerHub</span><span>{portal === "CANDIDATE" ? "Cơ hội phù hợp. Tương lai rộng mở." : portal === "RECRUITER" ? "Kết nối nhân tài. Xây dựng đội ngũ." : "Không gian vận hành hệ thống"}</span></footer>
+    <footer className={styles.footer}><span>© 2026 {siteName}</span><span>{portal === "CANDIDATE" ? "Cơ hội phù hợp. Tương lai rộng mở." : portal === "RECRUITER" ? "Kết nối nhân tài. Xây dựng đội ngũ." : "Không gian vận hành hệ thống"}</span></footer>
   </main>;
 }
 

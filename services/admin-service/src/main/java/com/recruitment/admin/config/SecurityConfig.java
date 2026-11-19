@@ -84,6 +84,7 @@ public class SecurityConfig {
           )
           .permitAll();
         a.requestMatchers(HttpMethod.POST, "/reports").authenticated();
+        a.requestMatchers(HttpMethod.GET, "/settings/public").permitAll();
         a.anyRequest().hasRole("ADMIN");
       })
       .oauth2ResourceServer(o ->

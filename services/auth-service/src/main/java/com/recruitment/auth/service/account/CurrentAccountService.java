@@ -3,21 +3,38 @@ package com.recruitment.auth.service.account;
 import com.recruitment.auth.dto.account.CurrentAccountResponse;
 import com.recruitment.auth.dto.account.RecruiterContactRequest;
 import com.recruitment.auth.dto.account.RecruiterContactResponse;
+import com.recruitment.auth.dto.account.RecruiterProfileResponse;
+import com.recruitment.auth.dto.account.UpdateRecruiterProfileRequest;
 import com.recruitment.auth.exception.AuthBusinessException;
 import com.recruitment.auth.model.AuthUser;
 import com.recruitment.auth.model.UserRole;
 import com.recruitment.auth.repository.jpa.AuthUserRepository;
+import com.recruitment.auth.security.password.RegistrationPasswordPolicy;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CurrentAccountService {
   private final AuthUserRepository users;
+  private final PasswordEncoder passwordEncoder;
+  private final RegistrationPasswordPolicy passwordPolicy;
+
+  @Autowired
+  public CurrentAccountService(
+      AuthUserRepository users,
+      PasswordEncoder passwordEncoder,
+      RegistrationPasswordPolicy passwordPolicy) {
+    this.users = users;
+    this.passwordEncoder = passwordEncoder;
+    this.passwordPolicy = passwordPolicy;
+  }
 
   public CurrentAccountService(AuthUserRepository users) {
-    this.users = users;
+    this(users, null, null);
   }
 
   @Transactional(readOnly = true)
@@ -42,6 +59,52 @@ public class CurrentAccountService {
     }
     users.saveAndFlush(user);
     return new RecruiterContactResponse(user.getRecruiterFullName(), user.getRecruiterPhone());
+  }
+
+  @Transactional(readOnly = true)
+  public RecruiterProfileResponse getRecruiterProfile(UUID userId) {
+    AuthUser user = requireRecruiter(userId);
+    return new RecruiterProfileResponse(
+        user.getId(),
+        user.getEmail(),
+        user.getRecruiterFullName() != null ? user.getRecruiterFullName() : "",
+        user.getRecruiterPhone() != null ? user.getRecruiterPhone() : "",
+        user.getRecruiterAvatarUrl() != null ? user.getRecruiterAvatarUrl() : "",
+        user.getRecruiterPosition() != null ? user.getRecruiterPosition() : "",
+        user.getRecruiterBio() != null ? user.getRecruiterBio() : ""
+    );
+  }
+
+  @Transactional
+  public RecruiterProfileResponse updateRecruiterProfile(UUID userId, UpdateRecruiterProfileRequest request) {
+    AuthUser user = requireRecruiter(userId);
+    try {
+      user.updateRecruiterProfile(
+          request.fullName(),
+          request.phone(),
+          request.avatarUrl(),
+          request.position(),
+          request.bio()
+      );
+    } catch (IllegalArgumentException exception) {
+      throw new AuthBusinessException("VALIDATION_ERROR", "Thông tin nhà tuyển dụng không hợp lệ", HttpStatus.BAD_REQUEST);
+    }
+    users.saveAndFlush(user);
+    return getRecruiterProfile(userId);
+  }
+
+  @Transactional
+  public void updatePassword(UUID userId, String currentPassword, String newPassword) {
+    if (passwordEncoder == null || passwordPolicy == null) {
+      throw new IllegalStateException("Password encoder or policy not configured");
+    }
+    AuthUser user = requireActiveUser(userId);
+    if (user.getPasswordHash() != null && !passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+      throw new AuthBusinessException("INVALID_CREDENTIALS", "Mật khẩu hiện tại không chính xác", HttpStatus.BAD_REQUEST);
+    }
+    passwordPolicy.validate(newPassword);
+    user.changePasswordHash(passwordEncoder.encode(newPassword));
+    users.saveAndFlush(user);
   }
 
   private AuthUser requireRecruiter(UUID userId) {

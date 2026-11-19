@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Flag, Menu, X, type LucideIcon } from "lucide-react";
 import { AccountNavigation } from "./AccountNavigation";
 import { Logo } from "./Logo";
+import { useSiteSettings } from "./SiteSettingsContext";
 import { portalHome, portalSection, type AccountRole } from "@/lib/portalRoutes";
 
 export interface WorkspaceLink { href: string; label: string; icon: LucideIcon; exact?: boolean; aliases?: string[] }
@@ -23,6 +24,7 @@ export function WorkspaceShell(props: {
 }
 
 function WorkspaceContent({ children, role, title, navigationLabel, links, showNavigation, name, avatarUrl, variant = "workspace" }: Parameters<typeof WorkspaceShell>[0]) {
+  const { siteName, footerText } = useSiteSettings();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -55,7 +57,7 @@ function WorkspaceContent({ children, role, title, navigationLabel, links, showN
     <a className="skip-link" href="#workspace-content">Bỏ qua điều hướng</a>
     <header className="topbar workspace-header"><div className="topbar-inner">
       {showNavigation && <button ref={menuButton} type="button" className="workspace-menu-button notification-bell" aria-label={menuOpen ? "Đóng menu" : "Mở menu"} aria-expanded={menuOpen} aria-controls="workspace-sidebar" onClick={() => setMenuOpen(open => !open)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>}
-      <Link prefetch={false} className="brand shell-brand" href={portalHome(roleKey)} aria-label="CareerHub - Trang chủ"><Logo size={34} /><span>CareerHub<small>{title}</small></span></Link>
+      <Link prefetch={false} className="brand shell-brand" href={portalHome(roleKey)} aria-label={`${siteName} - Trang chủ`}><Logo size={34} /><span>{siteName}<small>{title}</small></span></Link>
       <AccountNavigation workspace portal={roleKey} />
     </div></header>
     <div className="workspace-body">
@@ -74,7 +76,7 @@ function WorkspaceContent({ children, role, title, navigationLabel, links, showN
           {role !== "admin" && <Link prefetch={false} href={portalSection(roleKey, "reports")} className="workspace-nav-link workspace-report-link" aria-current={pathname === portalSection(roleKey, "reports") ? "page" : undefined} onClick={() => setMenuOpen(false)}><Flag size={19} strokeWidth={1.7} aria-hidden="true" /><span>Báo cáo vi phạm</span></Link>}
         </nav>
       </aside>}
-      <div id="workspace-content" tabIndex={-1} className={`workspace-content ${role === "candidate" ? "candidate-content" : "content"}`}><div className="workspace-page">{children}</div><footer className="workspace-footer"><span>CareerHub · {title}</span><span>Cùng bạn tiến xa hơn mỗi ngày.</span></footer></div>
+      <div id="workspace-content" tabIndex={-1} className={`workspace-content ${role === "candidate" ? "candidate-content" : "content"}`}><div className="workspace-page">{children}</div><footer className="workspace-footer"><span>{siteName} · {title}</span><span>{footerText}</span></footer></div>
     </div>
   </div>;
 }

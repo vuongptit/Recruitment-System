@@ -3,9 +3,13 @@ package com.recruitment.auth.controller;
 import com.recruitment.auth.dto.account.CurrentAccountResponse;
 import com.recruitment.auth.dto.account.RecruiterContactRequest;
 import com.recruitment.auth.dto.account.RecruiterContactResponse;
+import com.recruitment.auth.dto.account.RecruiterProfileResponse;
+import com.recruitment.auth.dto.account.UpdatePasswordRequest;
+import com.recruitment.auth.dto.account.UpdateRecruiterProfileRequest;
 import com.recruitment.auth.dto.common.ApiResponse;
 import com.recruitment.auth.service.account.CurrentAccountService;
 import jakarta.validation.Valid;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +49,35 @@ public class CurrentAccountController {
   public ResponseEntity<ApiResponse<RecruiterContactResponse>> updateRecruiterContact(
       @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody RecruiterContactRequest request) {
     return privateContact(accounts.updateRecruiterContact(UUID.fromString(jwt.getSubject()), request));
+  }
+
+  @GetMapping("/me/recruiter-profile")
+  public ResponseEntity<ApiResponse<RecruiterProfileResponse>> recruiterProfile(@AuthenticationPrincipal Jwt jwt) {
+    RecruiterProfileResponse profile = accounts.getRecruiterProfile(UUID.fromString(jwt.getSubject()));
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
+        .header(HttpHeaders.PRAGMA, "no-cache")
+        .body(ApiResponse.of(profile));
+  }
+
+  @PutMapping("/me/recruiter-profile")
+  public ResponseEntity<ApiResponse<RecruiterProfileResponse>> updateRecruiterProfile(
+      @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateRecruiterProfileRequest request) {
+    RecruiterProfileResponse profile = accounts.updateRecruiterProfile(UUID.fromString(jwt.getSubject()), request);
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
+        .header(HttpHeaders.PRAGMA, "no-cache")
+        .body(ApiResponse.of(profile));
+  }
+
+  @PutMapping("/me/password")
+  public ResponseEntity<ApiResponse<Map<String, String>>> updatePassword(
+      @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdatePasswordRequest request) {
+    accounts.updatePassword(UUID.fromString(jwt.getSubject()), request.currentPassword(), request.newPassword());
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CACHE_CONTROL, "no-store")
+        .header(HttpHeaders.PRAGMA, "no-cache")
+        .body(ApiResponse.of(Map.of("message", "Mật khẩu đã được cập nhật thành công")));
   }
 
   private ResponseEntity<ApiResponse<RecruiterContactResponse>> privateContact(RecruiterContactResponse contact) {

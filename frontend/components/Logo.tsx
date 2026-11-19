@@ -1,4 +1,42 @@
-export function Logo({ className = "", size = 32 }: { className?: string; size?: number }) {
+"use client";
+
+import { useSiteSettings } from "./SiteSettingsContext";
+
+export function Logo({
+  className = "",
+  size = 32,
+  src,
+  alt,
+}: {
+  className?: string;
+  size?: number;
+  src?: string | null;
+  alt?: string;
+}) {
+  const { siteLogo, siteName } = useSiteSettings();
+  const activeLogo = src !== undefined ? src : siteLogo;
+
+  if (activeLogo) {
+    return (
+      <img
+        src={activeLogo}
+        alt={alt || siteName || "Logo"}
+        width={size}
+        height={size}
+        className={`brand-custom-logo ${className}`}
+        style={{
+          width: size,
+          height: size,
+          objectFit: "contain",
+          borderRadius: 8,
+          display: "inline-block",
+          flexShrink: 0,
+        }}
+        decoding="async"
+      />
+    );
+  }
+
   return (
     <svg 
       xmlns="http://www.w3.org/2000/svg" 
@@ -6,6 +44,8 @@ export function Logo({ className = "", size = 32 }: { className?: string; size?:
       width={size} 
       height={size}
       className={className}
+      style={{ flexShrink: 0 }}
+      aria-hidden="true"
     >
       <defs>
         <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">

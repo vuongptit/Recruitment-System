@@ -45,7 +45,7 @@ export function AccountNavigation({ workspace = false, portal = "CANDIDATE" }: {
         {role === "RECRUITER" && <Link className="btn btn-primary header-create-job" href="/recruiter/jobs/new"><Plus size={17} aria-hidden="true" />Đăng tin</Link>}
         <NotificationBell />
         {role !== "ADMIN" && <Link prefetch={false} className="notification-bell" href={portalSection(role, "messages")} aria-label="Tin nhắn" title="Tin nhắn"><MessageSquare size={20} strokeWidth={1.7} aria-hidden="true" /></Link>}
-        <Link prefetch={false} className="account-identity" href={role === "CANDIDATE" ? "/candidate/profile" : role === "RECRUITER" ? "/recruiter/company" : "/admin"} title={account.email}>
+        <Link prefetch={false} className="account-identity" href={role === "CANDIDATE" ? "/candidate/profile" : role === "RECRUITER" ? "/recruiter/profile" : "/admin/profile"} title={account.email}>
           <span className="account-avatar" aria-hidden="true">{account.email.slice(0, 1).toUpperCase()}</span><span className="account-copy"><strong>{account.email.split("@")[0]}</strong><small>{portalLabel(role)}</small></span>
         </Link>
         <button className="notification-bell logout-button" type="button" disabled={pending} onClick={() => void logout()} aria-label={pending ? "Đang thoát…" : "Đăng xuất"} title="Đăng xuất"><LogOut size={19} aria-hidden="true" /></button>
