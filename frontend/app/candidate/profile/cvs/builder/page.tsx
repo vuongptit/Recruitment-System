@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { Check, FileText } from "lucide-react";
 import { LoadingState, PageHeader } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -9,6 +10,8 @@ import { ApiClientError, requestApi } from "../../../../../lib/apiClient";
 import { useCurrentAccount } from "../../../../../components/SessionGate";
 import {
   contentFromProfile,
+  cvTemplates,
+  type CvTemplateId,
   renderCvPdf,
   validateBuilder,
 } from "../../../../../lib/cvPdf";
@@ -22,6 +25,7 @@ import {
   type CandidateProfile,
   type PersonalUploadCheckpoint,
 } from "../../../../../lib/person1Api";
+import styles from "../CvLibrary.module.css";
 const empty: BuilderContent = {
   fullName: "",
   headline: "",
@@ -38,12 +42,13 @@ export default function BuilderPage() {
   const router = useRouter();
   const [content, setContent] = useState<BuilderContent>(empty);
   const [title, setTitle] = useState("CV của tôi");
-  const [template, setTemplate] = useState<"classic" | "modern">("modern");
+  const [template, setTemplate] = useState<CvTemplateId>("modern");
   const [original, setOriginal] = useState<CandidateCv | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState("");
+  const pdfDialog = useRef<HTMLDialogElement>(null);
   const lastPreview = useRef("");
   const pdfCache = useRef<{ fingerprint: string; blob: Blob } | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -61,7 +66,8 @@ export default function BuilderPage() {
           setOriginal(r.data);
           setTitle(r.data.title);
           setContent(validateBuilder(r.data.contentJson));
-          setTemplate(r.data.templateId === "classic" ? "classic" : "modern");
+          const savedTemplate = r.data.templateId;
+          setTemplate(savedTemplate && Object.hasOwn(cvTemplates, savedTemplate) ? savedTemplate as CvTemplateId : "modern");
         })
       : requestApi<CandidateProfile>("/api/profile/" + account.id, {
           privateData: true,
@@ -90,6 +96,9 @@ export default function BuilderPage() {
     },
     [],
   );
+  useEffect(() => {
+    if (preview && pdfDialog.current && !pdfDialog.current.open) pdfDialog.current.showModal();
+  }, [preview]);
   function change(name: keyof Omit<BuilderContent, "sections">, value: string) {
     setContent((c) => ({ ...c, [name]: value }));
   }
@@ -176,13 +185,27 @@ export default function BuilderPage() {
     });
   }
   return (
-    <main className="form-stack">
-      <PageHeader eyebrow="ỨNG VIÊN · CV" title={original ? "Chỉnh sửa CV" : "Tạo CV trực tuyến"} description="Sắp xếp kinh nghiệm, chọn mẫu trình bày và xem trước bản PDF trước khi lưu."
-        action={<Link className="btn" href="/candidate/profile/cvs">Danh sách CV</Link>} />
+    <main className={styles.page}>
+      <PageHeader title={original ? "Chỉnh sửa CV" : "Tạo CV trực tuyến"} description="Chọn mẫu, chỉnh nội dung và xem bản PDF trước khi lưu."
+        action={<div className="btn-group">{!loading && !loadFailed ? <a className={`btn ${styles.previewJump}`} href="#cv-live-preview">Xem trước trực tiếp</a> : null}<Link className="btn" href="/candidate/profile/cvs">Danh sách CV</Link></div>} />
       {loading ? (
         <LoadingState label="Đang tải nội dung…" />
       ) : (
+        <>
+        <section className={styles.templateGallery} aria-labelledby="cv-template-heading">
+          <h2 id="cv-template-heading">Thư viện mẫu CV</h2>
+          <div className={styles.templateGrid} role="group" aria-label="Mẫu CV">
+            {(Object.entries(cvTemplates) as [CvTemplateId, typeof cvTemplates[CvTemplateId]][]).map(([id, sample]) => (
+              <button className={styles.templateCard} type="button" key={id} aria-pressed={template === id} disabled={pending || loadFailed} onClick={() => setTemplate(id)}>
+                <span className={styles.templateArt} data-template={id} style={{ color: sample.accent }} aria-hidden="true"><span className={styles.templateSheet}><FileText size={21} /><i /><i /><i /></span>{template === id ? <Check size={16} /> : null}</span>
+                <strong>{sample.label}</strong><span className={styles.muted}>{sample.description}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+        <div className={styles.builderGrid}>
         <form className="card form-stack" noValidate onSubmit={save}>
+          <h2 className={styles.builderTitle}>Nội dung CV</h2>
           <UploadProgress step={uploadStep} />
           <fieldset
             disabled={pending || loadFailed}
@@ -197,17 +220,6 @@ export default function BuilderPage() {
                 maxLength={160}
                 onChange={(e) => setTitle(e.target.value)}
               />
-            </label>
-            <label className="field">
-              Mẫu CV
-              <select
-                className="select"
-                value={template}
-                onChange={(e) => setTemplate(e.target.value as typeof template)}
-              >
-                <option value="modern">Hiện đại</option>
-                <option value="classic">Cổ điển</option>
-              </select>
             </label>
             {(["fullName", "headline", "contact", "summary"] as const).map(
               (key, index) => (
@@ -334,23 +346,38 @@ export default function BuilderPage() {
             </p>
           ) : null}
         </form>
+        {!loadFailed ? <aside className={styles.livePreview} aria-labelledby="cv-live-preview">
+          <div className={styles.dialogHeader}><h2 id="cv-live-preview">Xem trước trực tiếp</h2><span className={styles.muted}>{cvTemplates[template].label}</span></div>
+          <article className={styles.livePaper} style={{ borderTopColor: cvTemplates[template].accent, lineHeight: cvTemplates[template].lineHeight }}>
+            <h3 style={{ color: cvTemplates[template].accent, fontSize: cvTemplates[template].nameSize }}>{content.fullName || "Họ và tên"}</h3>
+            <p className={styles.liveHeadline}>{content.headline || "Vị trí mong muốn"}</p>
+            {content.contact ? <p className={styles.muted}>{content.contact}</p> : null}
+            {content.summary ? <p>{content.summary}</p> : null}
+            {content.sections.filter(section => section.text.trim()).map((section, index) => <section key={index}>
+              <h4 style={{ color: cvTemplates[template].accent }}>{section.title}</h4><p>{section.text}</p>
+            </section>)}
+          </article>
+          <p className={styles.muted}>Chọn “Xem trước PDF” để kiểm tra bố cục và ngắt trang của bản xuất.</p>
+        </aside> : null}
+        </div>
+        </>
       )}
       {error ? (
         <p className="notice notice-danger" role="alert">
           {error}
         </p>
       ) : null}
-      {preview ? (
-        <section className="panel stack">
-          <div className="section-head"><div><h2>Bản xem trước PDF</h2>
-          <p className="help">Nhấn xem trước lần nữa sau khi chỉnh sửa.</p></div></div>
-          <iframe
-            className="person1-pdf"
-            src={preview}
-            title="Bản xem trước CV PDF"
-          />
-        </section>
-      ) : null}
+      <dialog ref={pdfDialog} className={`${styles.dialog} ${styles.pdfDialog}`} aria-labelledby="builder-pdf-title" onClose={() => {
+        if (lastPreview.current) URL.revokeObjectURL(lastPreview.current);
+        lastPreview.current = "";
+        setPreview("");
+      }}>
+        {preview ? <>
+          <div className={styles.dialogHeader}><h2 id="builder-pdf-title">Bản xem trước PDF</h2><button className="btn" type="button" onClick={() => pdfDialog.current?.close()}>Đóng</button></div>
+          <div className="btn-group"><button className="btn" type="button" onClick={() => void pdf(true)}>Tải PDF xuống</button></div>
+          <iframe className={styles.pdfFrame} src={preview} title="Bản xem trước CV PDF" />
+        </> : null}
+      </dialog>
     </main>
   );
 }

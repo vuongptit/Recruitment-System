@@ -240,6 +240,12 @@ export function validatePersonalFile(file: Pick<File, "name" | "size">, type: "C
   if (file.size > (type === "CV" ? 5 * 1024 * 1024 : AVATAR_MAX_BYTES))
     throw new Error(type === "CV" ? "Chọn PDF không quá 5 MiB." : "Ảnh tải lên không được vượt quá 2 MiB.");
 }
+export async function validateCvPdf(file: File): Promise<void> {
+  validatePersonalFile(file, "CV");
+  if (new TextDecoder().decode(await file.slice(0, 5).arrayBuffer()) !== "%PDF-") {
+    throw new Error("Nội dung tệp không phải PDF.");
+  }
+}
 export async function uploadPersonalFile(
   file: File,
   type: "CV" | "AVATAR",
@@ -252,12 +258,8 @@ export async function uploadPersonalFile(
   options.onStep?.("preparing");
   if (previous) file = previous.file;
   else if (type === "AVATAR") file = await prepareAvatarImage(file, signal);
-  validatePersonalFile(file, type);
-  if (
-    type === "CV" &&
-    new TextDecoder().decode(await file.slice(0, 5).arrayBuffer()) !== "%PDF-"
-  )
-    throw new Error("Nội dung tệp không phải PDF.");
+  if (type === "CV") await validateCvPdf(file);
+  else validatePersonalFile(file, type);
   let checkpoint = previous;
   if (!checkpoint || !checkpoint.uploaded && Date.parse(checkpoint.capability.expiresAt) <= Date.now()) {
     options.onStep?.("signing");

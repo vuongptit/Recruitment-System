@@ -159,6 +159,12 @@ test("CV library filters and sorts real rows and preserves private preview links
   await expect(library.getByRole("heading")).toHaveText(["Backend Developer"]);
   await expect(library.getByRole("link", { name: "Xem CV" })).toHaveAttribute("href", `/api/cv-preview/candidate/${cvId}`);
   await expect(library.getByRole("link", { name: "Xem CV" })).toHaveAttribute("target", "_blank");
+  await page.route(api + "/cv-preview/candidate/" + cvId, route => route.fulfill({ status: 200, contentType: "text/plain", body: "PDF fixture" }));
+  await library.getByRole("link", { name: "Xem CV" }).click();
+  const preview = page.getByRole("dialog", { name: "Backend Developer" });
+  await expect(preview.getByTitle("PDF: Backend Developer")).toHaveAttribute("src", `/api/cv-preview/candidate/${cvId}`);
+  await expect(preview.getByRole("link", { name: "Mở PDF trong tab mới" })).toHaveAttribute("target", "_blank");
+  await preview.getByRole("button", { name: "Đóng xem trước CV" }).click();
   await page.getByRole("searchbox", { name: "Tìm kiếm CV" }).fill("không khớp");
   await expect(page.getByText("Không tìm thấy CV phù hợp")).toBeVisible();
   await page.getByRole("button", { name: "Xóa bộ lọc" }).click();
@@ -170,6 +176,14 @@ test("CV library filters and sorts real rows and preserves private preview links
   await page.screenshot({ path: test.info().outputPath("cv-library.png"), fullPage: true });
   await page.evaluate(() => { window.location.hash = "upload-cv"; });
   await expect(page.getByLabel("Tên CV", { exact: true })).toBeVisible();
+  const transfer = await page.evaluateHandle(() => {
+    const data = new DataTransfer();
+    data.items.add(new File(["not a PDF"], "invalid.pdf", { type: "application/pdf" }));
+    return data;
+  });
+  await page.getByText("Kéo thả CV vào đây hoặc chọn tệp từ máy").dispatchEvent("drop", { dataTransfer: transfer });
+  await expect(page.getByRole("dialog", { name: "Tải CV lên" }).getByRole("alert")).toHaveText("Nội dung tệp không phải PDF.");
+  await expect(page.getByRole("button", { name: "Tải lên và lưu CV" })).toBeDisabled();
 });
 
 test("CV retries resume confirmation and saving without sending the same PDF again", async ({ page }) => {
@@ -496,6 +510,11 @@ test("CV Builder exports Vietnamese PDF then publishes a private snapshot", asyn
   await expect(
     page.getByRole("textbox", { name: "Họ tên", exact: true }),
   ).toHaveValue("Nguyễn Văn An", { timeout: 15000 });
+  await page.getByRole("button", { name: /Sáng tạo/ }).click();
+  await expect(page.getByRole("button", { name: /Sáng tạo/ })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("textbox", { name: "Họ tên", exact: true }).fill("Nguyễn Minh An");
+  await expect(page.getByRole("complementary", { name: "Xem trước trực tiếp" })).toContainText("Nguyễn Minh An");
+  await page.getByRole("textbox", { name: "Họ tên", exact: true }).fill("Nguyễn Văn An");
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Xuất PDF", exact: true }).click();
   const downloaded = await download;
@@ -514,6 +533,7 @@ test("CV Builder exports Vietnamese PDF then publishes a private snapshot", asyn
   expect(stored?.title).toBe("CV đổi tên sau lỗi lưu");
   expect(stored?.fileId).toBe(fileId);
   expect(stored?.contentSchemaVersion).toBe(1);
+  expect(stored?.templateId).toBe("creative");
   expect((stored?.contentJson as Record<string, unknown>).fullName).toBe(
     "Nguyễn Văn An",
   );

@@ -1,4 +1,12 @@
 import type { BuilderContent, CandidateProfile } from "./person1Api";
+
+export const cvTemplates = {
+  classic: { label: "Chuyên nghiệp", description: "Trang trọng, dễ đọc", accent: "#263c59", margin: 44, nameSize: 24, lineHeight: 1.25 },
+  minimal: { label: "Tối giản", description: "Gọn gàng, ít chi tiết", accent: "#30383e", margin: 48, nameSize: 21, lineHeight: 1.2 },
+  modern: { label: "Hiện đại", description: "Tiêu đề xanh nổi bật", accent: "#006e2e", margin: 44, nameSize: 24, lineHeight: 1.25 },
+  creative: { label: "Sáng tạo", description: "Điểm nhấn tím và khoảng thở", accent: "#6b3b87", margin: 52, nameSize: 28, lineHeight: 1.35 },
+} as const;
+export type CvTemplateId = keyof typeof cvTemplates;
 export function contentFromProfile(profile: CandidateProfile): BuilderContent {
   const section = (
     title: string,
@@ -80,7 +88,7 @@ export function validateBuilder(value: unknown): BuilderContent {
 }
 export async function renderCvPdf(
   content: BuilderContent,
-  template: "classic" | "modern",
+  template: CvTemplateId,
 ): Promise<Blob> {
   validateBuilder(content);
   const [{ default: pdfMake }, { default: fonts }] = await Promise.all([
@@ -88,17 +96,17 @@ export async function renderCvPdf(
     import("pdfmake/build/vfs_fonts"),
   ]);
   pdfMake.addVirtualFileSystem(fonts);
-  const accent = template === "modern" ? "#006e2e" : "#222222";
+  const { accent, margin, nameSize, lineHeight } = cvTemplates[template];
   // Build only plain text nodes: builder input cannot inject links, HTML, images, or PDF actions.
   const document = {
     pageSize: "A4",
-    pageMargins: [44, 40, 44, 40],
-    defaultStyle: { font: "Roboto", fontSize: 10, lineHeight: 1.25 },
+    pageMargins: [margin, 40, margin, 40],
+    defaultStyle: { font: "Roboto", fontSize: 10, lineHeight },
     info: { title: content.fullName + " — CV", author: content.fullName },
     content: [
       {
         text: content.fullName,
-        fontSize: 24,
+        fontSize: nameSize,
         bold: true,
         color: accent,
         margin: [0, 0, 0, 8],

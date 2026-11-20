@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Download, EllipsisVertical, Eye, FileText, Files, LayoutGrid, List, Monitor, Pencil, Plus, Search, Upload } from "lucide-react";
+import { Download, EllipsisVertical, Eye, FileText, Files, LayoutGrid, List, Monitor, Pencil, Plus, Search, Upload, X } from "lucide-react";
 import { EmptyState, LoadingState, PageHeader } from "@/components/ui";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { UploadProgress } from "../../../../components/UploadProgress";
 import { FilePicker } from "../../../../components/FilePicker";
 import type { UploadStep } from "../../../../lib/signedFileUpload";
@@ -12,6 +12,7 @@ import {
   person1Error,
   person1FormError,
   uploadPersonalFile,
+  validateCvPdf,
   type PersonalUploadCheckpoint,
   type CandidateCv,
 } from "../../../../lib/person1Api";
@@ -43,14 +44,18 @@ export default function CvsPage() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("recent");
   const [listView, setListView] = useState(false);
-  const uploadPanel = useRef<HTMLDetailsElement>(null);
+  const uploadPanel = useRef<HTMLDialogElement>(null);
   const uploadName = useRef<HTMLInputElement>(null);
   const renameForm = useRef<HTMLFormElement>(null);
+  const validationSequence = useRef(0);
+  const [fileChecking, setFileChecking] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [previewCv, setPreviewCv] = useState<CandidateCv | null>(null);
+  const previewDialog = useRef<HTMLDialogElement>(null);
 
   function showUpload(focus = true) {
     if (!uploadPanel.current) return;
-    uploadPanel.current.open = true;
-    uploadPanel.current.scrollIntoView({ block: "nearest" });
+    if (!uploadPanel.current.open) uploadPanel.current.showModal();
     if (focus) uploadName.current?.focus({ preventScroll: true });
   }
 
@@ -65,6 +70,35 @@ export default function CvsPage() {
   useEffect(() => {
     if (rename) renameForm.current?.querySelector("input")?.focus();
   }, [rename]);
+  useEffect(() => {
+    if (previewCv && previewDialog.current && !previewDialog.current.open) previewDialog.current.showModal();
+  }, [previewCv]);
+
+  async function selectFile(next?: File) {
+    if (pending || loading || !!loadError || cvs.length >= 5 || !next) return;
+    const sequence = ++validationSequence.current;
+    setFile(null);
+    setUploaded(null);
+    checkpoint.current = null;
+    if (fileInput.current) fileInput.current.value = "";
+    setUploadError("");
+    setFileChecking(true);
+    try {
+      await validateCvPdf(next);
+      if (sequence === validationSequence.current) setFile(next);
+    } catch (cause) {
+      if (sequence === validationSequence.current) setUploadError(person1Error(cause));
+    } finally {
+      if (sequence === validationSequence.current) setFileChecking(false);
+    }
+  }
+
+  function openPreview(event: MouseEvent<HTMLAnchorElement>, cv: CandidateCv) {
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    event.preventDefault();
+    setError("");
+    setPreviewCv(cv);
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -87,7 +121,7 @@ export default function CvsPage() {
     e.preventDefault();
     const formIssue = person1FormError(e.currentTarget);
     if (formIssue) { setUploadError(formIssue); return; }
-    if (pending || !file) return;
+    if (pending || fileChecking || !file) return;
     setPending(true);
     setUploadError("");
     setNotice("");
@@ -112,6 +146,7 @@ export default function CvsPage() {
       setQuery("");
       setFilter("ALL");
       setNotice("Đã lưu CV.");
+      uploadPanel.current?.close();
       setReload((n) => n + 1);
     } catch (e) {
       setUploadError(person1Error(e));
@@ -177,6 +212,7 @@ export default function CvsPage() {
       setPending(false);
     }
   }
+  const uploadLocked = pending || loading || !!loadError || cvs.length >= 5;
   const uploadedCount = cvs.filter(cv => cv.type === "UPLOAD").length;
   const normalizedQuery = query.trim().toLocaleLowerCase("vi-VN");
   const visibleCvs = cvs.filter(cv => (filter === "ALL" || filter === cv.type) && cv.title.toLocaleLowerCase("vi-VN").includes(normalizedQuery));
@@ -203,12 +239,15 @@ export default function CvsPage() {
         ))}
       </section>
 
-      <details id="upload-cv" ref={uploadPanel} className={styles.uploadPanel}>
-        <summary>Tải CV PDF</summary>
+      <dialog id="upload-cv" ref={uploadPanel} className={styles.dialog} aria-labelledby="cv-upload-title"
+        onCancel={event => { if (pending) event.preventDefault(); }}>
+        <div className={styles.dialogHeader}>
+          <div><h2 id="cv-upload-title">Tải CV lên</h2><p className={styles.muted}>Lưu CV PDF để dùng khi ứng tuyển.</p></div>
+          <button className={styles.menuTrigger} type="button" aria-label="Đóng cửa sổ tải CV" disabled={pending} onClick={() => uploadPanel.current?.close()}><X size={20} /></button>
+        </div>
         <form className="form-stack" noValidate onSubmit={upload}>
-            <p className={styles.muted}>Mỗi tài khoản có thể lưu tối đa 5 CV hoạt động.</p>
         <fieldset
-          disabled={pending || loading || !!loadError || cvs.length >= 5}
+          disabled={uploadLocked}
           className="form-grid person1-fieldset"
         >
           <label className="field">
@@ -222,26 +261,30 @@ export default function CvsPage() {
               onChange={(e) => setTitle(e.target.value)}
             />
           </label>
-          <div className="field">
+          <div className={`field ${styles.dropzone}`} data-dragging={dragging}
+            onDragOver={event => { event.preventDefault(); if (!uploadLocked) setDragging(true); }}
+            onDragLeave={event => { if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setDragging(false); }}
+            onDrop={event => {
+              event.preventDefault(); setDragging(false);
+              if (!uploadLocked) void selectFile(event.dataTransfer.files[0]);
+            }}>
+            <Upload size={26} aria-hidden="true" />
+            <strong>Kéo thả CV vào đây hoặc chọn tệp từ máy</strong>
             <label htmlFor="candidate-cv-file">Tệp PDF, tối đa 5 MB</label>
             <FilePicker
               id="candidate-cv-file"
               fileName={file?.name}
               ref={fileInput}
               accept="application/pdf,.pdf"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null);
-                setUploaded(null);
-                checkpoint.current = null;
-                setUploadError("");
-              }}
+              onChange={event => void selectFile(event.target.files?.[0])}
             />
           </div>
-          <div className="btn-group span-2"><button className="btn btn-primary" disabled={!file}>
-            {pending ? "Đang lưu…" : "Tải lên và lưu CV"}
-          </button></div>
+          <div className="btn-group span-2"><button className="btn" type="button" onClick={() => uploadPanel.current?.close()}>Hủy</button>
+            <button className="btn btn-primary" disabled={!file || fileChecking}>{pending ? "Đang lưu…" : "Tải lên và lưu CV"}</button></div>
         </fieldset>
         <UploadProgress step={uploadStep} />
+        {fileChecking ? <p className={styles.muted} role="status">Đang kiểm tra tệp…</p> : null}
+        {loadError ? <p className="notice notice-danger" role="alert">Chưa tải được danh sách CV. Hãy đóng cửa sổ và tải lại danh sách.</p> : null}
         {uploadError ? <p className="notice notice-danger" role="alert">{uploadError}</p> : null}
         {cvs.length >= 5 ? (
           <p className="notice notice-warning">
@@ -249,7 +292,7 @@ export default function CvsPage() {
           </p>
         ) : null}
         </form>
-      </details>
+      </dialog>
 
       <nav className={styles.tabs} aria-label="Loại CV">
         {filters.map(([key, label]) => <button type="button" key={key} aria-pressed={filter === key}
@@ -275,7 +318,7 @@ export default function CvsPage() {
         {loadError} <button className="btn" type="button" onClick={() => setReload(n => n + 1)}>Tải lại danh sách</button>
       </div> : null}
       {notice ? <p role="status" className="notice notice-success">{notice}</p> : null}
-      {error && !rename && !deleting ? <p role="alert" className="notice notice-danger">{error}</p> : null}
+      {error && !rename && !deleting && !previewCv ? <p role="alert" className="notice notice-danger">{error}</p> : null}
       {loading ? <LoadingState label="Đang tải CV…" /> : !loadError && (visibleCvs.length ? (
         <section className={listView ? styles.list : styles.grid} aria-label="Danh sách CV">
           {visibleCvs.map(cv => {
@@ -299,7 +342,7 @@ export default function CvsPage() {
                     </DropdownMenu.Trigger>
                     <DropdownMenu.Portal>
                       <DropdownMenu.Content className={styles.menu} align="end" sideOffset={6}>
-                        {cv.type === "ONLINE" ? <DropdownMenu.Item className={styles.menuItem} asChild><a href={preview} target="_blank" rel="noopener noreferrer">Xem CV</a></DropdownMenu.Item> : null}
+                        {cv.type === "ONLINE" ? <DropdownMenu.Item className={styles.menuItem} onSelect={() => { setError(""); setPreviewCv(cv); }}>Xem CV</DropdownMenu.Item> : null}
                         <DropdownMenu.Item className={styles.menuItem} onSelect={() => { setError(""); setRename(cv); setNewTitle(cv.title); }}>Đổi tên</DropdownMenu.Item>
                         {!cv.isDefault ? <DropdownMenu.Item className={styles.menuItem} onSelect={() => void mutate(cv, "default")}>Đặt mặc định</DropdownMenu.Item> : null}
                         <DropdownMenu.Separator className={styles.menuSeparator} />
@@ -311,7 +354,7 @@ export default function CvsPage() {
                 <div className={styles.cardActions}>
                   {cv.type === "ONLINE"
                     ? <Link className="btn btn-secondary" href={`/candidate/profile/cvs/builder?id=${encodeURIComponent(cv.id)}`}><Pencil size={15} aria-hidden="true" /> Chỉnh sửa</Link>
-                    : <a className="btn btn-secondary" href={preview} target="_blank" rel="noopener noreferrer"><Eye size={15} aria-hidden="true" /> Xem CV</a>}
+                    : <a className="btn btn-secondary" href={preview} target="_blank" rel="noopener noreferrer" onClick={event => openPreview(event, cv)}><Eye size={15} aria-hidden="true" /> Xem CV</a>}
                   <button className="btn" type="button" disabled={pending} onClick={() => void download(cv)}><Download size={15} aria-hidden="true" /> Tải xuống</button>
                 </div>
               </div>
@@ -319,12 +362,26 @@ export default function CvsPage() {
           })}
         </section>
       ) : (
-        <section className="card">
-          <EmptyState title={cvs.length ? "Không tìm thấy CV phù hợp" : "Chưa có CV"}
-            description={cvs.length ? "Thử đổi từ khóa hoặc chọn loại CV khác." : "Tải PDF hoặc tạo CV trực tuyến để bắt đầu ứng tuyển."} />
-          {cvs.length ? <button className="btn" type="button" onClick={() => { setFilter("ALL"); setQuery(""); }}>Xóa bộ lọc</button> : null}
+        <section className={`card ${styles.empty}`}>
+          {cvs.length ? <><EmptyState title="Không tìm thấy CV phù hợp" description="Thử đổi từ khóa hoặc chọn loại CV khác." />
+            <button className="btn" type="button" onClick={() => { setFilter("ALL"); setQuery(""); }}>Xóa bộ lọc</button></> :
+            <><div className={styles.emptyArt} aria-hidden="true"><FileText size={33} /><Plus size={16} /></div>
+              <h2>Chưa có CV</h2><p className={styles.muted}>Tải bản PDF của bạn hoặc chọn mẫu để tạo CV đầu tiên.</p>
+              <div className="btn-group"><button className="btn" type="button" onClick={() => showUpload()}>Tải CV đầu tiên</button><Link className="btn btn-primary" href="/candidate/profile/cvs/builder">Chọn mẫu CV</Link></div></>}
         </section>
       ))}
+      <dialog ref={previewDialog} className={`${styles.dialog} ${styles.pdfDialog}`} aria-labelledby="cv-preview-title" onClose={() => { setPreviewCv(null); setError(""); }}>
+        {previewCv ? <>
+          <div className={styles.dialogHeader}><div><h2 id="cv-preview-title">{previewCv.title}</h2><p className={styles.muted}>Bản xem trước PDF</p></div>
+            <button className={styles.menuTrigger} type="button" aria-label="Đóng xem trước CV" onClick={() => previewDialog.current?.close()}><X size={20} /></button></div>
+          <div className="btn-group">
+            <a className="btn" href={`/api/cv-preview/candidate/${encodeURIComponent(previewCv.id)}`} target="_blank" rel="noopener noreferrer">Mở PDF trong tab mới</a>
+            <button className="btn" type="button" disabled={pending} onClick={() => void download(previewCv)}><Download size={16} aria-hidden="true" /> Tải xuống</button>
+          </div>
+          {error ? <p role="alert" className="notice notice-danger">{error}</p> : null}
+          <iframe className={styles.pdfFrame} src={`/api/cv-preview/candidate/${encodeURIComponent(previewCv.id)}`} title={`PDF: ${previewCv.title}`} />
+        </> : null}
+      </dialog>
       {rename ? (
         <form
           ref={renameForm}
