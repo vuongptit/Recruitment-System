@@ -552,6 +552,14 @@ export default function ProfilePage() {
       setDraft({ ...result.data });
       setEditingGeneral(false);
       setNotice("Đã lưu hồ sơ.");
+      window.dispatchEvent(
+        new CustomEvent("candidate-profile-updated", {
+          detail: {
+            fullName: result.data.fullName,
+            avatarUrl: result.data.avatarUrl,
+          },
+        })
+      );
     } catch (e) {
       setError(person1Error(e));
     } finally {
@@ -581,6 +589,14 @@ export default function ProfilePage() {
       setProfile(result.data);
       setAvatarNotice("Đã cập nhật ảnh đại diện.");
       avatarAttempt.current = null;
+      window.dispatchEvent(
+        new CustomEvent("candidate-profile-updated", {
+          detail: {
+            fullName: result.data.fullName,
+            avatarUrl: result.data.avatarUrl,
+          },
+        })
+      );
     } catch (e) {
       setAvatarError(person1Error(e));
     } finally {

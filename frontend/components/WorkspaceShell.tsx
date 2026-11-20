@@ -58,7 +58,7 @@ function WorkspaceContent({ children, role, title, navigationLabel, links, showN
     <header className="topbar workspace-header"><div className="topbar-inner">
       {showNavigation && <button ref={menuButton} type="button" className="workspace-menu-button notification-bell" aria-label={menuOpen ? "Đóng menu" : "Mở menu"} aria-expanded={menuOpen} aria-controls="workspace-sidebar" onClick={() => setMenuOpen(open => !open)}>{menuOpen ? <X size={22} /> : <Menu size={22} />}</button>}
       <Link prefetch={false} className="brand shell-brand" href={portalHome(roleKey)} aria-label={`${siteName} - Trang chủ`}><Logo size={34} /><span>{siteName}<small>{title}</small></span></Link>
-      <AccountNavigation workspace portal={roleKey} />
+      <AccountNavigation workspace portal={roleKey} name={name} avatarUrl={avatarUrl} />
     </div></header>
     <div className="workspace-body">
       {menuOpen && <button className="workspace-menu-overlay" type="button" aria-label="Đóng menu điều hướng" onClick={() => { setMenuOpen(false); menuButton.current?.focus(); }} />}

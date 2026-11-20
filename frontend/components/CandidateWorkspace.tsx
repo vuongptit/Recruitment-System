@@ -42,8 +42,24 @@ function CandidateWorkspaceContent({ children }: { children: ReactNode }) {
     requestApi<CandidateProfile>(`/api/profile/${account.id}`, { privateData: true, signal: controller.signal })
       .then(result => { if (!controller.signal.aborted) setProfile(result.data); })
       .catch(() => { if (!controller.signal.aborted) setProfile(null); });
-    return () => controller.abort();
+
+    const handleProfileUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<{ fullName?: string; avatarUrl?: string }>;
+      if (customEvent.detail) {
+        setProfile(prev => prev ? ({ ...prev, ...customEvent.detail }) : ({ fullName: customEvent.detail.fullName, avatarUrl: customEvent.detail.avatarUrl } as CandidateProfile));
+      } else {
+        requestApi<CandidateProfile>(`/api/profile/${account.id}`, { privateData: true })
+          .then(result => setProfile(result.data))
+          .catch(() => {});
+      }
+    };
+
+    window.addEventListener("candidate-profile-updated", handleProfileUpdated);
+    return () => {
+      controller.abort();
+      window.removeEventListener("candidate-profile-updated", handleProfileUpdated);
+    };
   }, [account?.id, account?.role]);
   if (!isDemoPerson2Api && account?.role !== "CANDIDATE") return <PublicShell>{children}</PublicShell>;
-  return <WorkspaceShell role="candidate" title="Ứng viên" navigationLabel="Khu vực ứng viên" links={links} showNavigation variant={discovery ? "discovery" : "workspace"} name={profile?.fullName || account?.email} avatarUrl={profile?.avatarUrl}>{children}</WorkspaceShell>;
+  return <WorkspaceShell role="candidate" title="Ứng viên" navigationLabel="Khu vực ứng viên" links={links} showNavigation variant={discovery ? "discovery" : "workspace"} name={profile?.fullName?.trim() || account?.email} avatarUrl={profile?.avatarUrl?.trim() || null}>{children}</WorkspaceShell>;
 }
