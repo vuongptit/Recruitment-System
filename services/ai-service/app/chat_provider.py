@@ -32,9 +32,10 @@ MY_JOB_RECOMMENDATION_TOOL_NAME = "get_my_job_recommendations"
 MY_JOB_RECOMMENDATION_TOOL: dict[str, Any] = {
     "name": MY_JOB_RECOMMENDATION_TOOL_NAME,
     "description": (
-        "Fetch up to a few current job suggestions for the authenticated Candidate. "
-        "Use only when the Candidate explicitly asks for personalized job "
-        "recommendations. Identity, CV and preferences are resolved by the server."
+        "Fetch current job suggestions or listings for the authenticated Candidate. "
+        "Use whenever the Candidate asks to view, open, find, or get job recommendations "
+        "(e.g., 'gợi ý việc làm', 'mở cho tôi những job', 'tìm việc', 'có job nào', 'tìm việc làm'). "
+        "Identity, CV, and preferences are resolved by the server."
     ),
     "strict": True,
     "input_schema": {
@@ -267,9 +268,10 @@ class GeminiChatProvider:
                         {
                             "name": MY_JOB_RECOMMENDATION_TOOL_NAME,
                             "description": (
-                                "Fetch up to a few current job suggestions for the authenticated Candidate. "
-                                "Use only when the Candidate explicitly asks for personalized job "
-                                "recommendations. Identity, CV and preferences are resolved by the server."
+                                "Fetch current job suggestions or listings for the authenticated Candidate. "
+                                "Call this tool whenever the Candidate asks for job recommendations, finding jobs, "
+                                "opening jobs, or viewing available jobs (e.g. 'gợi ý việc làm', 'mở cho tôi những job', "
+                                "'tìm việc', 'có việc nào không', 'job về...')."
                             ),
                             "parameters": {
                                 "type": "OBJECT",
