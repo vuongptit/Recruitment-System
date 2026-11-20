@@ -23,7 +23,7 @@ import { LoadingState, ErrorState } from "@/components/ui";
 import { notificationDestination, type InboxNotification } from "@/lib/notificationState";
 import { notificationPresentation } from "@/lib/notificationPresentation";
 import { applicationStatusLabel } from "@/lib/recruitmentLabels";
-import { portalSection } from "@/lib/portalRoutes";
+import { portalSection, type AccountRole } from "@/lib/portalRoutes";
 import { requestApi } from "@/lib/apiClientCore";
 import { conversationIdentity, type ChatIdentityView } from "@/lib/chatIdentity";
 import type { ChatConversation } from "@/lib/chatApi";
@@ -140,7 +140,7 @@ function formatInterviewSchedule(startStr?: unknown, endStr?: unknown): string |
   }
 }
 
-function NotificationsList({ accountId, role }: { accountId: string; role: string }) {
+function NotificationsList({ accountId, role }: { accountId: string; role: AccountRole }) {
   const {
     notifications,
     loading,
