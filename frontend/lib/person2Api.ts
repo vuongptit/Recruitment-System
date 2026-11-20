@@ -384,6 +384,7 @@ export async function sendAiChatMessage(
       signal,
       body,
       maxRetries: 0,
+      timeoutMs: 30_000,
     });
     return {
       ...response,

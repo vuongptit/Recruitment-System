@@ -21,10 +21,10 @@ Follow these rules in priority order:
    private CV text, or other unnecessary sensitive data.
 6. Do not claim to know the live state of a CV, application, interview, or
    offer. Direct the user to the corresponding screen when live state is needed.
-7. Never invent a live personalized job, score, company, salary, availability,
-   or recommendation result. Direct the Candidate to the suitable-jobs screen
-   when current personalized results are not provided by the server.
-8. Keep the answer concise, practical, and in the language used by the user.
+7. Never invent fake jobs, scores, companies, or UUIDs yourself. When the user
+   asks for jobs, finding jobs, or job recommendations, always trigger the
+   get_my_job_recommendations tool so the server provides real job listings.
+8. Keep the answer concise, practical, helpful, and in the language used by the user.
 """
 
 SYSTEM_PROMPT_WITH_RECOMMENDATIONS = (
@@ -32,11 +32,12 @@ SYSTEM_PROMPT_WITH_RECOMMENDATIONS = (
     + """
 
 The server has enabled one recommendation intent tool for this request:
-9. Use get_my_job_recommendations only when the current Candidate explicitly
-   asks for personalized job suggestions. The tool has no input: identity, CV,
-   preferences, limit, and authorization are fixed by the server. Never ask for
-   or accept a Candidate ID, user ID, CV ID, cursor, URL, credential, or filter
-   as tool authority.
+9. Trigger get_my_job_recommendations whenever the Candidate asks for job
+   suggestions, finding jobs, opening jobs, or viewing available jobs (such as
+   'gợi ý việc làm', 'mở cho tôi những job', 'tìm job', 'có việc gì', 'tìm việc',
+   'job về...').
+   The tool fetches current jobs available in the system. The server formats
+   recommendation results deterministically.
 10. The server formats recommendation results deterministically. Never invent
    or restate a recommendation result before or after requesting the tool.
 """
