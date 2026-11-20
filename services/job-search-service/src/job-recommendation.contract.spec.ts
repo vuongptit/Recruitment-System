@@ -62,6 +62,7 @@ describe('Job recommendation HTTP contract', () => {
     { salaryMin: 10_000_000_000_000 },
     { salaryMin: 1.111 },
     { jobType: 'CONTRACT' },
+    { selectedCvId: 'invalid-id' },
   ])('rejects an unsafe query: %j', async (value) => {
     const dto = plainToInstance(JobRecommendationQueryDto, value);
     expect(await validate(dto)).not.toHaveLength(0);
@@ -198,6 +199,8 @@ describe('Job recommendation HTTP contract', () => {
         'limit',
         'location',
         'salaryMin',
+        'selectedCvId',
+        'strategy',
       ]);
       expect(parameters).not.toContain('userId');
       expect(parameters).not.toContain('cvId');

@@ -190,11 +190,21 @@ interface JobSearchResult {
   hasMore: boolean;
 }
 
+export interface JobRecommendationContext {
+  cvTitle: string | null;
+  selectedCvId: string | null;
+  cvOptions: { id: string; title: string | null }[];
+  cvCompared: boolean;
+  profileCompletion: number | null;
+  profileSkills: string[];
+}
+
 interface JobRecommendationResult {
-  items: Array<BackendJob & { score: number | null }>;
+  items: Array<BackendJob & { score: number | null; match?: JobRecommendation['match'] }>;
   nextCursor: string | null;
   source: RecommendationSource;
   fallbackReason: JobRecommendation["fallbackReason"] | null;
+  context?: JobRecommendationContext;
 }
 
 export interface RecruiterCandidateRecommendation {
@@ -1599,9 +1609,9 @@ export async function respondToApplicationOffer(
 }
 
 export async function getRecommendationsForCandidate(
-  options: { cursor?: string | null; limit?: number } = {},
+  options: { cursor?: string | null; limit?: number; strategy?: "PROFILE_CV"; selectedCvId?: string } = {},
   signal?: AbortSignal,
-): Promise<ApiEnvelope<JobRecommendation[]>> {
+): Promise<ApiEnvelope<JobRecommendation[]> & { context?: JobRecommendationContext }> {
   if (isDemoPerson2Api) {
     const response = await normalizeDemo(demo.getRecommendationsForCandidate());
     return {
@@ -1616,21 +1626,23 @@ export async function getRecommendationsForCandidate(
   const response = await requestApi<JobRecommendationResult>(PERSON2_AI_PUBLIC_ROUTES.candidateJobRecommendations, {
     privateData: true,
     signal,
-    query: { limit: options.limit ?? 10, cursor: options.cursor },
-    allowedQueryKeys: ["limit", "cursor"],
+    query: { limit: options.limit ?? 10, cursor: options.cursor, strategy: options.strategy, selectedCvId: options.selectedCvId },
+    allowedQueryKeys: ["limit", "cursor", "strategy", "selectedCvId"],
   });
   return {
     data: response.data.items.map((item) => ({
       id: item.id,
       title: item.title,
+      ...(options.strategy ? { job: toJob(item), match: item.match } : {}),
       matchPercent: Math.round((item.score ?? 0) * 100),
-      source: response.data.source,
+      source: options.strategy === "PROFILE_CV" && item.score === null ? "LATEST" : response.data.source,
       fallbackReason: response.data.fallbackReason ?? undefined,
       nextCursor: response.data.nextCursor,
       reasonText: response.data.fallbackReason
         ? `Nguồn dự phòng: ${response.data.fallbackReason}`
         : "Mức độ phù hợp do hệ thống gợi ý.",
     })),
+    ...(response.data.context ? { context: response.data.context } : {}),
     meta: {
       source: response.data.source,
       fallbackReason: response.data.fallbackReason,

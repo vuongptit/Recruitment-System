@@ -158,7 +158,7 @@ export default function CandidateJobDetailPage({ params, searchParams }: {
           {recommendationError ? <p className="notice notice-warning">Gợi ý tạm thời chưa sẵn sàng. Bạn vẫn có thể đọc và ứng tuyển tin này.</p> : null}
           {!recommendationLoading && !recommendationError && recommendations.length === 0 ? <div className={styles.recommendationEmpty}><EmptyState title="Chưa có gợi ý khác" description="Bạn có thể tiếp tục tìm kiếm để khám phá thêm các vị trí đang tuyển." /></div> : null}
           <div className={styles.recommendationGrid}>{recommendations.map((item) => (
-            <Link key={item.id} className={`card ${styles.relatedJob}`} href={`/candidate/jobs/${item.id}?source=${item.source === "AI" ? "AI_RECOMMENDATION" : "SEARCH"}`}><BriefcaseBusiness size={22} aria-hidden="true" /><div><strong>{item.title}</strong><p>{item.source === "AI" ? `Mức phù hợp ${item.matchPercent}%` : "Khám phá cơ hội nghề nghiệp"}</p></div></Link>
+            <Link key={item.id} className={`card ${styles.relatedJob}`} href={`/candidate/jobs/${item.id}?source=${item.source === "AI" ? "AI_RECOMMENDATION" : "SEARCH"}`}><BriefcaseBusiness size={22} aria-hidden="true" /><strong>{item.title}</strong></Link>
           ))}</div>
           <Link className="btn" href="/candidate/jobs#suitable-jobs">Xem thêm gợi ý</Link>
         </section>

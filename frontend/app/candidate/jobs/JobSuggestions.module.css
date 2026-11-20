@@ -1,0 +1,39 @@
+.section { display: grid; gap: 20px; margin: 48px auto 0; max-width: 1180px; scroll-margin-top: 92px; }
+.heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding: clamp(18px, 3vw, 32px); border: 1px solid var(--line); border-radius: 16px; background: var(--primary-tint); }
+.heading h2 { margin: 8px 0; font-size: clamp(22px, 2.5vw, 31px); line-height: 1.2; }
+.heading p, .identity p { margin: 0; color: var(--muted); }
+.eyebrow { display: inline-flex; gap: 6px; align-items: center; color: var(--primary); font-size: 13px; font-weight: 700; }
+.layout { display: grid; gap: 16px; align-items: start; }
+.list { display: grid; min-width: 0; gap: 12px; }
+.list > h3, .sources > h3 { margin: 0; font-size: 18px; }
+.card, .sources { min-width: 0; display: grid; gap: 14px; padding: clamp(14px, 2vw, 20px); border: 1px solid var(--line); border-radius: 14px; background: var(--surface-1); }
+.cardHeading { display: flex; align-items: center; gap: 12px; }
+.identity { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.identity h3 { margin: 0 0 4px; font-size: clamp(16px, 2vw, 20px); line-height: 1.3; }
+.identity a { color: var(--text); }
+.details, .skills { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 0; margin: 0; list-style: none; color: var(--muted); font-size: 13px; }
+.details li, .skills li, .cardFoot p, .action { display: flex; align-items: center; gap: 6px; }
+.details .salary { color: var(--primary); font-weight: 700; }
+.skills { gap: 6px; }
+.skills li { padding: 4px 9px; border-radius: 6px; background: var(--surface-2); overflow-wrap: anywhere; max-width: 100%; }
+.skills .matched { background: var(--primary-tint); color: var(--primary); }
+.cardFoot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; justify-content: space-between; border-top: 1px solid var(--line); padding-top: 10px; }
+.cardFoot p { margin: 0; font-size: 13px; color: var(--muted); }
+.supplemental { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
+.cardFoot svg { flex: none; }
+.action { margin-inline-start: auto; color: var(--primary); font-weight: 700; min-height: 40px; }
+.sourceCv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 10px; align-items: start; overflow-wrap: anywhere; }
+.sourceCv svg { color: var(--primary); }
+.sourceCv div, .profile { display: grid; gap: 4px; }
+.sourceCv select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+.sourceCv a { grid-column: 2; }
+.sourceCv span, .profile span { font-size: 13px; color: var(--muted); }
+.profile { border-top: 1px solid var(--line); padding-top: 12px; }
+.profile progress { width: 100%; accent-color: var(--primary); }
+.sources a { color: var(--primary); font-size: 13px; font-weight: 700; }
+.skillOpportunities { display: grid; gap: 5px; list-style: none; padding: 0; margin: 4px 0 0; }
+.skillOpportunities li { display: flex; justify-content: space-between; gap: 8px; overflow-wrap: anywhere; }
+.skillOpportunities li > :last-child { white-space: nowrap; }
+
+@media (min-width: 860px) { .layout:has(.sources) { grid-template-columns: minmax(0, 1fr) minmax(240px, 26%); } }
+@media (max-width: 480px) { .cardHeading { flex-wrap: wrap; } }

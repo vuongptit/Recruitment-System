@@ -8,10 +8,12 @@ import { Transform, Type } from 'class-transformer';
 import {
   IsByteLength,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   Max,
   Matches,
@@ -48,6 +50,16 @@ export function canonicalizeRecommendationLocation(value: unknown): unknown {
 }
 
 export class JobRecommendationQueryDto {
+  @ApiPropertyOptional({ enum: ['PROFILE_CV'] })
+  @IsOptional()
+  @IsIn(['PROFILE_CV'])
+  strategy?: 'PROFILE_CV';
+
+  @ApiPropertyOptional({ format: 'uuid', description: 'Active CV owned by the current candidate, for PROFILE_CV only' })
+  @IsOptional()
+  @IsUUID('4')
+  selectedCvId?: string;
+
   @ApiHideProperty()
   @IsOptional()
   @Type(() => Number)
@@ -94,6 +106,9 @@ export class JobRecommendationQueryDto {
 export class JobRecommendationItemDto extends JobSearchItemDto {
   @ApiProperty({ type: Number, minimum: 0, maximum: 1, nullable: true })
   declare score: number | null;
+
+  @ApiPropertyOptional()
+  match?: { skills: string[]; role: boolean; cv: boolean };
 }
 
 export class JobRecommendationResultDto {
@@ -115,4 +130,14 @@ export class JobRecommendationResultDto {
     nullable: true,
   })
   fallbackReason!: JobRecommendationFallbackReason | null;
+
+  @ApiPropertyOptional()
+  context?: {
+    cvTitle: string | null;
+    selectedCvId: string | null;
+    cvOptions: { id: string; title: string | null }[];
+    cvCompared: boolean;
+    profileCompletion: number | null;
+    profileSkills: string[];
+  };
 }

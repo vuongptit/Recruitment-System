@@ -85,7 +85,7 @@ type Activity = ReturnType<typeof useJobSearchActivity>;
 const compactNumber = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 });
 const relativeDate = new Intl.RelativeTimeFormat("vi-VN", { numeric: "auto" });
 
-function displaySalary(job: Job) {
+export function displaySalary(job: Job) {
   if (job.currency !== "VND" || job.isNegotiable || job.salaryMin < 1_000_000) return jobSalary(job);
   const min = compactNumber.format(job.salaryMin / 1_000_000);
   const max = job.salaryMax ? compactNumber.format(job.salaryMax / 1_000_000) : null;

@@ -241,26 +241,54 @@ test("an empty fallback retains NO_ACTIVE_CV guidance instead of a blank recomme
   await expect(page.getByRole("link", { name: "Mở quản lý CV", exact: true })).toHaveAttribute("href", "/candidate/profile/cvs");
 });
 
-test("job suggestions show the first three ranked items without loading the next page", async ({ page }) => {
+test("job suggestions show the first three ranked items without loading the next page", async ({ page }, info) => {
+  const cvOptions = [{ id: jobId, title: "backend.pdf" }, { id: applicationId, title: "platform.pdf" }];
   const items = Array.from({ length: 4 }, (_, index) => ({
     ...job,
     id: `${jobId.slice(0, -1)}${index + 1}`,
     title: `Gợi ý ${index + 1}`,
     score: 0.9 - index * 0.1,
+    skills: ["Java", "Docker"],
+    match: { skills: ["Java"], role: index === 0, cv: true },
   }));
   const searchParams: URLSearchParams[] = [];
   await page.route(`${gateway}/jobs/search**`, route => reply(route, { items: [], total: 0, source: "POSTGRESQL", hasMore: false }));
   await page.route(`${gateway}/jobs/recommended**`, route => {
-    searchParams.push(new URL(route.request().url()).searchParams);
-    return reply(route, { items, source: "AI", fallbackReason: null, nextCursor: "next-suggestions" });
+    const params = new URL(route.request().url()).searchParams;
+    searchParams.push(params);
+    const secondCv = params.get("selectedCvId") === applicationId;
+    return reply(route, {
+      items: secondCv ? [
+        { ...items[3], score: 0.84, match: { skills: ["Java"], role: false, cv: false } },
+        ...items.slice(0, 2).map(item => ({ ...item, score: null, match: undefined })),
+      ] : items,
+      source: secondCv ? "PREFERENCES" : "AI", fallbackReason: null, nextCursor: "next-suggestions",
+      context: { selectedCvId: secondCv ? applicationId : jobId, cvOptions, cvCompared: !secondCv, profileCompletion: 78, profileSkills: ["Java"] },
+    });
   });
   await authenticate(page, "CANDIDATE", "/candidate/jobs");
   const suggestions = page.locator("#suitable-jobs");
   await suggestions.scrollIntoViewIfNeeded();
   await expect(suggestions.getByRole("link", { name: /^Gợi ý \d$/ })).toHaveText(["Gợi ý 1", "Gợi ý 2", "Gợi ý 3"]);
+  const cvPicker = suggestions.getByRole("combobox", { name: "CV dùng để gợi ý" });
+  await expect(cvPicker).toHaveValue(jobId);
+  await expect(suggestions.getByText("Hoàn thiện 78%", { exact: true })).toBeVisible();
+  await expect(suggestions.getByText("3 tin", { exact: true })).toBeVisible();
+  await expect(suggestions.getByRole("article").first()).toContainText("1 kỹ năng trùng với hồ sơ");
   await expect(suggestions.getByRole("button", { name: "Xem thêm gợi ý AI" })).toHaveCount(0);
   expect(searchParams.at(-1)?.get("limit")).toBe("3");
+  expect(searchParams.at(-1)?.get("strategy")).toBe("PROFILE_CV");
   expect(searchParams.some(params => params.has("cursor"))).toBe(false);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  await suggestions.screenshot({ path: info.outputPath("suggestions.png"), animations: "disabled" });
+  await cvPicker.selectOption(applicationId);
+  await expect(suggestions.getByRole("link", { name: /^Gợi ý \d$/ })).toHaveText(["Gợi ý 4", "Gợi ý 1", "Gợi ý 2"]);
+  await expect(suggestions.getByText("Tin mới bổ sung", { exact: true })).toHaveCount(2);
+  await expect(suggestions.getByRole("article").getByText(/^\d+%$/)).toHaveCount(0);
+  await expect(suggestions.getByText("Chưa ghi nhận điểm khớp từ CV hoặc hồ sơ.", { exact: true })).toHaveCount(2);
+  await expect(cvPicker).toHaveValue(applicationId);
+  expect(searchParams.at(-1)?.get("selectedCvId")).toBe(applicationId);
+  await expect(page).toHaveURL(/\/candidate\/jobs$/);
 });
 
 test("an Offer expiring while its confirmation is open is not sent", async ({ page }) => {

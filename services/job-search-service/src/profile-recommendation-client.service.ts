@@ -49,6 +49,13 @@ const CANONICAL_SALARY_PATTERN =
 
 export interface RecommendationCv {
   cvId: string;
+  title?: string;
+}
+
+export interface RecommendationProfile {
+  roles: string[];
+  skills: string[];
+  completion: number | null;
 }
 
 export enum JobPreferenceState {
@@ -85,6 +92,7 @@ interface ValidCv {
   id: string;
   createdAt: number;
   isDefault: boolean;
+  title?: string;
 }
 
 @Injectable()
@@ -106,6 +114,13 @@ export class ProfileRecommendationClientService {
     candidateId: string,
     authorization: string,
   ): Promise<RecommendationCv | null> {
+    return (await this.getCvSelection(candidateId, authorization)).selected;
+  }
+
+  async getCvSelection(candidateId: string, authorization: string, selectedCvId?: string): Promise<{
+    selected: RecommendationCv | null;
+    options: { id: string; title: string | null }[];
+  }> {
     this.assertRequest(candidateId, authorization);
 
     let response: Response;
@@ -135,16 +150,49 @@ export class ProfileRecommendationClientService {
       throw new ProfileRecommendationUnavailableError();
     }
     const cvs = this.validateEnvelope(body, candidateId);
-    if (cvs.length === 0) return null;
-
     const defaultCvs = cvs.filter(({ isDefault }) => isDefault);
     if (defaultCvs.length > 1) {
       throw new ProfileRecommendationUnavailableError();
     }
-    const selected = defaultCvs[0] ?? [...cvs].sort((left, right) =>
-      right.createdAt - left.createdAt || left.id.localeCompare(right.id)
-    )[0];
-    return { cvId: selected.id };
+    const ordered = [...cvs].sort((left, right) => Number(right.isDefault) - Number(left.isDefault) ||
+      right.createdAt - left.createdAt || left.id.localeCompare(right.id));
+    const selected = selectedCvId ? ordered.find(cv => cv.id === selectedCvId.toLowerCase()) : ordered[0];
+    return {
+      selected: selected ? { cvId: selected.id, ...(selected.title ? { title: selected.title } : {}) } : null,
+      options: ordered.map(cv => ({ id: cv.id, title: cv.title ?? null })),
+    };
+  }
+
+  async getMatchingProfile(candidateId: string, authorization: string): Promise<RecommendationProfile | null> {
+    this.assertRequest(candidateId, authorization);
+    try {
+      const response = await fetch(`${this.baseUrl}/${candidateId}`, {
+        headers: { accept: 'application/json', authorization },
+        cache: 'no-store',
+        redirect: 'error',
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
+      if (!response.ok) {
+        await response.body?.cancel().catch(() => undefined);
+        if (response.status === 404) return null;
+        throw new ProfileRecommendationUnavailableError();
+      }
+      const body = await readBoundedJson(response);
+      if (!isPlainObject(body) || !isPlainObject(body.data) || body.data.userId !== candidateId) {
+        throw new ProfileRecommendationUnavailableError();
+      }
+      const { headline, experiences, skills, completionPercent } = body.data;
+      const texts = (values: unknown[]) => [...new Set(values.flatMap(value =>
+        typeof value === 'string' && value.trim() ? [value.trim().slice(0, 150)] : [],
+      ))];
+      return {
+        roles: texts([headline, ...(Array.isArray(experiences) ? experiences.slice(0, 20).map(value => isPlainObject(value) && value.position) : [])]),
+        skills: texts(Array.isArray(skills) ? skills.slice(0, 50).map(value => isPlainObject(value) && value.name) : []),
+        completion: typeof completionPercent === 'number' && Number.isInteger(completionPercent) && completionPercent >= 0 && completionPercent <= 100 ? completionPercent : null,
+      };
+    } catch {
+      throw new ProfileRecommendationUnavailableError();
+    }
   }
 
   async getJobPreferences(
@@ -472,6 +520,7 @@ export class ProfileRecommendationClientService {
         id: canonicalId,
         createdAt: createdAtMs,
         isDefault: value.isDefault,
+        title: typeof value.title === 'string' ? value.title.trim().slice(0, 160) : undefined,
       };
     });
   }

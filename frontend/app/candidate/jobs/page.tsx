@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCurrentAccount } from "@/components/SessionGate";
-import { EmptyState, ErrorState, LoadingState, StatusBadge } from "@/components/ui";
-import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
+import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, X } from "lucide-react";
 import { LocationPicker } from "@/components/discovery/LocationPicker";
-import discovery from "@/components/discovery/Discovery.module.css";
+import suggestionStyles from "./JobSuggestions.module.css";
+import { SuggestionCard, SuggestionHeading, SuggestionSources } from "./JobSuggestions";
 import styles from "./JobSearch.module.css";
 import { SearchJobCard, SearchSkeleton, useJobSearchActivity } from "./JobSearchPanels";
 import { formatSalaryMillions, JobSalaryRange } from "./JobSalaryRange";
@@ -27,10 +28,11 @@ import {
   type PublicJobSearchFilters,
   type PublicJobSearchForm,
 } from "../../../lib/publicJobSearch";
-import { recommendationFallbackView, recommendationSourceView } from "../../../lib/recommendationPresentation";
+import { recommendationFallbackView } from "../../../lib/recommendationPresentation";
 import {
   type Job,
   type JobRecommendation,
+  type JobRecommendationContext,
   type PublicCompanyProfile,
   type SearchMode,
   getPublicCompany,
@@ -41,38 +43,6 @@ import {
 } from "../../../lib/person2Api";
 
 const RECOMMENDATION_LIMIT = 3;
-
-function RecommendationCard({
-  item,
-  loading,
-  onRetry,
-}: {
-  item: JobRecommendation;
-  loading: boolean;
-  onRetry: () => void;
-}) {
-  const source = recommendationSourceView(item.source);
-  const fallback = recommendationFallbackView(item.fallbackReason);
-  return (
-    <article className="card recommendation-card">
-      <div className="section-head row-between"><Link href={`/candidate/jobs/${item.id}?source=${item.source === "AI" ? "AI_RECOMMENDATION" : "SEARCH"}`}><strong>{item.title}</strong></Link><StatusBadge tone={source.tone}>{source.label}</StatusBadge></div>
-      <p className="help">{source.description}</p>
-      {item.source === "AI" ? <p className="help">Mức phù hợp {item.matchPercent}%</p> : null}
-      <Link className="btn btn-secondary" href={`/candidate/jobs/${item.id}?source=${item.source === "AI" ? "AI_RECOMMENDATION" : "SEARCH"}`}>Xem việc làm</Link>
-      {fallback ? (
-        <section className="recommendation-fallback" aria-label="Thông tin nguồn gợi ý dự phòng">
-          <strong>{fallback.title}</strong>
-          <p>{fallback.description}</p>
-          {fallback.action === "UPLOAD_CV" ? (
-            <Link className="btn btn-secondary" href="/candidate/profile/cvs">{fallback.actionLabel}</Link>
-          ) : (
-            <button className="btn btn-secondary" type="button" disabled={loading} onClick={onRetry}>{loading ? "Đang làm mới…" : fallback.actionLabel}</button>
-          )}
-        </section>
-      ) : null}
-    </article>
-  );
-}
 
 function WatchSearchUrl({ onChange }: { onChange: (query: string) => void }) {
   const query = useSearchParams().toString();
@@ -113,6 +83,8 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
   const [tooDeep, setTooDeep] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [recs, setRecs] = useState<JobRecommendation[]>([]);
+  const [recommendationContext, setRecommendationContext] = useState<JobRecommendationContext>();
+  const [selectedCvId, setSelectedCvId] = useState<string>();
   const [recommendationError, setRecommendationError] = useState("");
   const [searchRestartNotice, setSearchRestartNotice] = useState("");
   const [recommendationReloadKey, setRecommendationReloadKey] = useState(0);
@@ -242,15 +214,20 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
       setRecommendationLoading(false);
       setRecommendationError("");
       setRecommendationFallback(undefined);
+      setRecommendationContext(undefined);
+      setSelectedCvId(undefined);
       return;
     }
     const controller = new AbortController();
     setRecommendationLoading(true);
     setRecommendationError("");
-    getRecommendationsForCandidate({ limit: RECOMMENDATION_LIMIT }, controller.signal)
+    getRecommendationsForCandidate({ limit: RECOMMENDATION_LIMIT, strategy: "PROFILE_CV", selectedCvId }, controller.signal)
       .then((response) => {
         if (controller.signal.aborted) return;
-        setRecs(response.data.slice(0, RECOMMENDATION_LIMIT));
+        const items = response.data.slice(0, RECOMMENDATION_LIMIT);
+        setRecs(items);
+        setRecommendationContext(response.context);
+        items.forEach(item => { if (item.job?.companyId) loadCompany(item.job.companyId); });
         setRecommendationFallback(response.meta?.fallbackReason as FallbackReason | undefined);
       })
       .catch((reason: unknown) => {
@@ -261,7 +238,7 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
         if (!controller.signal.aborted) setRecommendationLoading(false);
       });
     return () => controller.abort();
-  }, [canRecommend, recommendationReloadKey]);
+  }, [canRecommend, loadCompany, recommendationReloadKey, selectedCvId]);
 
   function change<K extends keyof PublicJobSearchForm>(field: K, value: PublicJobSearchForm[K]) {
     setForm((current) => ({ ...current, [field]: value, ...(field === "experienceBand" ? { experienceYears: "" } : {}) }));
@@ -369,6 +346,13 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
 
   function restartRecommendations() {
     setRecommendationReloadKey((value) => value + 1);
+  }
+
+  function selectRecommendationCv(id: string) {
+    setSelectedCvId(id);
+    setRecs([]);
+    setRecommendationLoading(true);
+    setRecommendationError("");
   }
 
   const nextOffsetTooDeep = mode === "OFFSET" && isOffsetWindowTooDeep(page + 1, limit);
@@ -521,19 +505,28 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
         </section>
 
       </div>
-        <section className={discovery.recommendations} id="suitable-jobs" tabIndex={-1}>
-          <header><span className={discovery.verified}><Sparkles size={16} aria-hidden="true" />Dành riêng cho bạn</span><h2>Gợi ý phù hợp</h2><p>Khám phá các cơ hội theo CV, sở thích nghề nghiệp hoặc tin mới nhất.</p></header>
-          {!canRecommend ? <p className="notice">Đăng nhập bằng tài khoản ứng viên để nhận gợi ý phù hợp với hồ sơ của bạn.</p> : null}
-          {canRecommend && !recommendationLoading && !recommendationError && recs.length === 0 ? (() => {
-            const fallback = recommendationFallbackView(recommendationFallback);
-            return <div className={discovery.recommendationEmpty}><EmptyState title={fallback?.title ?? "Chưa có việc làm phù hợp"} description={fallback?.description ?? "Hãy thử lại khi có tin tuyển dụng mới."} />{fallback?.action === "UPLOAD_CV" ? <Link className="btn btn-secondary" href="/candidate/profile/cvs">{fallback.actionLabel}</Link> : <button className="btn" type="button" onClick={restartRecommendations}>Làm mới gợi ý</button>}</div>;
-          })() : null}
-          {recommendationError ? <ErrorState message={recommendationError} onRetry={restartRecommendations} /> : null}
-          {recommendationLoading && recs.length === 0 ? <LoadingState label="Đang tải gợi ý việc làm" /> : null}
-          <div className={discovery.recommendationGrid}>
-            {recs.map((item) => <RecommendationCard key={item.id} item={item} loading={recommendationLoading} onRetry={restartRecommendations} />)}
+      <section className={suggestionStyles.section} id="suitable-jobs" tabIndex={-1} aria-labelledby="job-suggestions-title">
+        <SuggestionHeading signedIn={canRecommend} />
+        {!canRecommend ? <p className="notice">Đăng nhập bằng tài khoản ứng viên để xem gợi ý theo hồ sơ.</p> : (
+          <div className={suggestionStyles.layout}>
+            <div className={suggestionStyles.list}>
+              <h3>Việc làm dành cho bạn</h3>
+              {recommendationError ? <ErrorState message={recommendationError} onRetry={restartRecommendations} /> : null}
+              {recommendationLoading && recs.length === 0 ? <LoadingState label="Đang tải gợi ý việc làm" /> : null}
+              {!recommendationLoading && !recommendationError && recs.length === 0 ? (
+                <EmptyState
+                  title={recommendationFallbackView(recommendationFallback)?.title ?? "Chưa có việc làm đủ phù hợp"}
+                  description={recommendationFallbackView(recommendationFallback)?.description ?? "Thêm kỹ năng, vị trí từng đảm nhiệm hoặc cập nhật CV để cải thiện gợi ý."}
+                  href="/candidate/profile/cvs"
+                  action="Mở quản lý CV"
+                />
+              ) : null}
+              {recs.map(item => <SuggestionCard key={item.id} item={item} company={item.job ? companies[item.job.companyId] : undefined} />)}
+            </div>
+            {recommendationContext ? <SuggestionSources context={recommendationContext} items={recs} selectedCvId={selectedCvId} pending={recommendationLoading} onSelectCv={selectRecommendationCv} /> : null}
           </div>
-        </section>
+        )}
+      </section>
     </main>
   );
 }

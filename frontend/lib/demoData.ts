@@ -126,6 +126,8 @@ export interface JobRecommendation {
   fallbackReason?: FallbackReason;
   nextCursor?: string | null;
   reasonText: string;
+  job?: Job;
+  match?: { skills: string[]; role: boolean; cv: boolean };
 }
 
 export interface CandidateApplication {
