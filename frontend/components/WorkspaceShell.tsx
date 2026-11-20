@@ -26,7 +26,7 @@ export function WorkspaceShell(props: {
 
 function WorkspaceContent({ children, role, title, navigationLabel, links, showNavigation, name, avatarUrl, variant = "workspace" }: Parameters<typeof WorkspaceShell>[0]) {
   const { siteName, footerText } = useSiteSettings();
-  const { unreadCount, unreadMessageCount } = useNotifications();
+  const { unreadCount, unreadMessageCount, notifications } = useNotifications();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -75,7 +75,10 @@ function WorkspaceContent({ children, role, title, navigationLabel, links, showN
             const active = pathname === href || (!exact && pathname.startsWith(href + "/")) || !!aliases?.some(alias => pathname.startsWith(alias));
             const isMessage = href.endsWith("/messages");
             const isNotification = href.endsWith("/notifications");
-            const count = isMessage ? unreadMessageCount : (isNotification ? unreadCount : 0);
+            const msgCount = unreadMessageCount > 0 ? unreadMessageCount : (
+              notifications.filter(n => !n.is_read && (n.type === "new_message" || n.type.toLowerCase().includes("message"))).length
+            );
+            const count = isMessage ? msgCount : (isNotification ? unreadCount : 0);
             return (
               <Link prefetch={false} key={href} className="workspace-nav-link" href={href} aria-current={active ? "page" : undefined} onClick={() => setMenuOpen(false)}>
                 <Icon size={19} strokeWidth={1.7} aria-hidden="true" />

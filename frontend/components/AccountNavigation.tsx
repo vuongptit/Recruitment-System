@@ -21,20 +21,27 @@ export function NotificationBell() {
 
 export function MessageNavButton() {
   const account = useCurrentAccount();
-  const { unreadMessageCount } = useNotifications();
+  const { unreadMessageCount, notifications } = useNotifications();
   const role = account?.role ?? "CANDIDATE";
   if (role === "ADMIN") return null;
+
+  const count = unreadMessageCount > 0
+    ? unreadMessageCount
+    : notifications.filter(
+        (n) => !n.is_read && (n.type === "new_message" || n.type.toLowerCase().includes("message"))
+      ).length;
+
   return (
     <Link
       prefetch={false}
       className="notification-bell"
       href={portalSection(role, "messages")}
-      aria-label={unreadMessageCount > 0 ? `Tin nhắn, ${unreadMessageCount} chưa đọc` : "Tin nhắn"}
+      aria-label={count > 0 ? `Tin nhắn, ${count} chưa đọc` : "Tin nhắn"}
       title="Tin nhắn"
     >
       <MessageSquare size={20} strokeWidth={1.7} aria-hidden="true" />
-      {unreadMessageCount > 0 && (
-        <span className="notification-count">{unreadMessageCount > 99 ? "99+" : unreadMessageCount}</span>
+      {count > 0 && (
+        <span className="notification-count">{count > 99 ? "99+" : count}</span>
       )}
     </Link>
   );
