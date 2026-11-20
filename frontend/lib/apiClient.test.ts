@@ -31,7 +31,7 @@ import {
   nextOfferVersions,
 } from "./applicationVersioning";
 import { offerResponseRecoveryView } from "./offerResponseRecovery";
-import { OFFER_ATTACHMENT_SUPPORT, emptyOfferAttachment, normalizeOfferAttachment } from "./offerAttachment";
+import { OFFER_ATTACHMENT_SUPPORT, emptyOfferAttachment, normalizeOfferAttachment, validateOfferAttachmentFile } from "./offerAttachment";
 import { candidateApplicationActions, recruiterApplicationActions, validateRecruiterApplicationStatus } from "./applicationStateMachine";
 import { applicationCooldownView } from "./applicationCooldown";
 import { activeJobsMetricView, bookmarkCardView, dashboardWarningView } from "./applicationDegradedStates";
@@ -658,9 +658,13 @@ test("Offer attachment is either one confirmed pair or fully absent", () => {
     () => normalizeOfferAttachment({ fileId, fileUrl: "file:///tmp/offer.pdf" }),
     (error: unknown) => error instanceof ApiClientError && error.code === "INVALID_OFFER_FILE_URL",
   );
-  assert.equal(OFFER_ATTACHMENT_SUPPORT.available, false);
-  assert.match(OFFER_ATTACHMENT_SUPPORT.description, /chưa được hỗ trợ/);
-  assert.doesNotMatch(OFFER_ATTACHMENT_SUPPORT.description, /OFFER_LETTER|canonical|Media Service/);
+  assert.equal(OFFER_ATTACHMENT_SUPPORT.available, true);
+  assert.match(OFFER_ATTACHMENT_SUPPORT.description, /thư mời nhận việc/);
+  assert.doesNotThrow(() => validateOfferAttachmentFile({ name: "offer.pdf", size: 1024 }));
+  assert.doesNotThrow(() => validateOfferAttachmentFile({ name: "offer.docx", size: 2048 }));
+  assert.throws(() => validateOfferAttachmentFile({ name: "offer.exe", size: 1024 }), /định dạng/);
+  assert.throws(() => validateOfferAttachmentFile({ name: "offer.pdf", size: 0 }), /trống/);
+  assert.throws(() => validateOfferAttachmentFile({ name: "offer.pdf", size: 15 * 1024 * 1024 }), /10 MB/);
 });
 
 test("mutation responses become the only source for the next command versions", () => {
