@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { ArrowRight, BriefcaseBusiness, Camera, CheckCircle2, Circle, Eye, FileText, LoaderCircle, Mail, MapPin, Pencil, Phone, Plus } from "lucide-react";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { ArrowRight, BriefcaseBusiness, Camera, CheckCircle2, Circle, Ellipsis, Eye, FileText, LoaderCircle, Mail, MapPin, Pencil, Phone, Plus, Trash2 } from "lucide-react";
 import { LoadingState, PageHeader } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { UploadProgress } from "../../../components/UploadProgress";
@@ -178,6 +179,12 @@ function BlockEditor({
   const [deleting, setDeleting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  function edit(item: ProfileBlock) {
+    setEditing(item.id);
+    setDraft(item);
+    setError("");
+    setOpen(true);
+  }
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formIssue = person1FormError(e.currentTarget);
@@ -246,34 +253,35 @@ function BlockEditor({
               key={item.id}
               className={editing === item.id ? "person1-item-editing" : undefined}
             >
-              {block.key === "skills" ? <strong>{item.name}{item.level ? ` · ${item.level}` : ""}</strong> :
+              {block.key === "skills" ? <>
+                <strong>{item.name}{item.level ? ` · ${item.level}` : ""}</strong>
+                <DropdownMenu.Root modal={false}>
+                  <DropdownMenu.Trigger asChild>
+                    <button type="button" className={styles.skillMenuTrigger} disabled={busy} aria-label={`Thao tác với kỹ năng ${item.name}`}>
+                      <Ellipsis size={18} aria-hidden="true" />
+                    </button>
+                  </DropdownMenu.Trigger>
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content className={styles.skillMenu} align="end" sideOffset={6} collisionPadding={12}>
+                      <DropdownMenu.Item className={styles.skillMenuItem} onSelect={() => edit(item)}><Pencil size={15} aria-hidden="true" /> Sửa kỹ năng</DropdownMenu.Item>
+                      <DropdownMenu.Item className={`${styles.skillMenuItem} ${styles.skillMenuDanger}`} onSelect={() => setDeleting(item.id)}><Trash2 size={15} aria-hidden="true" /> Xóa kỹ năng</DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
+              </> : <>
                 <div className={styles.entry}>
                   {block.key === "experiences" ? <span className={styles.entryIcon}><BriefcaseBusiness size={18} aria-hidden="true" /></span> : null}
                   <BlockItemDetails blockKey={block.key} item={item} />
-                </div>}
-              <div className={styles.itemActions}>
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    setEditing(item.id);
-                    setDraft(item);
-                    setError("");
-                    setOpen(true);
-                  }}
-                >
-                  {editing === item.id ? "Đang sửa" : "Sửa"}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  disabled={busy}
-                  onClick={() => setDeleting(item.id)}
-                >
-                  Xóa
-                </button>
-              </div>
+                </div>
+                <div className={styles.itemActions}>
+                  <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => edit(item)}>
+                    {editing === item.id ? "Đang sửa" : "Sửa"}
+                  </button>
+                  <button type="button" className="btn btn-danger" disabled={busy} onClick={() => setDeleting(item.id)}>
+                    Xóa
+                  </button>
+                </div>
+              </>}
             </li>
           ))}
         </ul>

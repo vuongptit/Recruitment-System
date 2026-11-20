@@ -455,16 +455,29 @@ test("profile sections save independently with the current candidate identity", 
     });
   });
   await login(page);
-  const section = page
-    .locator("section")
-    .filter({
-      has: page.getByRole("heading", { name: "Kỹ năng", exact: true }),
-    });
+  const section = page.getByRole("region", { name: "Kỹ năng", exact: true });
+  await section.getByRole("button", { name: "Thêm kỹ năng", exact: true }).click();
   await section.getByLabel("Tên kỹ năng").fill("TypeScript");
   await section.getByLabel("Mức độ").fill("Tốt");
   await section.getByRole("button", { name: "Lưu kỹ năng" }).click();
   await expect(page.getByRole("progressbar", { name: "Mức độ hoàn thiện hồ sơ" })).toHaveAttribute("value", "55");
   expect(body).toEqual({ name: "TypeScript", level: "Tốt" });
+  const actions = section.getByRole("button", { name: "Thao tác với kỹ năng TypeScript" });
+  await expect(section.getByRole("button", { name: /^(Sửa|Xóa)$/ })).toHaveCount(0);
+  await actions.press("Enter");
+  await expect(page.getByRole("menuitem", { name: "Sửa kỹ năng" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(actions).toBeFocused();
+  await actions.click();
+  await page.getByRole("menuitem", { name: "Sửa kỹ năng" }).click();
+  await expect(section.getByLabel("Tên kỹ năng")).toHaveValue("TypeScript");
+  await section.getByRole("button", { name: "Hủy" }).click();
+  await actions.click();
+  await page.getByRole("menuitem", { name: "Xóa kỹ năng" }).click();
+  const confirmation = page.getByRole("alertdialog", { name: "Xóa kỹ năng" });
+  await expect(confirmation.getByRole("button", { name: "Quay lại" })).toBeFocused();
+  await confirmation.getByRole("button", { name: "Quay lại" }).click();
+  await expect(actions).toBeVisible();
 });
 test("CV Builder exports Vietnamese PDF then publishes a private snapshot", async ({
   page,
