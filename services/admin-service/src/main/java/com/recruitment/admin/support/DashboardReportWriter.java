@@ -14,6 +14,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xddf.usermodel.*;
+import org.apache.poi.xddf.usermodel.chart.*;
 import org.apache.poi.xssf.usermodel.*;
 
 /** Presentation-only formatter. All numbers originate from the authorized dashboard services. */
@@ -37,6 +39,11 @@ public class DashboardReportWriter {
   private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("dd/MM/uuuu");
   private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("dd/MM/uuuu HH:mm:ss").withZone(VIETNAM);
   private static final int MAX_BUCKETS = 9000; // Keeps the complete CSV under 50,000 data rows.
+  private static final int SUMMARY_COLUMNS = 15;
+  private static final int MAX_CHART_POINTS = 14;
+  private static final String[] ACTIVITY_CARDS = {"JOBS_PUBLISHED", "APPLIED", "HIRED"};
+  private static final Map<String, String> SHORT_LABELS = Map.of(
+      "APPLIED", "Ứng tuyển", "INTERVIEW", "Phỏng vấn", "OFFER", "Đề nghị", "HIRED", "Đã tuyển");
   private final DashboardActivityResponse activity;
   private final DashboardSnapshotResponse snapshot;
   private final List<Detail> details;
@@ -146,31 +153,179 @@ public class DashboardReportWriter {
   }
 
   private void summary(XSSFWorkbook book, Styles styles) {
-    var sheet = sheet(book, "Tong quan", new int[]{40, 25, 25, 20, 22, 42});
-    title(sheet, styles, "CareerHub | Báo cáo quản trị", 6);
-    note(sheet, styles, 1, "Kỳ hoạt động: " + period() + " | Múi giờ: " + zone(), 6);
-    note(sheet, styles, 2, "Xuất lúc: " + STAMP.format(generatedAt) + " (GMT+7)", 6);
-    note(sheet, styles, 3, "Chốt số liệu hoạt động lúc: " + STAMP.format(activity.observedAt()) + " (GMT+7)", 6);
-    note(sheet, styles, 4, "Kỳ so sánh: " + previousPeriod() + ". Hiện trạng được lấy độc lập, không lọc theo kỳ.", 6);
-    note(sheet, styles, 5, sourceNote(), 6);
-    header(sheet, styles, 7, "Chỉ số", "Trong kỳ", "Kỳ so sánh", "Chênh lệch", "Thay đổi (%)", "Diễn giải");
-    int index = 8;
+    int[] widths = new int[SUMMARY_COLUMNS];
+    Arrays.fill(widths, 10);
+    var sheet = sheet(book, "Tong quan", widths);
+    sheet.setZoom(90);
+    title(sheet, styles, "CareerHub | Tổng quan quản trị", SUMMARY_COLUMNS);
+    band(sheet, 1, "Kỳ hoạt động: " + period() + " (" + zone() + ")   ·   Kỳ so sánh: " + previousPeriod(), styles.note, 21);
+    band(sheet, 2, "Cập nhật hoạt động: " + STAMP.format(activity.observedAt()) + "   ·   Xuất file: " + STAMP.format(generatedAt) + " (GMT+7)", styles.note, 21);
+    band(sheet, 3, sourceNote(), styles.note, 22);
+
+    band(sheet, 5, "Hiện trạng toàn hệ thống   ·   " + STAMP.format(snapshot.capturedAt()) + " (GMT+7)", styles.section, 25);
+    for (int i = 0; i < 5; i++) {
+      var definition = SNAPSHOT[i];
+      tile(sheet, styles, 6, i * 3, 3, definition[2], snapshotValue(definition[0]), null, false);
+    }
+
+    band(sheet, 9, "Hoạt động tuyển dụng trong kỳ", styles.section, 25);
+    for (int i = 0; i < ACTIVITY_CARDS.length; i++) {
+      String key = ACTIVITY_CARDS[i];
+      long value = activity.totals().getOrDefault(key, 0L);
+      tile(sheet, styles, 10, i * 5, 5, LABELS.get(key), value, activityComparison(key, value), false);
+    }
+
+    drawSummaryCharts(sheet, styles);
+
+    band(sheet, 34, "Cần xử lý tại thời điểm lấy số", styles.section, 25);
+    for (int i = 0; i < 4; i++) {
+      var definition = SNAPSHOT[i + 5];
+      tile(sheet, styles, 35, i * 4, i == 3 ? 3 : 4, definition[2], snapshotValue(definition[0]), null, true);
+    }
+
+    band(sheet, 38, "So sánh hoạt động theo kỳ", styles.section, 25);
+    summaryRow(sheet, 39, new Object[]{"Chỉ số", "Trong kỳ", "Kỳ so sánh", "Chênh lệch", "Thay đổi", "Diễn giải"},
+        new CellStyle[]{styles.header, styles.header, styles.header, styles.header, styles.header, styles.header});
+    int index = 40;
     for (String key : METRICS) {
-      var row = sheet.createRow(index++); row.setHeightInPoints(34);
       long value = activity.totals().getOrDefault(key, 0L);
       Long previous = activity.previousTotals() == null ? null : activity.previousTotals().getOrDefault(key, 0L);
-      cell(row, 0, LABELS.get(key), styles.text);
-      cell(row, 1, value, styles.number);
-      cell(row, 2, previous == null ? "—" : previous, previous == null ? styles.text : styles.number);
-      cell(row, 3, previous == null ? "—" : value - previous, previous == null ? styles.text : styles.number);
-      cell(row, 4, previous == null || previous == 0 ? "—" : (double) (value - previous) / previous, previous == null || previous == 0 ? styles.text : styles.percent);
-      cell(row, 5, previous == null ? "Không so sánh với kỳ trước" : previous == 0 ? value == 0 ? "Không phát sinh ở cả hai kỳ" : "Có phát sinh; kỳ so sánh bằng 0" : hourly() ? "So với cùng giờ hôm qua" : "Hai kỳ có cùng số ngày", styles.text);
+      boolean comparable = previous != null && previous != 0;
+      summaryRow(sheet, index++, new Object[]{LABELS.get(key), value, previous == null ? "—" : previous,
+          previous == null ? "—" : value - previous, comparable ? (double) (value - previous) / previous : "—",
+          previous == null ? "Không có kỳ so sánh" : previous == 0 ? "Kỳ so sánh bằng 0" : comparisonBasis()},
+          new CellStyle[]{styles.text, styles.number, styles.number, styles.number, comparable ? styles.percent : styles.text, styles.text});
     }
-    note(sheet, styles, 15, "Các sheet tiếp theo: Hiện trạng và hàng đợi • Phễu tuyển dụng • Chi tiết theo " + bucketName().toLowerCase(Locale.ROOT) + " • Hướng dẫn đọc số liệu.", 6);
-    note(sheet, styles, 17, "Hồ sơ đạt mốc là số đơn ứng tuyển đạt mốc lần đầu; một người có thể có nhiều đơn. Các mốc không được cộng lại thành tổng ứng viên.", 6);
-    sheet.createFreezePane(1, 8);
-    sheet.setAutoFilter(new CellRangeAddress(7, index - 1, 0, 5));
-    book.setPrintArea(book.getSheetIndex(sheet), 0, 5, 0, 18);
+    band(sheet, 46, "Xem các sheet Hiện trạng, Phễu tuyển dụng, Chi tiết và Hướng dẫn để đối chiếu số liệu.", styles.note, 24);
+    sheet.createFreezePane(0, 4);
+    sheet.setRowBreak(37);
+    book.setPrintArea(book.getSheetIndex(sheet), 0, SUMMARY_COLUMNS - 1, 0, 46);
+  }
+
+  private Object snapshotValue(String key) {
+    var metric = snapshot.metrics().get(key);
+    if (metric == null || !metric.available() || metric.value() == null) return "—";
+    return metric.lowerBound() ? metric.value() + "+" : metric.value();
+  }
+
+  private String activityComparison(String key, long current) {
+    if (activity.previousTotals() == null) return "Không có kỳ so sánh";
+    long previous = activity.previousTotals().getOrDefault(key, 0L);
+    if (previous == 0) return current == 0 ? "Không phát sinh ở cả hai kỳ" : "Kỳ so sánh bằng 0";
+    return String.format(Locale.forLanguageTag("vi-VN"), "%+.1f%% so với %s", (current - previous) * 100.0 / previous,
+        hourly() ? "cùng giờ hôm qua" : "month".equals(activity.range().period()) ? "cả tháng trước" : "kỳ trước");
+  }
+
+  private String comparisonBasis() {
+    if (hourly()) return "Cùng giờ hôm qua";
+    return "month".equals(activity.range().period()) ? "Cả tháng trước" : "Hai kỳ cùng độ dài";
+  }
+
+  private void drawSummaryCharts(XSSFSheet sheet, Styles styles) {
+    var drawing = sheet.createDrawingPatriarch();
+    if (details.isEmpty()) {
+      merged(row(sheet, 18, 30), 0, 8, "Chưa có dữ liệu xu hướng trong kỳ đã chọn.", styles.note);
+    } else {
+      int groupSize = (details.size() + MAX_CHART_POINTS - 1) / MAX_CHART_POINTS;
+      var labels = new ArrayList<String>();
+      var published = new ArrayList<Long>();
+      var applied = new ArrayList<Long>();
+      DateTimeFormatter compact = DateTimeFormatter.ofPattern(hourly() ? "HH:mm" : monthly() ? "MM/uuuu" : "dd/MM");
+      for (int from = 0; from < details.size(); from += groupSize) {
+        var group = details.subList(from, Math.min(from + groupSize, details.size()));
+        labels.add(compact.format(group.getFirst().time()));
+        published.add(group.stream().mapToLong(row -> row.values().get("JOBS_PUBLISHED")).sum());
+        applied.add(group.stream().mapToLong(row -> row.values().get("APPLIED")).sum());
+      }
+      var chart = createChart(drawing, 0, 9, "Xu hướng tuyển dụng");
+      var category = chart.createCategoryAxis(AxisPosition.BOTTOM);
+      var values = chart.createValueAxis(AxisPosition.LEFT);
+      values.setMinimum(0);
+      values.setNumberFormat("#,##0");
+      var lines = (XDDFLineChartData) chart.createData(ChartTypes.LINE, category, values);
+      var categories = XDDFDataSourcesFactory.fromArray(labels.toArray(String[]::new));
+      addLine(lines, categories, published, "Tin đã đăng", new byte[]{49, 88, (byte) 181});
+      addLine(lines, categories, applied, "Đơn ứng tuyển", new byte[]{18, 105, 70});
+      chart.getOrAddLegend().setPosition(LegendPosition.BOTTOM);
+      chart.plot(lines);
+      String unit = bucketName().toLowerCase(Locale.ROOT);
+      merged(row(sheet, 32, 24), 0, 8, groupSize > 1 ? "Mỗi điểm gộp tối đa " + groupSize + " " + unit + "; nhãn là mốc bắt đầu nhóm."
+          : "Mỗi điểm là một " + unit + " trong kỳ (" + zone() + ").", styles.note);
+    }
+
+    var stages = activity.funnel().stream().filter(item -> SHORT_LABELS.containsKey(item.stage())).toList();
+    if (stages.isEmpty()) {
+      merged(row(sheet, 18, 30), 9, 14, "Chưa có dữ liệu phễu tuyển dụng trong kỳ.", styles.note);
+    } else {
+      var chart = createChart(drawing, 9, SUMMARY_COLUMNS, "Phễu tuyển dụng (hồ sơ)");
+      var category = chart.createCategoryAxis(AxisPosition.BOTTOM);
+      var values = chart.createValueAxis(AxisPosition.LEFT);
+      values.setMinimum(0);
+      values.setNumberFormat("#,##0");
+      values.setCrossBetween(AxisCrossBetween.BETWEEN);
+      long largestStage = stages.stream().mapToLong(item -> item.count()).max().orElse(0);
+      values.setMajorUnit(Math.max(1, Math.ceil(largestStage / 4.0)));
+      var bars = (XDDFBarChartData) chart.createData(ChartTypes.BAR, category, values);
+      bars.setBarDirection(BarDirection.COL);
+      var labels = stages.stream().map(item -> SHORT_LABELS.get(item.stage())).toArray(String[]::new);
+      var amounts = stages.stream().map(item -> item.count()).toArray(Long[]::new);
+      var series = bars.addSeries(XDDFDataSourcesFactory.fromArray(labels), XDDFDataSourcesFactory.fromArray(amounts));
+      series.setTitle("Số hồ sơ", null);
+      var properties = new XDDFShapeProperties();
+      properties.setFillProperties(new XDDFSolidFillProperties(XDDFColor.from(new byte[]{49, 88, (byte) 181})));
+      series.setShapeProperties(properties);
+      chart.plot(bars);
+      merged(row(sheet, 32, 24), 9, 14, "Tính theo nhóm hồ sơ nộp lần đầu trong kỳ.", styles.note);
+    }
+  }
+
+  private static XSSFChart createChart(XSSFDrawing drawing, int firstColumn, int lastColumn, String title) {
+    var anchor = drawing.createAnchor(0, 0, 0, 0, firstColumn, 14, lastColumn, 32);
+    var chart = drawing.createChart(anchor);
+    chart.setTitleText(title);
+    chart.setTitleOverlay(false);
+    return chart;
+  }
+
+  private static void addLine(XDDFLineChartData lines, XDDFDataSource<String> categories, List<Long> amounts, String label, byte[] rgb) {
+    var series = (XDDFLineChartData.Series) lines.addSeries(categories, XDDFDataSourcesFactory.fromArray(amounts.toArray(Long[]::new)));
+    series.setTitle(label, null);
+    series.setMarkerStyle(MarkerStyle.CIRCLE);
+    series.setSmooth(false);
+    var properties = new XDDFShapeProperties();
+    properties.setLineProperties(new XDDFLineProperties(new XDDFSolidFillProperties(XDDFColor.from(rgb))));
+    series.setShapeProperties(properties);
+  }
+
+  private static void tile(XSSFSheet sheet, Styles styles, int top, int firstColumn, int width,
+      String label, Object value, String hint, boolean queue) {
+    int lastColumn = firstColumn + width - 1;
+    merged(row(sheet, top, 22), firstColumn, lastColumn, label, queue ? styles.queueLabel : styles.tileLabel);
+    merged(row(sheet, top + 1, 33), firstColumn, lastColumn, value, queue ? styles.queueNumber : styles.tileNumber);
+    if (hint != null) merged(row(sheet, top + 2, 22), firstColumn, lastColumn, hint, styles.tileLabel);
+  }
+
+  private static void summaryRow(XSSFSheet sheet, int index, Object[] cells, CellStyle[] styles) {
+    int[] starts = {0, 4, 6, 8, 10, 12, SUMMARY_COLUMNS};
+    var row = row(sheet, index, 28);
+    for (int i = 0; i < cells.length; i++) merged(row, starts[i], starts[i + 1] - 1, cells[i], styles[i]);
+  }
+
+  private static void band(XSSFSheet sheet, int index, String title, CellStyle style, int height) {
+    merged(row(sheet, index, height), 0, SUMMARY_COLUMNS - 1, title, style);
+  }
+
+  private static XSSFRow row(XSSFSheet sheet, int index, int height) {
+    var row = sheet.getRow(index);
+    if (row == null) row = sheet.createRow(index);
+    row.setHeightInPoints(height);
+    return row;
+  }
+
+  private static void merged(XSSFRow row, int first, int last, Object value, CellStyle style) {
+    cell(row, first, value, style);
+    for (int i = first + 1; i <= last; i++) row.createCell(i).setCellStyle(style);
+    row.getSheet().addMergedRegion(new CellRangeAddress(row.getRowNum(), row.getRowNum(), first, last));
   }
 
   private void currentState(XSSFWorkbook book, Styles styles) {
@@ -243,7 +398,7 @@ public class DashboardReportWriter {
         {"Đơn ứng tuyển", "Số hồ sơ được ghi nhận ứng tuyển lần đầu trong kỳ. Một người có thể nộp nhiều hồ sơ."},
         {"Phỏng vấn / đề nghị / tuyển", "Số hồ sơ đạt từng mốc lần đầu trong kỳ. Không cộng các mốc để tính tổng ứng viên."},
         {"Phễu tuyển dụng", "Theo nhóm hồ sơ nộp lần đầu trong kỳ. Số đạt mốc có thể khác tổng hoạt động mốc đó, vì hồ sơ được nộp từ kỳ khác không thuộc nhóm này."},
-        {"So sánh", "Chênh lệch = trong kỳ − kỳ so sánh. Tỷ lệ = chênh lệch / kỳ so sánh. Không tính phần trăm khi kỳ so sánh bằng 0."},
+        {"So sánh", "Chênh lệch = trong kỳ − kỳ so sánh. Tỷ lệ = chênh lệch / kỳ so sánh. Tháng này đối chiếu với cả tháng trước; không tính phần trăm khi kỳ so sánh bằng 0."},
         {"Dấu —", "Không áp dụng, không có mẫu số để tính tỷ lệ, hoặc chưa lấy được nguồn dữ liệu; xem cột trạng thái và giải thích. Không được hiểu là 0."},
         {"Dấu + sau số", "Là số tối thiểu, không phải tổng chính xác. Ví dụ 50+ tin chờ duyệt khi API nguồn chỉ trả tối đa 50 tin."},
         {"Xuất file", "Hoạt động và hiện trạng được lấy lại khi xuất. File có thể mới hơn trang đang mở; mỗi phần ghi rõ thời điểm cập nhật."},
@@ -282,6 +437,7 @@ public class DashboardReportWriter {
   }
   private static class Styles {
     final XSSFCellStyle title, header, text, note, number, percent, date, month, hour, total, warning;
+    final XSSFCellStyle section, tileLabel, tileNumber, queueLabel, queueNumber;
     Styles(XSSFWorkbook book) {
       var normal = book.createFont(); normal.setFontName("Calibri"); normal.setFontHeightInPoints((short) 11);
       text = book.createCellStyle(); text.setFont(normal); text.setVerticalAlignment(VerticalAlignment.CENTER); text.setWrapText(true);
@@ -296,6 +452,27 @@ public class DashboardReportWriter {
       hour = copy(book, text); hour.setDataFormat(book.createDataFormat().getFormat("dd/mm/yyyy hh:mm"));
       total = copy(book, header); total.setDataFormat(number.getDataFormat()); total.setAlignment(HorizontalAlignment.RIGHT);
       warning = copy(book, text); warning.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex()); warning.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+      section = copy(book, header); section.setIndention((short) 1);
+      tileLabel = tileStyle(book, note, 11, new byte[]{(byte) 236, (byte) 242, (byte) 255}, new byte[]{36, 61, 107});
+      tileNumber = tileStyle(book, tileLabel, 21, new byte[]{(byte) 236, (byte) 242, (byte) 255}, new byte[]{25, 48, 95});
+      tileNumber.setDataFormat(number.getDataFormat());
+      queueLabel = tileStyle(book, note, 11, new byte[]{(byte) 255, (byte) 247, (byte) 227}, new byte[]{110, 75, 14});
+      queueNumber = tileStyle(book, queueLabel, 19, new byte[]{(byte) 255, (byte) 247, (byte) 227}, new byte[]{110, 75, 14});
+      queueNumber.setDataFormat(number.getDataFormat());
+    }
+
+    private static XSSFCellStyle tileStyle(XSSFWorkbook book, CellStyle base, int size, byte[] background, byte[] foreground) {
+      var tile = copy(book, base);
+      var font = book.createFont();
+      font.setFontName("Calibri"); font.setFontHeightInPoints((short) size); font.setBold(true);
+      font.setColor(new XSSFColor(foreground, null));
+      tile.setFont(font);
+      tile.setIndention((short) 1);
+      tile.setFillForegroundColor(new XSSFColor(background, null));
+      tile.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+      tile.setBorderRight(BorderStyle.MEDIUM);
+      tile.setRightBorderColor(IndexedColors.WHITE.getIndex());
+      return tile;
     }
     private static XSSFCellStyle copy(XSSFWorkbook book, CellStyle source) { var result = book.createCellStyle(); result.cloneStyleFrom(source); return result; }
   }

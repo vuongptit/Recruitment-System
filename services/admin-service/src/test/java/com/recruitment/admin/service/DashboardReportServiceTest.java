@@ -48,10 +48,22 @@ class DashboardReportServiceTest {
       assertNotNull(workbook.getSheet("Pheu tuyen dung"));
       assertNotNull(workbook.getSheet("Huong dan"));
       var summary = workbook.getSheet("Tong quan");
-      assertEquals(3.0, summary.getRow(9).getCell(1).getNumericCellValue());
-      assertEquals(-2.0, summary.getRow(9).getCell(3).getNumericCellValue());
-      assertEquals(-0.4, summary.getRow(9).getCell(4).getNumericCellValue(), 0.00001);
-      assertTrue(summary.getRow(9).getCell(4).getCellStyle().getDataFormatString().contains("%"));
+      assertEquals(15.0, summary.getRow(7).getCell(0).getNumericCellValue());
+      assertEquals("—", summary.getRow(7).getCell(3).getStringCellValue());
+      assertEquals(3.0, summary.getRow(11).getCell(5).getNumericCellValue());
+      assertEquals("50+", summary.getRow(36).getCell(4).getStringCellValue());
+      assertEquals(3.0, summary.getRow(41).getCell(4).getNumericCellValue());
+      assertEquals(-2.0, summary.getRow(41).getCell(8).getNumericCellValue());
+      assertEquals(-0.4, summary.getRow(41).getCell(10).getNumericCellValue(), 0.00001);
+      assertTrue(summary.getRow(41).getCell(10).getCellStyle().getDataFormatString().contains("%"));
+      var charts = summary.getDrawingPatriarch().getCharts();
+      assertEquals(2, charts.size());
+      var trend = charts.get(0).getCTChart().getPlotArea().getLineChartArray(0);
+      assertEquals(2, trend.sizeOfSerArray());
+      assertEquals(3, trend.getSerArray(1).getVal().getNumLit().getPtCount().getVal());
+      assertEquals("3", trend.getSerArray(1).getVal().getNumLit().getPtArray(1).getV());
+      var funnel = charts.get(1).getCTChart().getPlotArea().getBarChartArray(0);
+      assertEquals("1", funnel.getSerArray(0).getVal().getNumLit().getPtArray(1).getV());
       var current = workbook.getSheet("Hien trang");
       assertEquals("—", current.getRow(5).getCell(2).getStringCellValue());
       assertEquals("50+", current.getRow(10).getCell(2).getStringCellValue());
@@ -78,6 +90,22 @@ class DashboardReportServiceTest {
     assertTrue(csv.contains("Tin chờ duyệt,50+"));
     assertTrue(csv.contains("Chi tiết theo ngày,01/11/2026,UTC,Đơn ứng tuyển,0"));
     assertFalse(csv.contains("JOBS_PUBLISHED"));
+  }
+
+  @Test
+  void monthReportLabelsAndComparesAgainstTheWholePreviousMonth() throws Exception {
+    var source = historical();
+    var range = new DashboardActivityResponse.Range("month", source.range().from(), source.range().to(),
+        LocalDate.parse("2026-10-01"), LocalDate.parse("2026-10-31"), "DAY", "UTC", null, null, null, null);
+    var month = new DashboardActivityResponse(range, source.totals(), source.previousTotals(), source.daily(),
+        source.funnel(), source.aggregatedThrough(), source.firstRecordedDate(), 0, false, source.observedAt(), false, List.of());
+    var writer = new DashboardReportWriter(month, state());
+    assertTrue(new String(writer.csv(), StandardCharsets.UTF_8).contains("so với 01/10/2026 – 31/10/2026"));
+    try (var workbook = new XSSFWorkbook(new ByteArrayInputStream(writer.xlsx()))) {
+      var summary = workbook.getSheetAt(0);
+      assertTrue(summary.getRow(1).getCell(0).getStringCellValue().contains("01/10/2026 – 31/10/2026"));
+      assertEquals("Cả tháng trước", summary.getRow(41).getCell(12).getStringCellValue());
+    }
   }
 
   @Test
@@ -108,6 +136,11 @@ class DashboardReportServiceTest {
       var detail = workbook.getSheet("Chi tiet");
       assertEquals(88, detail.getLastRowNum()); // Header + 83 months + total.
       assertEquals(2.0, detail.getRow(88).getCell(2).getNumericCellValue());
+      var trend = workbook.getSheetAt(0).getDrawingPatriarch().getCharts().getFirst()
+          .getCTChart().getPlotArea().getLineChartArray(0);
+      var points = trend.getSerArray(1).getVal().getNumLit();
+      assertTrue(points.getPtCount().getVal() <= 14);
+      assertEquals(2L, points.getPtList().stream().mapToLong(point -> Long.parseLong(point.getV())).sum());
     }
   }
 

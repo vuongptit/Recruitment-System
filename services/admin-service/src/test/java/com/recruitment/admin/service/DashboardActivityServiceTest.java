@@ -9,6 +9,8 @@ import java.time.*;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 class DashboardActivityServiceTest {
@@ -57,6 +59,24 @@ class DashboardActivityServiceTest {
     var result = firstDay.activity(actor, "month", null, null);
     assertTrue(result.range().from().isAfter(result.range().to()));
     assertNull(result.previousTotals());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "2026-11-04T01:00:00Z, 2026-10-01, 2026-10-31",
+      "2024-03-05T01:00:00Z, 2024-02-01, 2024-02-29",
+      "2027-01-10T01:00:00Z, 2026-12-01, 2026-12-31"
+  })
+  void monthToDateUsesEntirePreviousCalendarMonth(String now, LocalDate from, LocalDate to) {
+    var month = new DashboardActivityService(gateway, repository, Clock.fixed(Instant.parse(now), ZoneOffset.UTC));
+    when(repository.totals(from, to)).thenReturn(Map.of("APPLIED", 42L));
+    var result = month.activity(actor, "month", null, null);
+    assertEquals(to.plusDays(1), result.range().from());
+    assertEquals(LocalDate.ofInstant(Instant.parse(now), ZoneOffset.UTC).minusDays(1), result.range().to());
+    assertEquals(from, result.range().previousFrom());
+    assertEquals(to, result.range().previousTo());
+    assertEquals(42L, result.previousTotals().get("APPLIED"));
+    verify(repository).totals(from, to);
   }
 
   @Test

@@ -24,7 +24,7 @@ Lựa chọn “Hôm nay” dùng GMT+7 từ 00:00 đến thời điểm làm m�
 | Màu trạng thái | Chữ kèm màu; xanh cho đã xác minh/mở, vàng cho chờ xử lý, đỏ cho khóa/từ chối |
 | Hộp thoại | Native dialog; Escape, giữ focus trong hộp, trả focus về nút mở, khóa đóng khi đang gửi |
 
-Trang tổng quan đặt hiện trạng toàn hệ thống ngay dưới tiêu đề. Bộ chọn thời gian, xuất báo cáo và ba chỉ số theo kỳ nằm trong phần Hoạt động tuyển dụng, cùng biểu đồ có bộ chọn chỉ số. Nhật ký gần đây, phễu tuyển dụng và hàng đợi xử lý nằm phía dưới. Nhật ký và số liệu hiện trạng độc lập với bộ lọc thời gian; hàng đợi dẫn đến màn hình xử lý. Kỳ mặc định là 30 ngày UTC đã hoàn tất. Các kỳ hữu hạn được so với kỳ trước cùng độ dài; khi kỳ so sánh bằng 0, giao diện hiển thị bằng chữ. Nguồn lỗi hiện dấu “—”, danh sách tin chờ duyệt chạm giới hạn API hiện “50+”.
+Trang tổng quan đặt hiện trạng toàn hệ thống ngay dưới tiêu đề. Bộ chọn thời gian, xuất báo cáo và ba chỉ số theo kỳ nằm trong phần Hoạt động tuyển dụng, cùng biểu đồ có bộ chọn chỉ số. Nhật ký gần đây, phễu tuyển dụng và hàng đợi xử lý nằm phía dưới. Nhật ký và số liệu hiện trạng độc lập với bộ lọc thời gian; hàng đợi dẫn đến màn hình xử lý. Kỳ mặc định là 30 ngày UTC đã hoàn tất. Tháng này so với toàn bộ tháng dương lịch liền trước. Các kỳ 7 ngày, 30 ngày và tùy chỉnh so với kỳ liền trước cùng độ dài; khi kỳ so sánh bằng 0, giao diện hiển thị bằng chữ. Nguồn lỗi hiện dấu “—”, danh sách tin chờ duyệt chạm giới hạn API hiện “50+”.
 
 ## Cấu trúc
 
@@ -49,7 +49,7 @@ Hoạt động dùng dữ liệu sự kiện đã ghi nhận; không giả đị
 
 ## Báo cáo đầy đủ
 
-Nút Excel/CSV gọi `/api/admin/stats/report`, truyền kỳ đang xem; không gọi nhầm API raw cũ. Khi xuất, backend lấy lại cả hoạt động và hiện trạng. Excel có 5 sheet Tổng quan, Hiện trạng, Phễu tuyển dụng, Chi tiết và Hướng dẫn. Bảng chi tiết đặt 5 chỉ số cạnh nhau, thêm các mốc 0 và dòng tổng công thức đã tính sẵn; tiêu đề có bộ lọc, cố định khi cuộn, định dạng số/ngày/phần trăm và thiết lập in.
+Nút Excel/CSV gọi `/api/admin/stats/report` với kỳ đang xem. Khi xuất, backend lấy lại cả hoạt động và hiện trạng. Excel mở ở sheet Tổng quan, gồm thẻ chỉ số, biểu đồ đường cho xu hướng, biểu đồ cột cho phễu, hàng chờ xử lý và bảng so sánh. Biểu đồ có thể gộp các mốc liên tiếp ở kỳ dài. Các sheet Hiện trạng, Phễu tuyển dụng, Chi tiết và Hướng dẫn giữ số liệu đầy đủ. Bảng chi tiết đặt 5 chỉ số cạnh nhau, thêm các mốc 0 và dòng tổng công thức đã tính sẵn; tiêu đề có bộ lọc, cố định khi cuộn, định dạng số/ngày/phần trăm và thiết lập in.
 
 CSV dùng UTF-8 BOM, nhãn tiếng Việt, bộ 10 cột thống nhất và nhóm số liệu để lọc. Gồm hiện trạng, hàng đợi, tổng hoạt động, phễu và chi tiết; ghi rõ múi giờ, thời điểm cập nhật, so sánh và tình trạng nguồn. Dấu “—” không phải 0, “50+” là số tối thiểu. Kỳ trước bằng 0 không tạo tỷ lệ vô hạn. File Hôm nay giữ GMT+7, dữ liệu tạm tính và kỳ so sánh cùng thời điểm hôm qua. Dữ liệu file có thể mới hơn trang đang mở.
 

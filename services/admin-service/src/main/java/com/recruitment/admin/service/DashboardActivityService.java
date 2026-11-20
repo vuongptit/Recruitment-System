@@ -64,7 +64,8 @@ public class DashboardActivityService {
     }
     long days = Math.max(0, ChronoUnit.DAYS.between(from, to) + 1);
     LocalDate previousTo = !all && days > 0 ? from.minusDays(1) : null;
-    LocalDate previousFrom = previousTo == null ? null : previousTo.minusDays(days - 1);
+    LocalDate previousFrom = previousTo == null ? null
+        : "month".equals(period) ? previousTo.withDayOfMonth(1) : previousTo.minusDays(days - 1);
     long pendingDays = repository.pendingDays(from, to);
     var rows = pendingDays > 0 ? repository.recordedActivity(from, to, all) : repository.trend(from, to, all);
     Map<String, Long> totals = pendingDays > 0 ? sum(rows) : zeroMetrics(repository.totals(from, to));
