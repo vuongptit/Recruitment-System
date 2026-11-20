@@ -71,114 +71,116 @@ const queues = [
 ];
 const number = (value: number) => new Intl.NumberFormat("vi-VN").format(value);
 
-export function AdminSnapshot({
-  data,
-  loading,
-  error,
-  onRetry,
-}: {
+type SnapshotProps = {
   data: DashboardSnapshot | null;
   loading: boolean;
+};
+
+function snapshotValue(data: DashboardSnapshot | null, loading: boolean, key: string) {
+  const metric = data?.metrics[key];
+  if (loading) return "…";
+  return metric?.available && metric.value != null
+    ? number(metric.value) + (metric.lowerBound ? "+" : "")
+    : "—";
+}
+
+export function AdminSnapshot({ data, loading, error, onRetry }: SnapshotProps & {
   error: string;
   onRetry: () => void;
 }) {
-  function value(key: string) {
-    const metric = data?.metrics[key];
-    if (loading) return "…";
-    return metric?.available && metric.value != null
-      ? number(metric.value) + (metric.lowerBound ? "+" : "")
-      : "—";
-  }
   const unavailable =
     data && Object.values(data.metrics).some((metric) => !metric.available);
   return (
-    <>
-      <section
-        className="admin-dashboard-section"
-        aria-labelledby="admin-current-heading"
-        aria-busy={loading}
-      >
-        <div className="admin-dashboard-section-title">
-          <div>
-            <h2 id="admin-current-heading">Hiện trạng toàn hệ thống</h2>
-            <p>Số liệu hiện tại, không phụ thuộc bộ lọc thời gian bên dưới.</p>
-          </div>
-          {data && !loading && (
-            <span className="admin-snapshot-time">
-              Lấy lúc{" "}
-              {new Intl.DateTimeFormat("vi-VN", {
-                timeZone: "Asia/Ho_Chi_Minh",
-                timeStyle: "short",
-              }).format(new Date(data.capturedAt))}{" "}
-              (GMT+7)
+    <section
+      className="admin-surface admin-dashboard-section admin-current-panel"
+      aria-labelledby="admin-current-heading"
+      aria-busy={loading}
+    >
+      <div className="admin-dashboard-section-title">
+        <div>
+          <h2 id="admin-current-heading">Hiện trạng toàn hệ thống</h2>
+          <p>Số liệu hiện tại trên toàn nền tảng.</p>
+        </div>
+        {data && !loading && (
+          <span className="admin-snapshot-time">
+            Lấy lúc{" "}
+            {new Intl.DateTimeFormat("vi-VN", {
+              timeZone: "Asia/Ho_Chi_Minh",
+              timeStyle: "short",
+            }).format(new Date(data.capturedAt))}{" "}
+            (GMT+7)
+          </span>
+        )}
+      </div>
+      {error && (
+        <div className="admin-feedback admin-feedback-error" role="alert">
+          <p>{error}</p>
+          <button className="btn" disabled={loading} onClick={onRetry}>
+            Thử lại hiện trạng
+          </button>
+        </div>
+      )}
+      <div className="admin-metrics admin-snapshot-metrics">
+        {overview.map(({ key, label, help, icon: Icon }) => (
+          <article className="admin-metric" key={key}>
+            <div className="admin-metric-label">
+              <span>{label}</span>
+              <Icon size={18} aria-hidden="true" />
+            </div>
+            <strong>{snapshotValue(data, loading, key)}</strong>
+            <small>
+              {!loading &&
+              (!data?.metrics[key]?.available ||
+                data.metrics[key].value == null)
+                ? "Chưa lấy được số liệu"
+                : help}
+            </small>
+          </article>
+        ))}
+      </div>
+      {unavailable && !error && (
+        <p className="admin-data-note">
+          <Info size={14} aria-hidden="true" />
+          Một số nguồn dữ liệu chưa phản hồi. Dấu “—” thể hiện số liệu chưa
+          có; bạn có thể làm mới để thử lại.
+        </p>
+      )}
+    </section>
+  );
+}
+
+export function AdminQueue({ data, loading }: SnapshotProps) {
+  return (
+    <section
+      className="admin-surface admin-dashboard-section admin-queue-panel"
+      aria-labelledby="admin-queue-heading"
+      aria-busy={loading}
+    >
+      <div className="admin-dashboard-section-title">
+        <div>
+          <h2 id="admin-queue-heading">Cần xử lý</h2>
+        </div>
+      </div>
+      <div className="admin-action-queues">
+        {queues.map(({ key, label, href, icon: Icon }) => (
+          <Link key={key} href={href} className="admin-action-queue">
+            <span className="admin-queue-icon">
+              <Icon size={20} aria-hidden="true" />
             </span>
-          )}
-        </div>
-        {error && (
-          <div className="admin-feedback admin-feedback-error" role="alert">
-            <p>{error}</p>
-            <button className="btn" disabled={loading} onClick={onRetry}>
-              Thử lại hiện trạng
-            </button>
-          </div>
-        )}
-        <div className="admin-metrics admin-snapshot-metrics">
-          {overview.map(({ key, label, help, icon: Icon }) => (
-            <article className="admin-metric" key={key}>
-              <div className="admin-metric-label">
-                <span>{label}</span>
-                <Icon size={18} aria-hidden="true" />
-              </div>
-              <strong>{value(key)}</strong>
-              <small>
-                {!loading &&
-                (!data?.metrics[key]?.available ||
-                  data.metrics[key].value == null)
-                  ? "Chưa lấy được số liệu"
-                  : help}
-              </small>
-            </article>
-          ))}
-        </div>
-        {unavailable && !error && (
-          <p className="admin-data-note">
-            <Info size={14} aria-hidden="true" />
-            Một số nguồn dữ liệu chưa phản hồi. Dấu “—” thể hiện số liệu chưa
-            có; bạn có thể làm mới để thử lại.
-          </p>
-        )}
-      </section>
-      <section
-        className="admin-dashboard-section"
-        aria-labelledby="admin-queue-heading"
-      >
-        <div className="admin-dashboard-section-title">
-          <div>
-            <h2 id="admin-queue-heading">Cần xử lý</h2>
-            <p>Mở từng nhóm để kiểm tra và xử lý yêu cầu.</p>
-          </div>
-        </div>
-        <div className="admin-action-queues">
-          {queues.map(({ key, label, href, icon: Icon }) => (
-            <Link key={key} href={href} className="admin-action-queue">
-              <span className="admin-queue-icon">
-                <Icon size={20} aria-hidden="true" />
-              </span>
-              <div>
-                <span>{label}</span>
-                <strong>{value(key)}</strong>
-                {data?.metrics[key]?.lowerBound && (
-                  <small>Tối thiểu 50 yêu cầu</small>
-                )}
-                {!loading && !data?.metrics[key]?.available && (
-                  <small>Chưa lấy được số liệu</small>
-                )}
-              </div>
-              <ArrowRight size={17} aria-hidden="true" />
-            </Link>
-          ))}
-        </div>
-      </section>
-    </>
+            <div>
+              <span>{label}</span>
+              <strong>{snapshotValue(data, loading, key)}</strong>
+              {data?.metrics[key]?.lowerBound && (
+                <small>Tối thiểu 50 yêu cầu</small>
+              )}
+              {!loading && !data?.metrics[key]?.available && (
+                <small>Chưa lấy được số liệu</small>
+              )}
+            </div>
+            <ArrowRight size={17} aria-hidden="true" />
+          </Link>
+        ))}
+      </div>
+    </section>
   );
 }

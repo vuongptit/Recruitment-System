@@ -1,389 +1,147 @@
-import Link from "next/link";
-import {
-  ArrowRight,
-  BriefcaseBusiness,
-  Building2,
-  Check,
-  ClipboardList,
-  Flag,
-  ShieldCheck,
-  UsersRound,
-} from "lucide-react";
-import { EmptyState, StatusBadge } from "../ui";
+import { useId, useState } from "react";
+import { BriefcaseBusiness, ChartNoAxesCombined, Check, UsersRound } from "lucide-react";
+import type { DashboardActivity } from "@/lib/adminDashboard";
+import { EmptyState } from "../ui";
 
-type Row = Record<string, unknown>;
-const names: Record<string, string> = {
+const metrics = {
   JOBS_PUBLISHED: "Tin đã đăng",
   APPLIED: "Đơn ứng tuyển",
   INTERVIEW: "Phỏng vấn",
   OFFER: "Đề nghị",
   HIRED: "Đã tuyển",
 };
-const icons = [
-  BriefcaseBusiness,
-  UsersRound,
-  ClipboardList,
-  ShieldCheck,
-  Check,
-];
-const count = (value: unknown) =>
-  new Intl.NumberFormat("vi-VN").format(Number(value) || 0);
-const date = (value: unknown) =>
-  new Intl.DateTimeFormat("vi-VN", {
-    timeZone: "UTC",
-    day: "2-digit",
-    month: "2-digit",
-  }).format(new Date(String(value)));
+type Metric = keyof typeof metrics;
+const primaryMetrics = [
+  { key: "JOBS_PUBLISHED", icon: BriefcaseBusiness, tone: "blue" },
+  { key: "APPLIED", icon: UsersRound, tone: "green" },
+  { key: "HIRED", icon: Check, tone: "amber" },
+] as const;
+const count = new Intl.NumberFormat("vi-VN");
+const decimal = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
 
-export function AdminOverview({
-  overview,
-  funnel,
-  from,
-  to,
-  bucket = "DAY",
-  previousTotals,
-  showQueues = true,
-  fromInstant,
-  toExclusive,
-  timezone = "UTC",
-}: {
-  overview: {
-    daily: Row[];
-    totals: Record<string, number>;
-    pendingDays?: number;
-    liveRecalculated?: boolean;
-  };
-  funnel: { stage: string; count: number; rate: number }[];
-  from: string;
-  to: string;
-  bucket?: "HOUR" | "DAY" | "MONTH";
-  previousTotals?: Record<string, number> | null;
-  showQueues?: boolean;
-  fromInstant?: string | null;
-  toExclusive?: string | null;
-  timezone?: string;
-}) {
-  const recordedTrend = overview.daily
-    .filter((row) => row.metric === "APPLIED")
-    .slice()
-    .sort((a, b) => String(a.stat_date).localeCompare(String(b.stat_date)));
-  const trend: Row[] = [];
+function periodKeys(activity: DashboardActivity) {
+  const { from, to, bucket, fromInstant, toExclusive } = activity.range;
+  const keys: string[] = [];
+  if (activity.pendingDays && !activity.liveRecalculated) return null;
   if (bucket === "HOUR" && fromInstant && toExclusive) {
-    const values = new Map(
-      recordedTrend.map((row) => [
-        Date.parse(String(row.stat_date)),
-        Number(row.value),
-      ]),
-    );
-    for (
-      let at = Date.parse(fromInstant);
-      at < Date.parse(toExclusive) && trend.length < 24;
-      at += 3600000
-    ) {
-      trend.push({
-        stat_date: new Date(at).toISOString(),
-        metric: "APPLIED",
-        value: values.get(at) ?? 0,
-      });
+    for (let at = Date.parse(fromInstant); at < Date.parse(toExclusive) && keys.length < 24; at += 3600000) {
+      keys.push(new Date(at).toISOString());
     }
-  } else if (overview.pendingDays && !overview.liveRecalculated)
-    trend.push(...recordedTrend);
-  else if (from <= to) {
-    const values = new Map(
-      recordedTrend.map((row) => [String(row.stat_date), Number(row.value)]),
-    );
-    const cursor = new Date(from + "T00:00:00Z");
-    if (bucket === "MONTH") cursor.setUTCDate(1);
-    while (cursor.toISOString().slice(0, 10) <= to && trend.length < 10000) {
-      const key = cursor.toISOString().slice(0, 10);
-      trend.push({
-        stat_date: key,
-        metric: "APPLIED",
-        value: values.get(key) ?? 0,
-      });
-      if (bucket === "MONTH") cursor.setUTCMonth(cursor.getUTCMonth() + 1);
-      else cursor.setUTCDate(cursor.getUTCDate() + 1);
+  } else if (from <= to) {
+    const day = new Date(`${from}T00:00:00Z`);
+    if (bucket === "MONTH") day.setUTCDate(1);
+    while (day.toISOString().slice(0, 10) <= to && keys.length < 10000) {
+      keys.push(day.toISOString().slice(0, 10));
+      if (bucket === "MONTH") day.setUTCMonth(day.getUTCMonth() + 1);
+      else day.setUTCDate(day.getUTCDate() + 1);
     }
   }
-  function comparison(key: string) {
-    if (!previousTotals)
-      return showQueues ? "Trong khoảng đã chọn" : "Dữ liệu ghi nhận trong kỳ";
-    const current = overview.totals[key] ?? 0;
-    const previous = previousTotals[key] ?? 0;
-    if (previous === 0)
-      return current === 0
-        ? bucket === "HOUR"
-          ? "Không đổi so với cùng giờ hôm qua"
-          : "Không thay đổi so với kỳ trước"
-        : "Có phát sinh; kỳ so sánh bằng 0";
-    const percent = ((current - previous) * 100) / previous;
-    return `${percent > 0 ? "+" : ""}${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(percent)}% ${bucket === "HOUR" ? "so với cùng giờ hôm qua" : "so với kỳ trước"}`;
-  }
-  const chartDate = (value: unknown) =>
-    bucket === "HOUR"
-      ? new Intl.DateTimeFormat("vi-VN", {
-          timeZone: timezone,
-          hour: "2-digit",
-          minute: "2-digit",
-          hourCycle: "h23",
-        }).format(new Date(String(value)))
-      : bucket === "MONTH"
-        ? new Intl.DateTimeFormat("vi-VN", {
-            timeZone: "UTC",
-            month: "2-digit",
-            year: "numeric",
-          }).format(new Date(String(value)))
-        : date(value);
-  const start = trend.length ? Date.parse(String(trend[0].stat_date)) : 0;
-  const duration = trend.length
-    ? Date.parse(String(trend[trend.length - 1].stat_date)) - start
-    : 0;
-  const x = (row: Row) =>
-    duration === 0
-      ? 352
-      : 52 + (600 * (Date.parse(String(row.stat_date)) - start)) / duration;
-  // Rounded intervals keep axis labels unique even for small counts.
-  const interval = Math.max(
-    1,
-    Math.ceil(Math.max(0, ...trend.map((row) => Number(row.value) || 0)) / 4),
-  );
-  const maximum = interval * 4;
-  return (
-    <>
-      <section className="admin-metrics" aria-label="Thống kê tuyển dụng">
-        {Object.entries(names).map(([key, label], index) => {
-          const Icon = icons[index];
-          return (
-            <article key={key} className="admin-metric">
-              <div className="admin-metric-label">
-                <span>{label}</span>
-                <Icon size={18} aria-hidden="true" />
-              </div>
-              <strong>{count(overview.totals[key])}</strong>
-              <small>{comparison(key)}</small>
-            </article>
-          );
-        })}
-      </section>
-      <div className="admin-analytics-grid">
-        <section className="admin-surface admin-trend">
-          <div className="admin-section-heading">
-            <div>
-              <h2>
-                Đơn ứng tuyển theo{" "}
-                {bucket === "HOUR"
-                  ? "giờ"
-                  : bucket === "MONTH"
-                    ? "tháng"
-                    : "ngày"}
-              </h2>
-              <p>
-                {from > to
-                  ? "Chưa có ngày hoàn tất trong tháng này"
-                  : `${date(from)} – ${date(to)}`}
-              </p>
-            </div>
-            <StatusBadge tone="neutral">
-              {count(overview.totals.APPLIED)} đơn
-            </StatusBadge>
-          </div>
-          {trend.length ? (
-            <div className="admin-chart">
-              <svg
-                viewBox="0 0 680 240"
-                role="img"
-                aria-label="Biểu đồ đơn ứng tuyển. Bảng số liệu đầy đủ ở bên dưới."
-              >
-                {[0, 1, 2, 3, 4].map((tick) => (
-                  <g key={tick}>
-                    <line
-                      x1="48"
-                      x2="656"
-                      y1={196 - tick * 42}
-                      y2={196 - tick * 42}
-                      stroke="#e6ebf2"
-                      strokeDasharray="4 4"
-                    />
-                    <text x="36" y={200 - tick * 42} textAnchor="end">
-                      {count(tick * interval)}
-                    </text>
-                  </g>
-                ))}
-                <polyline
-                  fill="none"
-                  stroke="var(--primary)"
-                  strokeWidth="3"
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                  points={trend
-                    .map(
-                      (r) =>
-                        `${x(r)},${196 - (Number(r.value) * 168) / maximum}`,
-                    )
-                    .join(" ")}
-                />
-                {trend.map((r, i) => (
-                  <circle
-                    key={String(r.stat_date)}
-                    cx={x(r)}
-                    cy={196 - (Number(r.value) * 168) / maximum}
-                    r={trend.length > 60 ? 2 : 4}
-                    fill="var(--primary)"
-                  >
-                    <title>
-                      {chartDate(r.stat_date)}: {count(r.value)} đơn
-                    </title>
-                  </circle>
-                ))}
-                <text x="48" y="226">
-                  {chartDate(trend[0].stat_date)}
-                </text>
-                <text x="656" y="226" textAnchor="end">
-                  {chartDate(trend[trend.length - 1].stat_date)}
-                </text>
-              </svg>
-            </div>
-          ) : (
-            <EmptyState
-              title="Chưa có đơn ứng tuyển"
-              description="Chọn khoảng thời gian khác để xem hoạt động ứng tuyển."
-            />
-          )}
-          <details className="admin-data-details">
-            <summary>Xem bảng số liệu</summary>
-            <div
-              className="admin-table-scroll"
-              tabIndex={0}
-              role="region"
-              aria-label="Thống kê theo ngày"
-            >
-              <table className="admin-table">
-                <caption className="sr-only">
-                  Thống kê tuyển dụng theo{" "}
-                  {bucket === "HOUR"
-                    ? "giờ GMT+7"
-                    : bucket === "MONTH"
-                      ? "tháng UTC"
-                      : "ngày UTC"}
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">
-                      {bucket === "HOUR"
-                        ? "Giờ (GMT+7)"
-                        : bucket === "MONTH"
-                          ? "Tháng"
-                          : "Ngày"}
-                    </th>
-                    <th scope="col">Chỉ số</th>
-                    <th scope="col">Số lượng</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.daily.map((r, i) => (
-                    <tr key={i}>
-                      <td>
-                        {bucket === "MONTH" || bucket === "HOUR"
-                          ? chartDate(r.stat_date)
-                          : String(r.stat_date)}
-                      </td>
-                      <td>{names[String(r.metric)] || String(r.metric)}</td>
-                      <td>{count(r.value)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </details>
-        </section>
-        <section className="admin-surface admin-funnel">
-          <div className="admin-section-heading">
-            <div>
-              <h2>Phễu tuyển dụng</h2>
-              <p>Tỷ lệ trên số ứng tuyển ban đầu</p>
-            </div>
-          </div>
-          {funnel.length ? (
-            <ol className="admin-funnel-list">
-              {["APPLIED", "INTERVIEW", "OFFER", "HIRED"]
-                .flatMap((key) => funnel.filter((item) => item.stage === key))
-                .map((item) => (
-                  <li key={item.stage}>
-                    <div>
-                      <span>{names[item.stage]}</span>
-                      <strong>
-                        {count(item.count)}{" "}
-                        <small>
-                          {(funnel.find((stage) => stage.stage === "APPLIED")
-                            ?.count ?? 0) === 0
-                            ? "—"
-                            : new Intl.NumberFormat("vi-VN", {
-                                maximumFractionDigits: 1,
-                              }).format(item.rate)}
-                          {(funnel.find((stage) => stage.stage === "APPLIED")
-                            ?.count ?? 0) > 0
-                            ? "%"
-                            : ""}
-                        </small>
-                      </strong>
-                    </div>
-                    <progress
-                      aria-label={names[item.stage]}
-                      max={100}
-                      value={Math.max(0, Math.min(100, item.rate))}
-                    />
-                  </li>
-                ))}
-            </ol>
-          ) : (
-            <EmptyState
-              title="Chưa có dữ liệu chuyển đổi"
-              description="Số liệu xuất hiện khi có hoạt động ứng tuyển."
-            />
-          )}
-          <p className="admin-data-note">
-            Tính theo hồ sơ nộp lần đầu trong kỳ,{" "}
-            {bucket === "HOUR" ? "đến thời điểm cập nhật" : "đến hết ngày cuối"}
-            . Một hồ sơ được tính một lần ở mỗi mốc; không phải số ứng viên duy
-            nhất.
-          </p>
-        </section>
+  return keys;
+}
+
+function metricTrend(rows: Record<string, unknown>[], metric: Metric, keys: string[] | null, hourly: boolean) {
+  const recorded = new Map(rows.filter(row => row.metric === metric).map(row => {
+    const date = String(row.stat_date);
+    return [hourly ? new Date(date).toISOString() : date, Number(row.value) || 0] as const;
+  }));
+  return (keys ?? [...recorded.keys()].sort()).map(date => ({ date, value: recorded.get(date) ?? 0 }));
+}
+
+function comparison(activity: DashboardActivity, key: Metric) {
+  const { totals, previousTotals, range } = activity;
+  if (!previousTotals) return { text: "Trong kỳ đã chọn", tone: "steady" };
+  const current = totals[key] ?? 0;
+  const previous = previousTotals[key] ?? 0;
+  const relativePeriod = range.bucket === "HOUR" ? "cùng giờ hôm qua" : "kỳ trước";
+  if (!previous) return { text: current ? "Có phát sinh; kỳ so sánh bằng 0" : `Không đổi so với ${relativePeriod}`, tone: "steady" };
+  const percent = ((current - previous) * 100) / previous;
+  return { text: `${percent > 0 ? "+" : ""}${decimal.format(percent)}% so với ${relativePeriod}`, tone: percent > 0 ? "rising" : percent < 0 ? "falling" : "steady" };
+}
+
+export function AdminOverview({ activity }: { activity: DashboardActivity }) {
+  const [metric, setMetric] = useState<Metric>("APPLIED");
+  const fillId = useId();
+  const { range, totals, pendingDays, liveRecalculated } = activity;
+  const hourly = range.bucket === "HOUR";
+  const rows = hourly ? (activity.hourly ?? []) : activity.daily;
+  const keys = periodKeys(activity);
+  const trend = metricTrend(rows, metric, keys, hourly);
+  const bucket = hourly ? "giờ" : range.bucket === "MONTH" ? "tháng" : "ngày";
+  const chartDate = new Intl.DateTimeFormat("vi-VN", hourly ? {
+    timeZone: range.timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  } : range.bucket === "MONTH" ? { timeZone: "UTC", month: "2-digit", year: "numeric" }
+    : { timeZone: "UTC", day: "2-digit", month: "2-digit" });
+  const interval = Math.max(1, Math.ceil(Math.max(0, ...trend.map(point => point.value)) / 4));
+  const start = trend[0] ? Date.parse(trend[0].date) : 0;
+  const duration = trend.length > 1 ? Date.parse(trend[trend.length - 1].date) - start : 0;
+  const x = (index: number) => duration ? 66 + 788 * (Date.parse(trend[index].date) - start) / duration : 460;
+  const y = (value: number) => 206 - (value / (interval * 4)) * 168;
+  const points = trend.map(({ value }, index) => `${x(index)},${y(value)}`).join(" ");
+  const ticks = Math.min(trend.length, 7);
+  const tickIndexes = Array.from({ length: ticks }, (_, index) => ticks === 1 ? 0 : Math.round(index * (trend.length - 1) / (ticks - 1)));
+
+  return <>
+    <section className="admin-overview-kpis" aria-label="Thống kê tuyển dụng">
+      {primaryMetrics.map(({ key, icon: Icon, tone }) => {
+        const delta = comparison(activity, key);
+        const series = metricTrend(rows, key, keys, hourly);
+        const maximum = Math.max(1, ...series.map(point => point.value));
+        const sparkline = series.map(({ value }, index) => `${2 + index * 236 / Math.max(1, series.length - 1)},${32 - 26 * value / maximum}`).join(" ");
+        return <article className={`admin-metric admin-kpi is-${tone}`} key={key}>
+          <div className="admin-metric-label"><span>{metrics[key]}</span><span className="admin-kpi-icon"><Icon size={19} aria-hidden="true" /></span></div>
+          <strong>{count.format(totals[key] ?? 0)}</strong>
+          <small data-trend={delta.tone}>{delta.text}</small>
+          {series.length > 1 && <svg className="admin-sparkline" viewBox="0 0 240 36" preserveAspectRatio="none" aria-hidden="true"><polyline points={sparkline} fill="none" stroke="currentColor" strokeWidth="1.8" vectorEffect="non-scaling-stroke" strokeLinejoin="round" /></svg>}
+        </article>;
+      })}
+    </section>
+    <section className="admin-surface admin-trend" aria-labelledby="admin-trend-title">
+      <div className="admin-section-heading admin-trend-heading">
+        <div><h2 id="admin-trend-title">{metrics[metric]} theo {bucket}</h2><p><ChartNoAxesCombined size={15} aria-hidden="true" />{count.format(totals[metric] ?? 0)} trong kỳ</p></div>
+        <select className="select admin-chart-select" aria-label="Chỉ số biểu đồ" value={metric} onChange={event => setMetric(event.target.value as Metric)}>
+          {Object.entries(metrics).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
+        </select>
       </div>
-      {showQueues && (
-        <section className="admin-queues" aria-label="Truy cập nhanh quản trị">
-          {[
-            {
-              href: "/admin/companies",
-              label: "Xác minh doanh nghiệp",
-              description: "Kiểm tra hồ sơ đang chờ duyệt",
-              icon: Building2,
-            },
-            {
-              href: "/admin/jobs",
-              label: "Kiểm duyệt tin tuyển dụng",
-              description: "Đánh giá nội dung trước khi đăng",
-              icon: BriefcaseBusiness,
-            },
-            {
-              href: "/admin/reports",
-              label: "Xử lý báo cáo",
-              description: "Tiếp nhận và xem xét phản ánh",
-              icon: Flag,
-            },
-          ].map(({ href, label, description, icon: Icon }) => (
-            <Link className="admin-queue" key={href} href={href}>
-              <span className="admin-queue-icon">
-                <Icon size={21} aria-hidden="true" />
-              </span>
-              <div>
-                <strong>{label}</strong>
-                <p>{description}</p>
-              </div>
-              <ArrowRight size={17} aria-hidden="true" />
-            </Link>
-          ))}
-        </section>
-      )}
-    </>
-  );
+      {trend.length ? <div className="admin-chart" role="region" aria-label="Vùng biểu đồ xu hướng" tabIndex={0}>
+        <svg viewBox="0 0 920 252" role="img" aria-label={`Biểu đồ ${metrics[metric].toLocaleLowerCase("vi-VN")}. Bảng số liệu ở bên dưới.`}>
+          <defs><linearGradient id={fillId} x1="0" x2="0" y1="0" y2="1" gradientUnits="objectBoundingBox"><stop stopColor="var(--primary)" stopOpacity=".17"/><stop offset="1" stopColor="var(--primary)" stopOpacity=".015"/></linearGradient></defs>
+          {[0, 1, 2, 3, 4].map(tick => <g key={tick}>
+            <line x1="66" x2="854" y1={y(tick * interval)} y2={y(tick * interval)} stroke="var(--line)" strokeDasharray={tick > 0 ? "3 4" : undefined} />
+            <text x="50" y={y(tick * interval) + 4} textAnchor="end">{count.format(tick * interval)}</text>
+          </g>)}
+          {trend.length > 1 && <polygon fill={`url(#${fillId})`} points={`${x(0)},206 ${points} ${x(trend.length - 1)},206`} />}
+          <polyline fill="none" stroke="var(--primary)" strokeWidth="2.6" strokeLinejoin="round" strokeLinecap="round" points={points} />
+          {trend.map((point, index) => <circle key={point.date} cx={x(index)} cy={y(point.value)} r={trend.length > 60 ? 1.7 : 3.6} fill="var(--primary)"><title>{chartDate.format(new Date(point.date))} · {count.format(point.value)}</title></circle>)}
+          {tickIndexes.map(index => <text key={index} x={x(index)} y="233" textAnchor="middle">{chartDate.format(new Date(trend[index].date))}</text>)}
+        </svg>
+      </div> : <EmptyState title="Chưa có dữ liệu cho chỉ số này" description="Chọn một chỉ số hoặc khoảng thời gian khác." />}
+      {!!pendingDays && !liveRecalculated && <p className="admin-overview-message">Biểu đồ hiển thị các mốc đã ghi nhận.</p>}
+      <details className="admin-data-details">
+        <summary>Xem bảng số liệu</summary>
+        <div className="admin-table-scroll" tabIndex={0} role="region" aria-label={`Thống kê theo ${bucket}`}>
+          <table className="admin-table">
+            <caption className="sr-only">Thống kê tuyển dụng theo {bucket} {hourly ? "GMT+7" : "UTC"}</caption>
+            <thead><tr><th scope="col">{hourly ? "Giờ (GMT+7)" : range.bucket === "MONTH" ? "Tháng" : "Ngày"}</th><th scope="col">Chỉ số</th><th scope="col">Số lượng</th></tr></thead>
+            <tbody>{rows.map((row, index) => <tr key={index}>
+              <td>{range.bucket === "DAY" ? String(row.stat_date) : chartDate.format(new Date(String(row.stat_date)))}</td>
+              <td>{metrics[row.metric as Metric] || String(row.metric)}</td><td>{count.format(Number(row.value) || 0)}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+  </>;
+}
+
+export function AdminFunnel({ activity }: { activity: DashboardActivity }) {
+  const stages = (["APPLIED", "INTERVIEW", "OFFER", "HIRED"] as const).flatMap(key => activity.funnel.filter(item => item.stage === key));
+  const hasApplied = (stages.find(stage => stage.stage === "APPLIED")?.count ?? 0) > 0;
+  return <section className="admin-surface admin-funnel" aria-labelledby="admin-funnel-title">
+    <div className="admin-section-heading"><div><h2 id="admin-funnel-title">Phễu tuyển dụng</h2><p>Tỷ lệ so với số hồ sơ nộp lần đầu trong kỳ</p></div></div>
+    {stages.length ? <ol className="admin-funnel-list">{stages.map(item => <li key={item.stage}>
+      <div><span>{metrics[item.stage as Metric]}</span><strong>{count.format(item.count)} <small>{hasApplied ? `${decimal.format(item.rate)}%` : "—"}</small></strong></div>
+      <progress aria-label={metrics[item.stage as Metric]} max={100} value={Math.max(0, Math.min(100, item.rate))} />
+    </li>)}</ol> : <p className="admin-overview-message">Chưa có dữ liệu chuyển đổi.</p>}
+    <p className="admin-data-note">Mỗi hồ sơ được tính một lần ở từng mốc, {activity.range.bucket === "HOUR" ? "đến thời điểm cập nhật" : "đến hết ngày cuối kỳ"}.</p>
+  </section>;
 }

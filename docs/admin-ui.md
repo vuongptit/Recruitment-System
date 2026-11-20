@@ -17,14 +17,14 @@ Lựa chọn “Hôm nay” dùng GMT+7 từ 00:00 đến thời điểm làm m�
 
 | Thành phần | Quy ước |
 | --- | --- |
-| Điều hướng | Nền `#17273f`, mục chọn `#3158b5`, chỉ liên kết trong cổng admin |
-| Nội dung | Nền `#f4f6fa`, bề mặt trắng, đường phân cách `#e1e7f0` |
+| Điều hướng | Nền trắng, mục đang mở có nền xanh nhạt `#edf2ff`; thông tin tài khoản nằm cuối sidebar |
+| Nội dung | Nền `#f7f8fc`, bề mặt trắng, đường phân cách `#e1e7f0` |
 | Chữ | Segoe UI/system font hỗ trợ tiếng Việt, tiêu đề 24–30px, số liệu dùng tabular numerals |
 | Bảng | Cột trạng thái và thao tác cố định về ý nghĩa; cuộn ngang bên trong bảng trên mobile |
 | Màu trạng thái | Chữ kèm màu; xanh cho đã xác minh/mở, vàng cho chờ xử lý, đỏ cho khóa/từ chối |
 | Hộp thoại | Native dialog; Escape, giữ focus trong hộp, trả focus về nút mở, khóa đóng khi đang gửi |
 
-Trang tổng quan chia thành ba phần: hiện trạng toàn hệ thống, hàng đợi cần xử lý và hoạt động tuyển dụng. Hiện trạng không đổi theo bộ lọc; hàng đợi dẫn trực tiếp đến màn hình xử lý. Hoạt động mặc định 30 ngày UTC đã hoàn tất, có 7 ngày, tháng này, tất cả dữ liệu ghi nhận và khoảng tùy chỉnh. Các kỳ hữu hạn được so với kỳ trước cùng số ngày; kỳ trước bằng 0 không tạo phần trăm vô hạn. Chỉ hiển thị dữ liệu từ API; nguồn lỗi hiện dấu “—”, danh sách tin chờ duyệt chạm giới hạn API hiện “50+”.
+Trang tổng quan đặt hiện trạng toàn hệ thống ngay dưới tiêu đề. Bộ chọn thời gian, xuất báo cáo và ba chỉ số theo kỳ nằm trong phần Hoạt động tuyển dụng, cùng biểu đồ có bộ chọn chỉ số. Nhật ký gần đây, phễu tuyển dụng và hàng đợi xử lý nằm phía dưới. Nhật ký và số liệu hiện trạng độc lập với bộ lọc thời gian; hàng đợi dẫn đến màn hình xử lý. Kỳ mặc định là 30 ngày UTC đã hoàn tất. Các kỳ hữu hạn được so với kỳ trước cùng độ dài; khi kỳ so sánh bằng 0, giao diện hiển thị bằng chữ. Nguồn lỗi hiện dấu “—”, danh sách tin chờ duyệt chạm giới hạn API hiện “50+”.
 
 ## Cấu trúc
 

@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { requestApi } from "../../lib/apiClient";
 import { StatusBadge } from "../ui";
+import { auditActions, auditOutcomes, auditTitle } from "@/lib/adminAudit";
 import { jobStatusLabel } from "../../lib/recruitmentLabels";
 
 export type AdminRow = Record<string, unknown>;
@@ -56,31 +57,6 @@ export const targetLabels: Record<string, string> = {
   AUTH: "Tài khoản",
   REPORT: "Báo cáo vi phạm",
 };
-const outcomes: Record<string, string> = {
-  SUCCESS: "Thành công",
-  SUCCEEDED: "Thành công",
-  FAILED: "Thất bại",
-  FAILURE: "Thất bại",
-  PENDING: "Đang xử lý",
-  STARTED: "Đã bắt đầu",
-  UNKNOWN: "Chưa xác định kết quả",
-};
-const actionLabels: Record<string, string> = {
-  LOCK_USER: "Khóa tài khoản",
-  UNLOCK_USER: "Mở khóa tài khoản",
-  APPROVE_JOB: "Duyệt tin",
-  REJECT_JOB: "Từ chối tin",
-  VERIFY_COMPANY: "Xác minh công ty",
-  RESOLVE_REPORT: "Xử lý báo cáo",
-  DISMISS_REPORT: "Bỏ qua báo cáo",
-  HANDLE_REPORT: "Xử lý báo cáo",
-  SUSPEND_JOB: "Gỡ tin tuyển dụng",
-  RESTORE_JOB: "Khôi phục tin tuyển dụng",
-  SUSPEND_COMPANY: "Đình chỉ công ty",
-  RESTORE_COMPANY: "Khôi phục công ty",
-};
-const auditTitle = (row: AdminRow) =>
-  actionLabels[String(row.action)] || "Hoạt động quản trị";
 const text = (value: unknown, fallback = "Chưa cập nhật") =>
   typeof value === "string" && value.trim()
     ? value
@@ -103,7 +79,7 @@ export const rowTitle = (row: AdminRow) =>
       row.title ??
       row.email ??
       row.reason ??
-      actionLabels[String(row.action)] ??
+      auditActions[String(row.action)] ??
       row.action,
     String(row.id),
   );
@@ -301,7 +277,7 @@ export function AdminDataTable({
                                 : "neutral"
                         }
                       >
-                        {outcomes[String(row.outcome)] || "Chưa xác định kết quả"}
+                        {auditOutcomes[String(row.outcome)] || "Chưa xác định kết quả"}
                       </StatusBadge>
                     </td>
                     <td className="admin-nowrap">
@@ -1827,7 +1803,7 @@ export function AdminDetail({
                               "Chưa rõ trạng thái"
                             : jobStatusLabel(String(row[key]))
                           : key === "outcome"
-                            ? outcomes[String(row[key])] ||
+                            ? auditOutcomes[String(row[key])] ||
                               "Chưa xác định kết quả"
                             : text(row[key])}
             </dd>

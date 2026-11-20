@@ -2,10 +2,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowDownToLine,
-  ChevronRight,
+  CalendarDays,
   Info,
   RefreshCw,
-  ShieldCheck,
 } from "lucide-react";
 import { requestApi } from "@/lib/apiClient";
 import { person1Error, saveBlob } from "@/lib/person1Api";
@@ -18,8 +17,9 @@ import {
   type DashboardSnapshot,
 } from "@/lib/adminDashboard";
 import { LoadingState, PageHeader } from "../ui";
-import { AdminSnapshot } from "./AdminSnapshot";
-import { AdminOverview } from "./AdminOverview";
+import { AdminQueue, AdminSnapshot } from "./AdminSnapshot";
+import { AdminFunnel, AdminOverview } from "./AdminOverview";
+import { AdminRecentActivity, type AuditEntry } from "./AdminRecentActivity";
 
 type Selection = { period: DashboardPeriod; from: string; to: string };
 const defaults = (): Selection => ({
@@ -44,6 +44,10 @@ export function AdminDashboard() {
   const [activityReload, setActivityReload] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [recent, setRecent] = useState<AuditEntry[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
+  const [recentError, setRecentError] = useState("");
+  const [recentReload, setRecentReload] = useState(0);
 
   useEffect(() => {
     const restore = () => {
@@ -139,6 +143,25 @@ export function AdminDashboard() {
       });
     return () => controller.abort();
   }, [selection, activityReload, ready]);
+  useEffect(() => {
+    if (!ready) return;
+    const controller = new AbortController();
+    setRecentLoading(true);
+    setRecentError("");
+    requestApi<AuditEntry[] | { items?: AuditEntry[] }>("/api/admin/audit-logs", { privateData: true, signal: controller.signal })
+      .then(({ data }) => {
+        if (controller.signal.aborted) return;
+        const rows = Array.isArray(data) ? data : data.items ?? [];
+        setRecent(rows.filter(row => row.outcome !== "STARTED").slice(0, 5));
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) setRecentError(person1Error(error));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setRecentLoading(false);
+      });
+    return () => controller.abort();
+  }, [ready, recentReload]);
 
   function applyDates(event: FormEvent) {
     event.preventDefault();
@@ -188,88 +211,41 @@ export function AdminDashboard() {
   }
   return (
     <main className="admin-workspace admin-dashboard">
-      <div className="admin-breadcrumb">
-        <ShieldCheck size={15} aria-hidden="true" />
-        <span>Quản trị</span>
-        <ChevronRight size={13} aria-hidden="true" />
-        <span>Tổng quan</span>
-      </div>
       <PageHeader
         title="Tổng quan hệ thống"
-        description="Theo dõi hiện trạng nền tảng, yêu cầu cần xử lý và hoạt động tuyển dụng."
+        description="Hoạt động tuyển dụng và vận hành CareerHub"
         action={
-          <button
-            className="btn"
-            disabled={snapshotLoading || activityLoading}
-            onClick={() => {
-              setSnapshotReload((n) => n + 1);
-              setActivityReload((n) => n + 1);
-            }}
-          >
-            <RefreshCw size={16} aria-hidden="true" />
-            {snapshotLoading || activityLoading ? "Đang tải…" : "Làm mới"}
-          </button>
+          <button type="button" className="btn admin-overview-refresh" disabled={snapshotLoading || activityLoading || recentLoading} onClick={() => {
+            setSnapshotReload(n => n + 1);
+            setActivityReload(n => n + 1);
+            setRecentReload(n => n + 1);
+          }}><RefreshCw size={16} aria-hidden="true" /> Làm mới</button>
         }
       />
-      <AdminSnapshot
-        data={snapshot}
-        loading={snapshotLoading}
-        error={snapshotError}
-        onRetry={() => setSnapshotReload((n) => n + 1)}
-      />
-      <section
-        className="admin-dashboard-section admin-activity-section"
-        aria-labelledby="admin-activity-heading"
-      >
-        <div className="admin-dashboard-section-title">
-          <div>
-            <h2 id="admin-activity-heading">Hoạt động tuyển dụng</h2>
-            <p>Số hồ sơ ứng tuyển và các mốc tuyển dụng phát sinh trong kỳ.</p>
-          </div>
-          <div className="admin-export">
-            <button
-              className="btn"
-              disabled={!canExport || exporting}
-              onClick={() => void exportFile("xlsx")}
-            >
-              <ArrowDownToLine size={16} aria-hidden="true" />
-              {exporting ? "Đang xuất…" : "Xuất Excel"}
-            </button>
-            <button
-              className="btn"
-              disabled={!canExport || exporting}
-              onClick={() => void exportFile("csv")}
-            >
-              CSV
-            </button>
-          </div>
-        </div>
-        <p className="admin-data-note">
-          Báo cáo gồm hiện trạng, yêu cầu cần xử lý, tổng hoạt động, phễu và chi
-          tiết kỳ đang chọn. Excel có 5 sheet; CSV có tên cột và chỉ số tiếng
-          Việt.
-        </p>
-        <div
-          className="admin-periods"
-          role="group"
-          aria-label="Khoảng thống kê"
-        >
-          {dashboardPeriods.map((item) => (
-            <button
-              className="btn"
-              key={item.value}
-              aria-pressed={selection.period === item.value}
-              onClick={() => {
+      <AdminSnapshot data={snapshot} loading={snapshotLoading} error={snapshotError} onRetry={() => setSnapshotReload(n => n + 1)} />
+      <section className="admin-dashboard-section admin-activity-section" aria-labelledby="admin-activity-heading" aria-busy={activityLoading}>
+        <div className="admin-dashboard-section-title admin-activity-heading">
+          <h2 id="admin-activity-heading">Hoạt động tuyển dụng</h2>
+          <div className="admin-overview-toolbar">
+            <label className="admin-period-picker">
+              <CalendarDays size={17} aria-hidden="true" />
+              <span className="sr-only">Khoảng thống kê</span>
+              <select className="select" value={selection.period} onChange={event => {
                 setDateError("");
-                setSelection((previous) => ({
-                  ...previous,
-                  period: item.value,
-                }));
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
+                const period = event.target.value as DashboardPeriod;
+                setSelection(current => ({ ...current, period }));
+              }}>
+                {dashboardPeriods.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+            </label>
+            <div className="admin-export" role="group" aria-label="Xuất báo cáo">
+              <button type="button" className="btn" disabled={!canExport || exporting} onClick={() => void exportFile("xlsx")}>
+                <ArrowDownToLine size={16} aria-hidden="true" />
+                {exporting ? "Đang xuất…" : "Xuất Excel"}
+              </button>
+              <button type="button" className="btn" disabled={!canExport || exporting} onClick={() => void exportFile("csv")}>CSV</button>
+            </div>
+          </div>
         </div>
         {selection.period === "custom" && (
           <form
@@ -311,12 +287,6 @@ export function AdminDashboard() {
             {dateError}
           </p>
         )}
-        <p className="admin-data-note">
-          <Info size={14} aria-hidden="true" />
-          {selection.period === "today"
-            ? "Hôm nay tính từ 00:00 theo GMT+7 đến thời điểm cập nhật, từ sự kiện đã ghi nhận. Số liệu trong ngày chưa chốt; bấm Làm mới để cập nhật."
-            : "Theo ngày UTC đã hoàn tất; dữ liệu tổng hợp sau 00:15 UTC. Số liệu dựa trên sự kiện đã ghi nhận, không bao gồm lịch sử chưa đồng bộ."}
-        </p>
         {exportError && (
           <p className="admin-field-error" role="alert">
             {exportError}
@@ -373,26 +343,25 @@ export function AdminDashboard() {
                   Không bao gồm lịch sử chưa được đồng bộ vào hệ thống thống kê.
                 </p>
               )}
-              <AdminOverview
-                overview={
-                  activity.range.bucket === "HOUR"
-                    ? { ...activity, daily: activity.hourly ?? [] }
-                    : activity
-                }
-                funnel={activity.funnel}
-                from={activity.range.from}
-                to={activity.range.to}
-                bucket={activity.range.bucket}
-                fromInstant={activity.range.fromInstant}
-                toExclusive={activity.range.toExclusive}
-                timezone={activity.range.timezone}
-                previousTotals={activity.previousTotals}
-                showQueues={false}
-              />
+              <AdminOverview activity={activity} />
             </>
           )
         )}
       </section>
+      <div className="admin-overview-panels">
+        <AdminRecentActivity items={recent} loading={recentLoading} error={recentError} onRetry={() => setRecentReload(n => n + 1)} />
+        {activity && !activityLoading && !activityError ? <AdminFunnel activity={activity} /> : null}
+        <AdminQueue data={snapshot} loading={snapshotLoading} />
+      </div>
+      <details className="admin-overview-notes">
+        <summary>Phạm vi và nguồn số liệu</summary>
+        <p className="admin-data-note">
+          <Info size={14} aria-hidden="true" />
+          {selection.period === "today"
+            ? "Hôm nay tính từ 00:00 theo GMT+7 đến thời điểm cập nhật, từ sự kiện đã ghi nhận. Số liệu trong ngày chưa chốt; bấm Làm mới để cập nhật."
+            : "Theo ngày UTC đã hoàn tất; dữ liệu tổng hợp sau 00:15 UTC. Số liệu dựa trên sự kiện đã ghi nhận, không bao gồm lịch sử chưa đồng bộ."}
+        </p>
+      </details>
     </main>
   );
 }

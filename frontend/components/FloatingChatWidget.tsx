@@ -88,8 +88,8 @@ export function FloatingChatWidget() {
     }
   }, [messages, pending, isOpen]);
 
-  // Don't render widget on full AI assistant page or video room
   if (
+    pathname === "/admin" || pathname.startsWith("/admin/") ||
     pathname === "/candidate/ai" ||
     (pathname.startsWith("/interviews/") && pathname.endsWith("/room"))
   ) {

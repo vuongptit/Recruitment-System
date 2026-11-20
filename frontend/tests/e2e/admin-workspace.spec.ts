@@ -47,6 +47,7 @@ async function session(page: Page) {
   await page.route(api + "/admin/stats/snapshot", (route) =>
     reply(route, snapshotFixture),
   );
+  await page.route(api + "/admin/audit-logs**", (route) => reply(route, []));
 }
 
 test("admin filters and pagination survive reload without crossing portals", async ({
@@ -103,7 +104,7 @@ test("moderation keeps the reason after API failure and requires explicit confir
 }) => {
   await session(page);
   let writes = 0;
-  await page.route(api + "/admin/jobs/pending", (route) =>
+  await page.route(url => url.pathname === "/api/admin/jobs", (route) =>
     reply(
       route,
       writes === 2
@@ -113,6 +114,7 @@ test("moderation keeps the reason after API failure and requires explicit confir
               id: jobId,
               title: "Tin cần kiểm tra",
               description: "Mô tả đầy đủ",
+              status: "PENDING_APPROVAL",
               deadline: "2027-01-01",
             },
           ],
@@ -153,7 +155,7 @@ test("moderation keeps the reason after API failure and requires explicit confir
   await dialog.getByRole("button", { name: "Xác nhận", exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await expect(page.getByRole("status")).toContainText("Đã hoàn tất");
-  await expect(page.getByText("Đã xử lý hết yêu cầu chờ duyệt")).toBeVisible();
+  await expect(page.getByText("Không có bản ghi phù hợp với bộ lọc")).toBeVisible();
   expect(writes).toBe(2);
 });
 
@@ -188,7 +190,7 @@ test("details close with Escape and return focus to their trigger", async ({
   await expect(
     dialog.getByRole("heading", { name: "Công ty Kiểm thử" }),
   ).toBeVisible();
-  await expect(dialog.getByText("Chờ xác minh", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("region", { name: "Tóm tắt công ty" }).getByText("Chờ xác minh", { exact: true })).toBeVisible();
   await expect(dialog.locator("dd").filter({ hasText: "Thông tin doanh nghiệp" })).toContainText("PENDING");
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
@@ -235,9 +237,11 @@ test("reports preserve optimistic version and prevent unsupported lock actions",
   const companyRow = page
     .getByRole("row")
     .filter({ hasText: "Phản ánh công ty" });
-  await expect(
-    companyRow.getByRole("button", { name: "Xử lý", exact: true }),
-  ).toBeDisabled();
+  await companyRow.getByRole("button", { name: "Xử lý", exact: true }).click();
+  const companyDialog = page.getByRole("dialog", { name: "Chấp nhận báo cáo và đình chỉ công ty" });
+  await expect(companyDialog).toBeVisible();
+  await companyDialog.getByRole("button", { name: "Đóng hộp thoại" }).click();
+  expect(writes).toBe(0);
   await page
     .getByRole("row")
     .filter({ hasText: "Phản ánh tài khoản" })
@@ -303,9 +307,8 @@ test("dashboard keeps current state independent from activity presets", async ({
     return reply(route, activityFixture(period));
   });
   await page.goto("/admin");
-  await expect(
-    page.getByRole("button", { name: "30 ngày", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  const periodSelect = page.getByRole("combobox", { name: "Khoảng thống kê" });
+  await expect(periodSelect).toHaveValue("30d");
   const current = page.getByRole("region", {
     name: "Hiện trạng toàn hệ thống",
     exact: true,
@@ -315,11 +318,9 @@ test("dashboard keeps current state independent from activity presets", async ({
     "50+",
   );
   const initialSnapshotRequests = snapshotRequests;
-  await page.getByRole("button", { name: "7 ngày", exact: true }).click();
+  await periodSelect.selectOption("7d");
   await expect(page).toHaveURL(/period=7d/);
-  await expect(
-    page.getByRole("button", { name: "7 ngày", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(periodSelect).toHaveValue("7d");
   await expect(
     page.getByRole("img", { name: /Biểu đồ đơn ứng tuyển/ }),
   ).toBeVisible();
@@ -327,9 +328,34 @@ test("dashboard keeps current state independent from activity presets", async ({
   expect(snapshotRequests).toBe(initialSnapshotRequests);
   await expect(current.getByText("1.234", { exact: true })).toBeVisible();
   await page.reload();
-  await expect(
-    page.getByRole("button", { name: "7 ngày", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(periodSelect).toHaveValue("7d");
+});
+
+test("dashboard prioritizes recruitment metrics and shows completed recent audit entries", async ({ page }, info) => {
+  await session(page);
+  await page.route(api + "/admin/stats/activity**", route => reply(route, activityFixture()));
+  await page.route(api + "/admin/audit-logs**", route => reply(route, [
+    { id: "started", action: "LOCK_USER", outcome: "STARTED", target_label: "Đang xử lý thử", created_at: "2026-11-04T01:00:00Z" },
+    { id: "done", action: "APPROVE_JOB", outcome: "SUCCESS", target_label: "Java Developer", created_at: "2026-11-04T00:30:00Z" },
+  ]));
+  await page.goto("/admin");
+  const kpis = page.getByRole("region", { name: "Thống kê tuyển dụng" });
+  await expect(kpis.getByRole("article")).toHaveCount(3);
+  const current = page.getByRole("region", { name: "Hiện trạng toàn hệ thống" });
+  const activity = page.getByRole("region", { name: "Hoạt động tuyển dụng", exact: true });
+  await expect(current.getByRole("article")).toHaveCount(5);
+  expect((await current.boundingBox())!.y).toBeLessThan((await activity.boundingBox())!.y);
+  await expect(activity.getByRole("combobox", { name: "Khoảng thống kê" })).toBeVisible();
+  const chart = page.getByRole("combobox", { name: "Chỉ số biểu đồ" });
+  await chart.selectOption("HIRED");
+  await expect(page.getByRole("img", { name: /Biểu đồ đã tuyển/ })).toBeVisible();
+  const recent = page.getByRole("region", { name: "Hoạt động quản trị gần đây" });
+  await expect(recent.getByRole("listitem")).toHaveCount(1);
+  await expect(recent.getByText(/Java Developer.*Thành công/)).toBeVisible();
+  await expect(recent.getByRole("link", { name: "Xem nhật ký" })).toHaveAttribute("href", "/admin/audit");
+  await chart.selectOption("APPLIED");
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: info.outputPath("admin-overview.png"), fullPage: true, animations: "disabled" });
 });
 
 test("all-time activity uses recorded monthly history and supports complete reports", async ({
@@ -441,7 +467,8 @@ test("today uses GMT+7 hourly activity, same-time comparison and its own CSV end
     });
   });
   await page.goto("/admin");
-  await page.getByRole("button", { name: "Hôm nay", exact: true }).click();
+  const periodSelect = page.getByRole("combobox", { name: "Khoảng thống kê" });
+  await periodSelect.selectOption("today");
   await expect(page).toHaveURL(/period=today/);
   await expect(
     page.getByRole("heading", { name: "Đơn ứng tuyển theo giờ", exact: true }),
@@ -465,9 +492,7 @@ test("today uses GMT+7 hourly activity, same-time comparison and its own CSV end
   );
   expect(exports).toBe(1);
   await page.reload();
-  await expect(
-    page.getByRole("button", { name: "Hôm nay", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(periodSelect).toHaveValue("today");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth > innerWidth,
