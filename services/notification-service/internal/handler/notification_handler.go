@@ -106,7 +106,7 @@ func (h *NotificationHandler) UnreadCount(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	count, err := h.notifService.GetUnreadCount(r.Context(), userID)
+	counts, err := h.notifService.GetUnreadCounts(r.Context(), userID)
 	if err != nil {
 		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
 		return
@@ -114,7 +114,35 @@ func (h *NotificationHandler) UnreadCount(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
-		"data": map[string]int{"unread_count": count},
+		"data": map[string]int{
+			"unread_count":              counts.Total,
+			"unread_message_count":      counts.Messages,
+			"unread_notification_count": counts.Notifications,
+		},
+	})
+}
+
+func (h *NotificationHandler) MarkConversationRead(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
+
+	convID := chi.URLParam(r, "conversation_id")
+	if convID == "" {
+		http.Error(w, `{"error":"invalid conversation_id"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := h.notifService.MarkConversationAsRead(r.Context(), convID, userID); err != nil {
+		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"data": map[string]string{"status": "ok"},
 	})
 }
 

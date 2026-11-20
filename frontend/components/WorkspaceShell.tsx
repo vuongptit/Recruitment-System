@@ -7,6 +7,7 @@ import { Flag, Menu, X, type LucideIcon } from "lucide-react";
 import { AccountNavigation } from "./AccountNavigation";
 import { Logo } from "./Logo";
 import { useSiteSettings } from "./SiteSettingsContext";
+import { useNotifications } from "./NotificationProvider";
 import { portalHome, portalSection, type AccountRole } from "@/lib/portalRoutes";
 
 export interface WorkspaceLink { href: string; label: string; icon: LucideIcon; exact?: boolean; aliases?: string[] }
@@ -25,6 +26,7 @@ export function WorkspaceShell(props: {
 
 function WorkspaceContent({ children, role, title, navigationLabel, links, showNavigation, name, avatarUrl, variant = "workspace" }: Parameters<typeof WorkspaceShell>[0]) {
   const { siteName, footerText } = useSiteSettings();
+  const { unreadCount, unreadMessageCount } = useNotifications();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -71,7 +73,16 @@ function WorkspaceContent({ children, role, title, navigationLabel, links, showN
         <nav ref={navigationRef} className={`workspace-navigation ${role === "candidate" ? "candidate-side-nav" : ""}`} aria-label={navigationLabel}>
           {links.map(({ href, label, icon: Icon, exact, aliases }) => {
             const active = pathname === href || (!exact && pathname.startsWith(href + "/")) || !!aliases?.some(alias => pathname.startsWith(alias));
-            return <Link prefetch={false} key={href} className="workspace-nav-link" href={href} aria-current={active ? "page" : undefined} onClick={() => setMenuOpen(false)}><Icon size={19} strokeWidth={1.7} aria-hidden="true" /><span>{label}</span></Link>;
+            const isMessage = href.endsWith("/messages");
+            const isNotification = href.endsWith("/notifications");
+            const count = isMessage ? unreadMessageCount : (isNotification ? unreadCount : 0);
+            return (
+              <Link prefetch={false} key={href} className="workspace-nav-link" href={href} aria-current={active ? "page" : undefined} onClick={() => setMenuOpen(false)}>
+                <Icon size={19} strokeWidth={1.7} aria-hidden="true" />
+                <span>{label}</span>
+                {count > 0 && <span className="workspace-nav-badge">{count > 99 ? "99+" : count}</span>}
+              </Link>
+            );
           })}
           {role !== "admin" && <Link prefetch={false} href={portalSection(roleKey, "reports")} className="workspace-nav-link workspace-report-link" aria-current={pathname === portalSection(roleKey, "reports") ? "page" : undefined} onClick={() => setMenuOpen(false)}><Flag size={19} strokeWidth={1.7} aria-hidden="true" /><span>Báo cáo vi phạm</span></Link>}
         </nav>

@@ -4,6 +4,7 @@ import { portalCall, portalSection, type AccountRole } from "@/lib/portalRoutes"
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCurrentAccount } from "@/components/SessionGate";
+import { useNotifications } from "@/components/NotificationProvider";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui";
 import { requestApi, toUserMessage } from "@/lib/apiClientCore";
 import {
@@ -81,6 +82,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("chat");
+  const { markConversationAsRead, notifications } = useNotifications();
 
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -239,7 +241,10 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
     setInputText("");
     initialHistory.current = true;
     requestAnimationFrame(() => inputRef.current?.focus());
-  }, [selectedId]);
+    if (selectedId) {
+      void markConversationAsRead(selectedId);
+    }
+  }, [selectedId, markConversationAsRead]);
 
   // Load message history for selected conversation
   useEffect(() => {
@@ -339,6 +344,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
               !container || container.scrollHeight - container.scrollTop - container.clientHeight < 150;
             setMessages((current) => mergeConversationMessages(currentId, current, [{ ...message, status: "delivered" }]));
             if (atLatest) scrollToLatest();
+            void markConversationAsRead(currentId);
           }
 
           // Update sidebar preview
@@ -773,6 +779,10 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
               const identity = conversationIdentity(conversation, accountId);
               const peerId = (conversation.members ?? []).find((id) => id !== accountId) || conversation.counterpart?.user_id;
               const isSelected = selectedId === conversation.id;
+              const isUnread = !isSelected && (
+                notifications.some((n) => !n.is_read && n.metadata?.conversation_id === conversation.id) ||
+                Boolean(conversation.unread_count && conversation.unread_count > 0)
+              );
               const preview = conversation.last_message_content || identity.description;
               const timeDisplay = formatChatTime(conversation.updated_at);
 
@@ -796,7 +806,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
                     padding: "14px 16px",
                     border: 0,
                     borderBottom: "1px solid var(--line)",
-                    background: isSelected ? "var(--primary-tint)" : "transparent",
+                    background: isSelected ? "var(--primary-tint)" : isUnread ? "#f7faf8" : "transparent",
                     textAlign: "left",
                     cursor: "pointer",
                     transition: "background 0.15s ease",
@@ -825,7 +835,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
                       <strong
                         style={{
                           fontSize: 14,
-                          fontWeight: 600,
+                          fontWeight: isUnread ? 700 : 600,
                           whiteSpace: "nowrap",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -834,12 +844,18 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
                       >
                         {identity.name}
                       </strong>
-                      <small style={{ fontSize: 11, color: "var(--muted)", flexShrink: 0 }}>{timeDisplay}</small>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        <small style={{ fontSize: 11, color: isUnread ? "var(--primary)" : "var(--muted)", fontWeight: isUnread ? 600 : 400 }}>{timeDisplay}</small>
+                        {isUnread && (
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--danger)", display: "inline-block" }} title="Tin nhắn mới" />
+                        )}
+                      </div>
                     </div>
                     <span
                       style={{
                         fontSize: 12,
-                        color: isSelected ? "var(--primary)" : "var(--muted)",
+                        color: isSelected ? "var(--primary)" : isUnread ? "var(--text)" : "var(--muted)",
+                        fontWeight: isUnread ? 600 : 400,
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",

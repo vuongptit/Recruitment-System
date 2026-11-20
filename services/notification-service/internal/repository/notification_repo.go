@@ -138,6 +138,26 @@ func (r *NotificationRepository) ListByUserID(ctx context.Context, userID uuid.U
 	return notifs, rows.Err()
 }
 
+type UnreadCounts struct {
+	Total         int
+	Messages      int
+	Notifications int
+}
+
+func (r *NotificationRepository) CountUnreadDetailed(ctx context.Context, userID uuid.UUID) (UnreadCounts, error) {
+	query := `
+		SELECT 
+			COUNT(*),
+			COUNT(*) FILTER (WHERE type = 'new_message'),
+			COUNT(*) FILTER (WHERE type != 'new_message')
+		FROM notifications
+		WHERE user_id = $1 AND is_read = FALSE
+	`
+	var counts UnreadCounts
+	err := r.db.QueryRowContext(ctx, query, userID).Scan(&counts.Total, &counts.Messages, &counts.Notifications)
+	return counts, err
+}
+
 func (r *NotificationRepository) CountUnread(ctx context.Context, userID uuid.UUID) (int, error) {
 	query := `
 		SELECT COUNT(*)
@@ -147,6 +167,16 @@ func (r *NotificationRepository) CountUnread(ctx context.Context, userID uuid.UU
 	var count int
 	err := r.db.QueryRowContext(ctx, query, userID).Scan(&count)
 	return count, err
+}
+
+func (r *NotificationRepository) MarkConversationAsRead(ctx context.Context, conversationID string, userID uuid.UUID) error {
+	query := `
+		UPDATE notifications
+		SET is_read = TRUE, read_at = CURRENT_TIMESTAMP
+		WHERE user_id = $1 AND type = 'new_message' AND metadata->>'conversation_id' = $2 AND is_read = FALSE
+	`
+	_, err := r.db.ExecContext(ctx, query, userID, conversationID)
+	return err
 }
 
 func (r *NotificationRepository) MarkAsRead(ctx context.Context, notifID, userID uuid.UUID) error {

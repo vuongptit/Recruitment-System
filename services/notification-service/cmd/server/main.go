@@ -126,6 +126,7 @@ func main() {
 		mux.Get("/", notifHandler.List)
 		mux.Get("/unread-count", notifHandler.UnreadCount)
 		mux.Patch("/read-all", notifHandler.MarkAllRead)
+		mux.Patch("/conversations/{conversation_id}/read", notifHandler.MarkConversationRead)
 		mux.Patch("/{notification_id}/read", notifHandler.MarkRead)
 		mux.Post("/push-tokens", notifHandler.RegisterPushToken)
 	}

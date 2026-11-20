@@ -11,6 +11,8 @@ export type Notification = InboxNotification;
 
 interface NotificationContextValue {
   unreadCount: number;
+  unreadMessageCount: number;
+  unreadNotificationCount: number;
   notifications: Notification[];
   hasMore: boolean;
   loading: boolean;
@@ -20,6 +22,7 @@ interface NotificationContextValue {
   loadMore: () => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  markConversationAsRead: (conversationId: string) => Promise<void>;
 }
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 export function useNotifications() {
@@ -39,6 +42,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   identity.current = accountId;
   const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationsRef = useRef(notifications);
   notificationsRef.current = notifications;
@@ -71,8 +76,19 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     if (!isCurrent()) return;
     const revision = ++countRevision.current;
     try {
-      const response = await requestApi<{ unread_count: number }>("/api/notifications/unread-count", { privateData: true });
-      if (isCurrent() && revision === countRevision.current) setUnreadCount(response.data.unread_count);
+      const response = await requestApi<{
+        unread_count: number;
+        unread_message_count?: number;
+        unread_notification_count?: number;
+      }>("/api/notifications/unread-count", { privateData: true });
+      if (isCurrent() && revision === countRevision.current) {
+        const total = response.data.unread_count ?? 0;
+        const messages = response.data.unread_message_count ?? 0;
+        const notifs = response.data.unread_notification_count ?? Math.max(0, total - messages);
+        setUnreadCount(total);
+        setUnreadMessageCount(messages);
+        setUnreadNotificationCount(notifs);
+      }
     } catch { /* Inbox read failures are shown by refresh; keep the last known count. */ }
   }, [isCurrent]);
 
@@ -140,10 +156,36 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     finally { if (isCurrent()) { mutationLock.current = false; setMarking(false); } }
   }
 
+  async function markConversationAsRead(conversationId: string) {
+    if (!isCurrent() || !conversationId) return;
+    const matching = notificationsRef.current.filter(
+      n => !n.is_read && (n.metadata?.conversation_id === conversationId || (n.type === "new_message" && n.metadata?.conversation_id === conversationId))
+    );
+    if (matching.length > 0) {
+      recordUpdates(matching.map(n => ({ ...n, is_read: true })));
+    }
+    try {
+      await requestApi(`/api/notifications/conversations/${encodeURIComponent(conversationId)}/read`, {
+        method: "PATCH",
+        privateData: true,
+        maxRetries: 0,
+      });
+    } catch {
+      for (const n of matching) {
+        try {
+          await requestApi(`/api/notifications/${encodeURIComponent(n.id)}/read`, { method: "PATCH", privateData: true, maxRetries: 0 });
+        } catch {}
+      }
+    } finally {
+      await fetchUnreadCount();
+    }
+  }
+
   useEffect(() => {
     identity.current = accountId;
     notificationUpdates.current.clear(); notificationRevision.current = 0; notificationsRef.current = [];
-    setNotifications([]); setUnreadCount(0); setNextCursor(null); setIncomingCall(null); setError("");
+    setNotifications([]); setUnreadCount(0); setUnreadMessageCount(0); setUnreadNotificationCount(0);
+    setNextCursor(null); setIncomingCall(null); setError("");
     loadLock.current = false; mutationLock.current = false; callLock.current = false;
     setMarking(false); setCallPending(false); setLoading(false); setCallError("");
     setInboxOwner(accountId);
@@ -239,7 +281,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   // The provider survives navigation. Hide the previous owner's state in the
   // render that precedes the identity-reset effect, including incoming calls.
   const ownsInbox = !!accountId && inboxOwner === accountId;
-  return <NotificationContext.Provider value={{ unreadCount: ownsInbox ? unreadCount : 0, notifications: ownsInbox ? notifications : [], hasMore: ownsInbox && !!nextCursor, loading: ownsInbox ? loading : !!accountId, error: ownsInbox ? error : "", marking: ownsInbox && marking, refresh, loadMore, markAsRead, markAllAsRead }}>
+  return <NotificationContext.Provider value={{ unreadCount: ownsInbox ? unreadCount : 0, unreadMessageCount: ownsInbox ? unreadMessageCount : 0, unreadNotificationCount: ownsInbox ? unreadNotificationCount : 0, notifications: ownsInbox ? notifications : [], hasMore: ownsInbox && !!nextCursor, loading: ownsInbox ? loading : !!accountId, error: ownsInbox ? error : "", marking: ownsInbox && marking, refresh, loadMore, markAsRead, markAllAsRead, markConversationAsRead }}>
     {children}
     {ownsInbox && incomingCall && <aside className="card stack" role="region" aria-label="Cuộc gọi đến" style={{ position: "fixed", bottom: 20, right: 20, width: "min(340px, calc(100vw - 40px))", zIndex: 9999 }}>
       <strong>{incomingCall.title}</strong><p role="status">Bạn có lời mời tham gia cuộc gọi video.</p>

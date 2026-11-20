@@ -23,8 +23,16 @@ func (s *NotificationService) List(ctx context.Context, userID uuid.UUID, notifT
 	return s.notifRepo.ListByUserID(ctx, userID, notifType, limit, cursorCreatedAt, cursorID)
 }
 
+func (s *NotificationService) GetUnreadCounts(ctx context.Context, userID uuid.UUID) (repository.UnreadCounts, error) {
+	return s.notifRepo.CountUnreadDetailed(ctx, userID)
+}
+
 func (s *NotificationService) GetUnreadCount(ctx context.Context, userID uuid.UUID) (int, error) {
 	return s.notifRepo.CountUnread(ctx, userID)
+}
+
+func (s *NotificationService) MarkConversationAsRead(ctx context.Context, conversationID string, userID uuid.UUID) error {
+	return s.notifRepo.MarkConversationAsRead(ctx, conversationID, userID)
 }
 
 func (s *NotificationService) MarkAsRead(ctx context.Context, notifID, userID uuid.UUID) error {

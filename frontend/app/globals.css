@@ -1082,6 +1082,8 @@ button, input, select, textarea { font-family: inherit; }
 .workspace-nav-link svg { flex-shrink: 0; }
 .workspace-nav-link:hover { background: var(--primary-tint); color: var(--primary); }
 .workspace-nav-link[aria-current="page"] { background: var(--primary); color: white; font-weight: 600; }
+.workspace-nav-badge { margin-left: auto; display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9999px; background: var(--danger); color: white; font-size: 10px; font-weight: 700; line-height: 1; }
+.workspace-nav-link[aria-current="page"] .workspace-nav-badge { background: white; color: var(--primary); }
 .workspace-report-link { margin-top: 16px; }
 .workspace-content { display: flex; flex: 1; flex-direction: column; min-width: 0; padding: 32px var(--page-gutter) 0; }
 .workspace-page { width: 100%; max-width: 1280px; flex: 1; margin-inline: auto; }

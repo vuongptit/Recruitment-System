@@ -19,6 +19,27 @@ export function NotificationBell() {
   </Link>;
 }
 
+export function MessageNavButton() {
+  const account = useCurrentAccount();
+  const { unreadMessageCount } = useNotifications();
+  const role = account?.role ?? "CANDIDATE";
+  if (role === "ADMIN") return null;
+  return (
+    <Link
+      prefetch={false}
+      className="notification-bell"
+      href={portalSection(role, "messages")}
+      aria-label={unreadMessageCount > 0 ? `Tin nhắn, ${unreadMessageCount} chưa đọc` : "Tin nhắn"}
+      title="Tin nhắn"
+    >
+      <MessageSquare size={20} strokeWidth={1.7} aria-hidden="true" />
+      {unreadMessageCount > 0 && (
+        <span className="notification-count">{unreadMessageCount > 99 ? "99+" : unreadMessageCount}</span>
+      )}
+    </Link>
+  );
+}
+
 export function AccountNavigation({
   workspace = false,
   portal = "CANDIDATE",
@@ -129,7 +150,7 @@ export function AccountNavigation({
       {account === undefined ? <span className="account-skeleton" aria-label="Đang kiểm tra tài khoản" /> : account ? <>
         {role === "RECRUITER" && <Link className="btn btn-primary header-create-job" href="/recruiter/jobs/new"><Plus size={17} aria-hidden="true" />Đăng tin</Link>}
         <NotificationBell />
-        {role !== "ADMIN" && <Link prefetch={false} className="notification-bell" href={portalSection(role, "messages")} aria-label="Tin nhắn" title="Tin nhắn"><MessageSquare size={20} strokeWidth={1.7} aria-hidden="true" /></Link>}
+        <MessageNavButton />
         <Link prefetch={false} className="account-identity" href={role === "CANDIDATE" ? "/candidate/profile" : role === "RECRUITER" ? "/recruiter/profile" : "/admin/profile"} title={displayName ? `${displayName} (${account.email})` : account.email}>
           {effectiveAvatar ? (
             <img
