@@ -183,6 +183,28 @@ export interface CandidateProfile {
   certificates: ProfileBlock[];
   projects: ProfileBlock[];
 }
+
+export type RecruiterCandidateProfile = Pick<CandidateProfile,
+  "fullName" | "headline" | "summary" | "avatarUrl" | "githubUrl" | "linkedinUrl" |
+  "portfolioUrl" | "educations" | "experiences" | "skills" | "certificates" | "projects"
+>;
+
+interface ProfileViewActivity {
+  totalViews: number;
+  uniqueRecruiters: number;
+}
+
+export function getProfileViewActivity(signal?: AbortSignal) {
+  return requestApi<ProfileViewActivity>("/api/profile/me/view-activity", { privateData: true, signal });
+}
+
+export function openCandidateProfile(applicationId: string, viewId: string, signal?: AbortSignal) {
+  return requestApi<RecruiterCandidateProfile>(
+    `/api/profile/applications/${encodeURIComponent(applicationId)}/views/${encodeURIComponent(viewId)}`,
+    { method: "POST", privateData: true, signal },
+  );
+}
+
 export interface CandidateCv {
   id: string;
   title: string;

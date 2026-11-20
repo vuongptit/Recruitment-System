@@ -96,6 +96,34 @@ export class ProfileService {
     userId: string,
   ): Promise<ProfileResponseDto> {
     this.assertOwner(actorId, userId);
+    return this.readProfile(userId);
+  }
+
+  async getViewActivity(userId: string) {
+    const [activity] = await this.prisma.$queryRaw<{ views: bigint; recruiters: bigint }[]>`
+      SELECT COUNT(*) AS views, COUNT(DISTINCT v.recruiter_id) AS recruiters
+      FROM "profile"."profile_views" v
+      JOIN "profile"."profiles" p ON p.id = v.profile_id
+      WHERE p.user_id = ${userId}::uuid
+    `;
+    return { totalViews: Number(activity.views), uniqueRecruiters: Number(activity.recruiters) };
+  }
+
+  // The caller must resolve the candidate through authorized application access.
+  async viewForRecruiter(userId: string, recruiterId: string, viewId: string) {
+    const { id, fullName, avatarUrl, headline, summary, githubUrl, linkedinUrl,
+      portfolioUrl, educations, experiences, skills, certificates, projects } = await this.readProfile(userId);
+
+    await this.prisma.profileView.createMany({
+      data: [{ profileId: id, recruiterId, viewId }],
+      skipDuplicates: true,
+    });
+
+    return { fullName, avatarUrl, headline, summary, githubUrl, linkedinUrl, portfolioUrl,
+      educations, experiences, skills, certificates, projects };
+  }
+
+  private async readProfile(userId: string): Promise<ProfileResponseDto> {
     const profile = await this.prisma.$transaction(
       (transaction) =>
         transaction.profile.findUnique({

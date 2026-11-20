@@ -66,6 +66,41 @@ export class HttpApplicationCvUsageClient
     this.requestTimeoutMs = this.readRequestTimeout(config);
   }
 
+  async getCandidateForRecruiter(applicationId: string, authorization: string): Promise<string> {
+    if (!UUID_V4_PATTERN.test(applicationId)) {
+      throw this.invalidRequest();
+    }
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/${applicationId}/candidate-profile-access`, {
+        headers: { Accept: 'application/json', Authorization: authorization },
+        redirect: 'error',
+        signal: AbortSignal.timeout(this.requestTimeoutMs),
+      });
+    } catch {
+      throw this.unavailable();
+    }
+    if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined);
+      if (response.status === HttpStatus.NOT_FOUND) {
+        throw new ApiException('APPLICATION_NOT_FOUND', 'Application was not found', HttpStatus.NOT_FOUND);
+      }
+      if (response.status === HttpStatus.FORBIDDEN) {
+        throw new ApiException('APPLICATION_ACCESS_DENIED', 'You cannot view this application', HttpStatus.FORBIDDEN);
+      }
+      if (response.status === HttpStatus.UNAUTHORIZED) {
+        throw new ApiException('APPLICATION_ACCESS_UNAUTHORIZED', 'Sign in again to view this application', HttpStatus.UNAUTHORIZED);
+      }
+      throw this.mapUpstreamStatus(response.status);
+    }
+
+    const { data } = await this.readJson(response);
+    if (!this.isRecord(data) || typeof data.candidateId !== 'string' || !UUID_V4_PATTERN.test(data.candidateId)) {
+      throw this.badResponse();
+    }
+    return data.candidateId;
+  }
+
   async lookup(
     candidateId: string,
     cvId: string,

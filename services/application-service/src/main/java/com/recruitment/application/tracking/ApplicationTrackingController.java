@@ -5,6 +5,7 @@ import com.recruitment.application.api.BusinessException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -47,6 +48,18 @@ public class ApplicationTrackingController {
             viewerRole(authentication),
             authorization
         ));
+    }
+
+    @GetMapping("/{applicationId}/candidate-profile-access")
+    @PreAuthorize("hasRole('RECRUITER')")
+    @Operation(summary = "Resolve the candidate of an application the recruiter can manage")
+    public ApiResponse<Map<String, UUID>> getCandidateForRecruiter(
+        JwtAuthenticationToken authentication,
+        @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization,
+        @PathVariable UUID applicationId
+    ) {
+        UUID candidateId = tracking.getCandidateForRecruiter(applicationId, subject(authentication), authorization);
+        return ApiResponse.of(Map.of("candidateId", candidateId));
     }
 
     private UUID subject(JwtAuthenticationToken authentication) {

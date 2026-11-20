@@ -225,3 +225,40 @@ test("Recruiter detail loads the stored application and hides scheduling for a t
   await expect(page.getByRole("link", { name: "Tạo thư mời nhận việc" })).toHaveCount(0);
   await expect(page.getByText("nguyenvana@example.com")).toHaveCount(0);
 });
+
+test("Opening a candidate profile records a view only on demand and reuses its ID on retry", async ({ page }, testInfo) => {
+  const views: string[] = [];
+  await page.route(api + "/applications/" + applicationId, r => reply(r, application));
+  await page.route(`${api}/profile/applications/${applicationId}/views/*`, route => {
+    expect(route.request().method()).toBe("POST");
+    views.push(route.request().url());
+    if (views.length === 1) return reply(route, { code: "APPLICATION_SERVICE_UNAVAILABLE" }, 503);
+    return reply(route, {
+      fullName: "Nguyễn Văn An", headline: "Lập trình viên Backend", summary: "Kinh nghiệm phát triển API",
+      experiences: [{ id: "experience", position: "Lập trình viên", companyName: "Công ty mẫu", startDate: "2022-09-22", endDate: "2027-04-22" }],
+      skills: [{ id: "skill", name: "Java", level: "Nâng cao" }],
+      educations: [], certificates: [], projects: [], githubUrl: "https://github.com/example",
+    });
+  });
+  await login(page, "RECRUITER", `/recruiter/applications/${applicationId}`);
+  const open = page.getByRole("button", { name: "Xem hồ sơ ứng viên" });
+  await expect(open).toBeVisible();
+  expect(views).toHaveLength(0);
+  await open.click();
+  const dialog = page.getByRole("dialog", { name: "Hồ sơ ứng viên" });
+  await dialog.getByRole("button", { name: "Thử lại" }).click();
+  await expect(dialog.getByRole("heading", { name: "Nguyễn Văn An" })).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Giới thiệu bản thân" })).toBeVisible();
+  await expect(dialog.getByText("22/09/2022 — 22/04/2027")).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Kỹ năng chuyên môn" })).toBeVisible();
+  await expect(dialog.getByRole("link", { name: "GitHub" })).toBeVisible();
+  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await dialog.screenshot({ path: testInfo.outputPath("recruiter-candidate-profile.png") });
+  expect(views[1]).toBe(views[0]);
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+  await open.click();
+  await expect(dialog.getByText("Kinh nghiệm phát triển API")).toBeVisible();
+  expect(views).toHaveLength(3);
+  expect(views[2]).not.toBe(views[0]);
+});

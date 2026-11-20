@@ -20,6 +20,8 @@ import {
   type PersonalUploadCheckpoint,
 } from "../../../lib/person1Api";
 import styles from "./CandidateProfile.module.css";
+import { BlockItemDetails, ProfileSections, blockTitles, profileBlockOrder } from "./ProfileSections";
+import { ProfileViewActivity } from "./ProfileViewActivity";
 type Field = {
   name: string;
   label: string;
@@ -111,10 +113,6 @@ const profileTabs = [
   ["skills", "Kỹ năng"], ["projects", "Dự án"], ["certificates", "Chứng chỉ"],
 ] as const;
 type ProfileTab = (typeof profileTabs)[number][0];
-const blockTitles: Record<(typeof blocks)[number]["key"], string> = {
-  experiences: "Kinh nghiệm làm việc", skills: "Kỹ năng chuyên môn",
-  educations: "Học vấn", projects: "Dự án", certificates: "Chứng chỉ",
-};
 function Fields({
   fields,
   value,
@@ -165,173 +163,6 @@ function Fields({
     </>
   );
 }
-function BlockItemDetails({
-  blockKey,
-  item,
-}: {
-  blockKey: (typeof blocks)[number]["key"];
-  item: ProfileBlock;
-}) {
-  if (blockKey === "experiences") {
-    const timeDisplay = [
-      item.startDate,
-      item.isCurrent ? "Hiện tại" : item.endDate,
-    ]
-      .filter(Boolean)
-      .join(" — ");
-
-    return (
-      <div className={styles.entryText}>
-        <strong>{String(item.position || item.companyName || "")}</strong>
-        {item.position && item.companyName ? <p className={styles.muted}>{String(item.companyName)}</p> : null}
-        {timeDisplay ? <p className={styles.muted}>{timeDisplay}</p> : null}
-        {item.description ? <p className={styles.summary}>{String(item.description)}</p> : null}
-      </div>
-    );
-  }
-
-  if (blockKey === "educations") {
-    const timeDisplay = [item.startDate, item.endDate || "Hiện tại"]
-      .filter(Boolean)
-      .join(" — ");
-
-    return (
-      <div className="person1-item-details">
-        <div className="person1-item-row">
-          <span className="person1-item-label">Trường:</span>
-          <strong className="person1-item-value">{String(item.school ?? "")}</strong>
-        </div>
-        {item.major ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Chuyên ngành:</span>
-            <span className="person1-item-value">{String(item.major)}</span>
-          </div>
-        ) : null}
-        {item.degree ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Bằng cấp:</span>
-            <span className="person1-item-value">{String(item.degree)}</span>
-          </div>
-        ) : null}
-        {timeDisplay ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Thời gian:</span>
-            <span className="person1-item-value">{timeDisplay}</span>
-          </div>
-        ) : null}
-        {item.description ? (
-          <div className="person1-item-row person1-item-desc">
-            <span className="person1-item-label">Mô tả:</span>
-            <p className="person1-item-text">{String(item.description)}</p>
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (blockKey === "skills") {
-    return (
-      <div className="person1-item-details">
-        <div className="person1-item-row">
-          <span className="person1-item-label">Kỹ năng:</span>
-          <strong className="person1-item-value">{String(item.name ?? "")}</strong>
-        </div>
-        {item.level ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Mức độ:</span>
-            <span className="person1-badge-pill">{String(item.level)}</span>
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (blockKey === "certificates") {
-    return (
-      <div className="person1-item-details">
-        <div className="person1-item-row">
-          <span className="person1-item-label">Chứng chỉ:</span>
-          <strong className="person1-item-value">{String(item.name ?? "")}</strong>
-        </div>
-        {item.issuer ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Đơn vị cấp:</span>
-            <span className="person1-item-value">{String(item.issuer)}</span>
-          </div>
-        ) : null}
-        {item.issuedAt ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Ngày cấp:</span>
-            <span className="person1-item-value">{String(item.issuedAt)}</span>
-          </div>
-        ) : null}
-        {item.credentialUrl ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Liên kết:</span>
-            <a
-              href={String(item.credentialUrl)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="person1-item-link"
-            >
-              {String(item.credentialUrl)} ↗
-            </a>
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (blockKey === "projects") {
-    return (
-      <div className="person1-item-details">
-        <div className="person1-item-row">
-          <span className="person1-item-label">Dự án:</span>
-          <strong className="person1-item-value">{String(item.name ?? "")}</strong>
-        </div>
-        {item.role ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Vai trò:</span>
-            <span className="person1-item-value">{String(item.role)}</span>
-          </div>
-        ) : null}
-        {item.url ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Liên kết:</span>
-            <a
-              href={String(item.url)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="person1-item-link"
-            >
-              {String(item.url)} ↗
-            </a>
-          </div>
-        ) : null}
-        {item.description ? (
-          <div className="person1-item-row person1-item-desc">
-            <span className="person1-item-label">Mô tả:</span>
-            <p className="person1-item-text">{String(item.description)}</p>
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className="person1-item-details">
-      {Object.entries(item)
-        .filter(([k]) => k !== "id")
-        .map(([k, v]) => (
-          <div key={k} className="person1-item-row">
-            <span className="person1-item-label">{k}:</span>
-            <span className="person1-item-value">{String(v)}</span>
-          </div>
-        ))}
-    </div>
-  );
-}
-
 function BlockEditor({
   block,
   items,
@@ -644,7 +475,6 @@ export default function ProfilePage() {
     { label: "Kỹ năng chuyên môn", complete: Boolean(profile?.skills?.length) },
     { label: "Chứng chỉ", complete: Boolean(profile?.certificates?.length) },
   ] as const;
-  const blockOrder = ["experiences", "skills", "educations", "projects", "certificates"] as const;
   const name = profile?.fullName || "Tên của bạn";
   const initials = (profile?.fullName?.trim() || account?.email || "UV").split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase();
 
@@ -720,7 +550,7 @@ export default function ProfilePage() {
                 </div>
               </section> : null}
             </div>
-            {blockOrder.map(key => {
+            {profileBlockOrder.map(key => {
               const block = blocks.find(item => item.key === key)!;
               return <div key={key} hidden={tab !== "overview" && tab !== key}>
                 <BlockEditor block={block} items={profile?.[key] ?? []} onSaved={setProfile} />
@@ -758,6 +588,7 @@ export default function ProfilePage() {
                 </div> : <p className={styles.muted}>Bạn chưa có CV. Tải lên một bản PDF hoặc tạo CV trực tuyến.</p>}
               <Link className={styles.textAction} href="/candidate/profile/cvs#upload-cv"><Plus size={16} aria-hidden="true" /> Tải CV mới lên</Link>
             </section>
+            {account?.role === "CANDIDATE" ? <ProfileViewActivity key={account.id} /> : null}
           </aside>
         </div>
         <dialog ref={previewRef} className={styles.preview} aria-labelledby="profile-preview-title">
@@ -767,10 +598,7 @@ export default function ProfilePage() {
           </div>
           <div className={styles.stack}>
             <div><h3>{name}</h3><p className={styles.muted}>{[profile?.headline, profile?.address].filter(Boolean).join(" · ")}</p></div>
-            {profile?.summary ? <section><h3>Giới thiệu bản thân</h3><p className={styles.summary}>{profile.summary}</p></section> : null}
-            {blockOrder.map(key => profile?.[key]?.length ? <section key={key}><h3>{blockTitles[key]}</h3>
-              <ul className={styles.items}>{profile[key].map(item => <li key={item.id}><BlockItemDetails blockKey={key} item={item} /></li>)}</ul>
-            </section> : null)}
+            {profile ? <ProfileSections profile={profile} /> : null}
           </div>
         </dialog>
       </> : null}

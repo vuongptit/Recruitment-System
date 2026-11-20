@@ -73,18 +73,29 @@ public class ApplicationTrackingService {
         TrackingViewerRole viewerRole,
         String authorization
     ) {
-        ApplicationEntity application = applications.findById(applicationId)
-            .orElseThrow(() -> new BusinessException(
-                "APPLICATION_NOT_FOUND",
-                "Application was not found",
-                HttpStatus.NOT_FOUND
-            ));
+        ApplicationEntity application = findApplication(applicationId);
         authorize(application, viewerId, viewerRole, authorization);
         return ApplicationDetailResponse.from(
             application,
             history.findTimeline(applicationId),
             offers.findByApplicationId(applicationId).map(OfferEntity::getId).orElse(null)
         );
+    }
+
+    @Transactional(readOnly = true)
+    public UUID getCandidateForRecruiter(UUID applicationId, UUID recruiterId, String authorization) {
+        ApplicationEntity application = findApplication(applicationId);
+        authorize(application, recruiterId, TrackingViewerRole.RECRUITER, authorization);
+        return application.getCandidateId();
+    }
+
+    private ApplicationEntity findApplication(UUID applicationId) {
+        return applications.findById(applicationId)
+            .orElseThrow(() -> new BusinessException(
+                "APPLICATION_NOT_FOUND",
+                "Application was not found",
+                HttpStatus.NOT_FOUND
+            ));
     }
 
     private void authorize(

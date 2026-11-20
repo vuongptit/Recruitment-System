@@ -175,6 +175,8 @@ class ApplicationTrackingServiceTest {
 
         assertThat(result.companyId()).isEqualTo(companyId);
         assertThat(application.getRecruiterId()).isNotEqualTo(viewerId);
+        assertThat(service.getCandidateForRecruiter(applicationId, viewerId, "Bearer token"))
+            .isEqualTo(candidateId);
     }
 
     @Test
@@ -198,6 +200,10 @@ class ApplicationTrackingServiceTest {
             .extracting("code")
             .isEqualTo("APPLICATION_ACCESS_DENIED");
         verify(history, never()).findTimeline(applicationId);
+        assertThatThrownBy(() -> service.getCandidateForRecruiter(applicationId, viewerId, "Bearer token"))
+            .isInstanceOf(BusinessException.class)
+            .extracting("code")
+            .isEqualTo("APPLICATION_ACCESS_DENIED");
     }
 
     @Test

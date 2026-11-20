@@ -57,6 +57,8 @@ process.env.CORS_ORIGINS = 'http://localhost:3000';
 
 const { AppModule } = require('../dist/app.module');
 const { configureApplication } = require('../dist/main');
+const { HttpApplicationCvUsageClient } = require('../dist/application/http-application-cv-usage.client');
+const { ApiException } = require('../dist/common/http/api-exception');
 const {
   PROFILE_COLLECTION_LIMITS,
 } = require('../dist/profile/profile.service');
@@ -410,6 +412,43 @@ test('Candidate Profile CRUD API on PostgreSQL 16', async (t) => {
     assert.equal(profile.aggregateVersion, 1);
     assert.equal(profile.avatarFileId, null);
     assert.equal(profile.avatarUrl, null);
+  });
+
+  await t.test('counts authorized profile opens once per view and reports distinct recruiters', async (test) => {
+    const applicationId = randomUUID();
+    const viewId = randomUUID();
+    const endpoint = `/applications/${applicationId}/views/`;
+    const activity = '/me/view-activity';
+    const firstRecruiter = accessToken(CANDIDATE_C, 'RECRUITER');
+    const secondRecruiter = accessToken(CANDIDATE_D, 'RECRUITER');
+    const lookup = test.mock.method(app.get(HttpApplicationCvUsageClient), 'getCandidateForRecruiter', async (_, authorization) => {
+      if (![firstRecruiter, secondRecruiter].some(token => authorization === `Bearer ${token}`)) {
+        throw new ApiException('APPLICATION_ACCESS_DENIED', 'You cannot view this application', 403);
+      }
+      return CANDIDATE_A;
+    });
+
+    assert.deepEqual(expectSuccess(await api('GET', activity, candidateToken)), { totalViews: 0, uniqueRecruiters: 0 });
+    assert.equal((await api('POST', endpoint + viewId, candidateToken)).status, 403);
+    assert.equal(lookup.mock.callCount(), 0);
+    assert.equal((await api('POST', endpoint + viewId, recruiterToken)).status, 403);
+
+    const retries = await Promise.all([
+      api('POST', endpoint + viewId, firstRecruiter),
+      api('POST', endpoint + viewId, firstRecruiter),
+    ]);
+    for (const response of retries) {
+      const profile = expectSuccess(response);
+      assert.equal(profile.fullName, 'Nguyen Van An');
+      for (const field of ['userId', 'phone', 'address', 'avatarFileId']) {
+        assert.equal(Object.hasOwn(profile, field), false);
+      }
+    }
+    expectSuccess(await api('POST', endpoint + randomUUID(), firstRecruiter));
+    expectSuccess(await api('POST', endpoint + viewId, secondRecruiter));
+    assert.deepEqual(expectSuccess(await api('GET', activity, candidateToken)), { totalViews: 3, uniqueRecruiters: 2 });
+    assert.deepEqual(expectSuccess(await api('GET', activity, accessToken(CANDIDATE_B))), { totalViews: 0, uniqueRecruiters: 0 });
+    assert.equal((await api('GET', activity, firstRecruiter)).status, 403);
   });
 
   await t.test('five independent collection APIs reach 100 percent', async () => {

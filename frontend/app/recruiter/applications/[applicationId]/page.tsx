@@ -12,6 +12,7 @@ import {
 } from "@/components/ui";
 import { RecruiterCvAccess } from "@/components/RecruiterCvAccess";
 import { RecruiterEvaluation } from "@/components/RecruiterEvaluation";
+import { RecruiterProfileAccess } from "@/components/RecruiterProfileAccess";
 import { getApplicationDetail, type CandidateApplication } from "@/lib/person2Api";
 import {
   interviewStatusLabel,
@@ -191,6 +192,7 @@ export default function RecruiterApplicationDetailPage({
             <h2>Thông tin ứng tuyển</h2>
             <p className="help">Ứng viên: <strong>{application.candidateName || "Ứng viên"}</strong></p>
           </div>
+          <RecruiterProfileAccess key={application.id} applicationId={application.id} />
         </div>
         <p>
           Nộp ngày{" "}

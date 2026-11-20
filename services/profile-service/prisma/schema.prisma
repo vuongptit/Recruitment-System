@@ -91,8 +91,20 @@ model Profile {
   cvDeletions            CvDeletionWorkflow[]
   jobPreference          CandidateJobPreference?
   recruiterDiscovery     CandidateRecruiterDiscovery?
+  views                   ProfileView[]
 
   @@map("profiles")
+}
+
+model ProfileView {
+  profileId  String   @map("profile_id") @db.Uuid
+  recruiterId String  @map("recruiter_id") @db.Uuid
+  viewId      String  @map("view_id") @db.Uuid
+  viewedAt    DateTime @default(now()) @map("viewed_at") @db.Timestamptz(3)
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@id([profileId, recruiterId, viewId])
+  @@map("profile_views")
 }
 
 model CandidateJobPreference {

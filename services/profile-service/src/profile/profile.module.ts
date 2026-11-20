@@ -19,6 +19,7 @@ import { ProfileMediaController } from './profile-media.controller';
 import { ProfileMediaService } from './profile-media.service';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
+import { ProfileViewController } from './profile-view.controller';
 import { RecruiterDiscoveryController } from './recruiter-discovery.controller';
 import { RecruiterDiscoveryService } from './recruiter-discovery.service';
 
@@ -33,6 +34,7 @@ import { RecruiterDiscoveryService } from './recruiter-discovery.service';
     JobPreferenceController,
     RecruiterDiscoveryController,
     ProfileMediaController,
+    ProfileViewController,
     ProfileController,
   ],
   providers: [
