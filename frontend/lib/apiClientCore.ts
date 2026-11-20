@@ -328,6 +328,7 @@ export function normalizeError(code: string): string {
     ACTIVE_APPLICATION_EXISTS: "Bạn đã ứng tuyển vị trí này.",
     JOB_STATE_CHANGED: "Trạng thái tin tuyển dụng vừa thay đổi. Hãy tải lại và so sánh trước khi tiếp tục.",
     JOB_DELETE_NOT_ALLOWED: "Chỉ xóa được bản nháp chưa từng gửi duyệt và có lịch sử đầy đủ.",
+    JOB_DEADLINE_PASSED: "Hạn nộp phải sau hôm nay. Hãy chọn hạn nộp mới.",
     JOB_SUSPENDED: "Tin đang bị quản trị viên gỡ. Hãy liên hệ quản trị viên để được hỗ trợ.",
     JOB_ACCESS_DENIED: "Bạn không có quyền thao tác với tin tuyển dụng này. Danh sách sẽ được đồng bộ lại.",
     JOB_SEARCH_PAGE_TOO_DEEP: "Kết quả quá sâu. Hãy lọc hẹp hơn hoặc chuyển sang tải thêm.",

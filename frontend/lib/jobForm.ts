@@ -67,11 +67,11 @@ export function normalizeJobSkills(raw: string): string[] {
   return result;
 }
 
-function isDateAfterUtcToday(value: string, now: Date): boolean {
+export function isDateAfterUtcToday(value: string, now = new Date()): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const deadline = new Date(`${value}T00:00:00.000Z`);
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  return Number.isFinite(deadline.getTime()) && deadline.getTime() > today;
+  return Number.isFinite(deadline.getTime()) && deadline.toISOString().slice(0, 10) === value && deadline.getTime() > today;
 }
 
 export function validateRecruiterJobForm(
@@ -136,14 +136,4 @@ export function normalizeRecruiterJobForm(values: RecruiterJobFormValues): Recru
     payload.salaryMax = Number(values.salaryMax);
   }
   return payload;
-}
-
-// Mirrors the Job Service rule: only these normalized fields send a PUBLISHED
-// job back to admin review; deadline, quantity, skills… are applied at once.
-const REVIEW_FIELDS = ["title", "description", "requirements", "isNegotiable", "currency", "salaryMin", "salaryMax"] as const;
-
-export function jobEditRequiresReview(original: RecruiterJobFormValues, draft: RecruiterJobFormValues): boolean {
-  const before = normalizeRecruiterJobForm(original);
-  const after = normalizeRecruiterJobForm(draft);
-  return REVIEW_FIELDS.some((field) => before[field] !== after[field]);
 }

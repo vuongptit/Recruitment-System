@@ -39,6 +39,7 @@ Các đường dẫn code tính từ `frontend/`.
 - Phân biệt “Hồ sơ nhà tuyển dụng” với “Hồ sơ công ty”; quyền thành viên công ty quyết định dữ liệu và hành động. Không cho UI tự lấy một companyId bất kỳ để thao tác.
 - Xác minh công ty có trạng thái và lý do từ chối; dùng `companyVerificationView`, `requiresCompanyReverification` và helper quyền hiện hành. Hiển thị đúng khả năng gửi lại và trường thay đổi cần xác minh lại; không giả định cập nhật hồ sơ đồng nghĩa đã được duyệt.
 - Tin nháp có thể gửi duyệt; tin đã xuất bản có thể đóng theo `recruiterJobActions`. `PENDING_APPROVAL` không phải `PUBLISHED`. Tin bị từ chối hiện có thể quay về `DRAFT` kèm lý do: dùng `isRejectedRecruiterJob`, không phát minh trạng thái `REJECTED` cho job.
+- Tin chỉ cần duyệt trước lần công khai đầu tiên. Chỉnh sửa tin đang tuyển giữ nguyên trạng thái. Tin đã đóng có thể mở lại với hạn nộp hợp lệ nếu công ty đã xác minh và tin không bị quản trị viên gỡ.
 - Giữ lý do từ chối khi sửa theo góp ý. Chỉ hiện nút sửa/đóng/gửi duyệt theo state và quyền backend; phản hồi 403/409 cần có hướng khắc phục, không giả thành công.
 - Điểm đọc: `lib/companyMembership.ts`, `lib/companyVerification.ts`, `lib/recruiterJobAccess.ts`, `lib/jobLifecycle.ts`, `lib/jobForm.ts`, `lib/person2Api.ts`.
 

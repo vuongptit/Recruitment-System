@@ -7,13 +7,11 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useCurrentAccount } from "@/components/SessionGate";
 import { ErrorState, LoadingState, PageHeader, StatusBadge } from "@/components/ui";
-import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { ConflictRecoveryPanel } from "@/components/ConflictRecoveryPanel";
 import { ApiClientError, toUserMessage } from "../../../../../lib/apiClient";
 import { prepareConflictSnapshot, type ConflictSnapshot } from "../../../../../lib/conflictRecovery";
 import { JOB_CONFLICT_FIELDS } from "../../../../../lib/person2ConflictFields";
 import {
-  jobEditRequiresReview,
   normalizeRecruiterJobForm,
   validateRecruiterJobForm,
   type RecruiterJobFormValues,
@@ -57,7 +55,6 @@ export default function EditRecruiterJobPage() {
   const [loadError, setLoadError] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [confirmPublishedEdit, setConfirmPublishedEdit] = useState(false);
   const [savedForSubmission, setSavedForSubmission] = useState(false);
   const [mutationError, setMutationError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -109,16 +106,12 @@ export default function EditRecruiterJobPage() {
     setConflict(null);
   }
 
-  async function submitForReview(event?: React.FormEvent<HTMLFormElement>, confirmed = false) {
+  async function submitForReview(event?: React.FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     if (!draft || !job || submitting) return;
     setAttempted(true);
     if (Object.keys(errors).length) {
       document.getElementById(Object.keys(errors)[0])?.focus();
-      return;
-    }
-    if (job.status === "PUBLISHED" && !confirmed && jobEditRequiresReview(toDraft(job), draft)) {
-      setConfirmPublishedEdit(true);
       return;
     }
     setSubmitting(true);
@@ -147,7 +140,6 @@ export default function EditRecruiterJobPage() {
           : "Đã lưu thay đổi.");
       }
       setSavedForSubmission(false);
-      setConfirmPublishedEdit(false);
     } catch (reason: unknown) {
       try {
         const snapshot = await prepareConflictSnapshot({
@@ -171,7 +163,6 @@ export default function EditRecruiterJobPage() {
       }
     } finally {
       setSubmitting(false);
-      setConfirmPublishedEdit(false);
     }
   }
 
@@ -212,11 +203,10 @@ export default function EditRecruiterJobPage() {
       <PageHeader
         eyebrow="CHỈNH SỬA TIN"
         title={job.rejectionReason ? "Sửa tin theo góp ý" : "Sửa tin tuyển dụng"}
-        description="Sửa nội dung tuyển dụng. Với tin đang công khai, đổi tiêu đề, mô tả, yêu cầu, lương hoặc đơn vị tiền cần quản trị viên duyệt lại; hạn nộp, số lượng và các trường khác được cập nhật ngay."
+        description={job.status === "PUBLISHED" ? "Thay đổi sẽ được áp dụng cho tin đang tuyển sau khi lưu." : "Cập nhật thông tin tuyển dụng trước khi công khai tin."}
         action={<Link className="btn" href="/recruiter/jobs">Về danh sách</Link>}
       />
 
-      <ConfirmationDialog open={confirmPublishedEdit} title="Gửi tin tuyển dụng duyệt lại?" description={`Tin “${job.title}” sẽ tạm ngừng công khai sau khi lưu và chờ quản trị viên duyệt lại. Bản nhập của bạn được giữ nếu quay lại.`} confirmLabel="Lưu và gửi duyệt lại" pending={submitting} onConfirm={() => { void submitForReview(undefined, true); }} onCancel={() => setConfirmPublishedEdit(false)} />
       {job.rejectionReason && editable ? (
         <section className="notice notice-warning" role="note" aria-labelledby="job-review-feedback">
           <strong id="job-review-feedback">Góp ý từ quản trị viên</strong>
@@ -233,7 +223,7 @@ export default function EditRecruiterJobPage() {
       {successMessage ? <p className="notice notice-success" role="status">{successMessage}</p> : null}
       {mutationError ? (
         <div className="notice notice-danger" role="alert">
-          <strong>Chưa hoàn tất luồng gửi duyệt.</strong>
+          <strong>Chưa hoàn tất cập nhật tin.</strong>
           <p>{mutationError}</p>
           {savedForSubmission ? <button className="btn btn-secondary" type="button" disabled={submitting} onClick={() => { void submitForReview(); }}>Thử gửi quản trị viên duyệt</button> : null}
         </div>

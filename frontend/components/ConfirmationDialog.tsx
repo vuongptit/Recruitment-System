@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 
 export function ConfirmationDialog({
   open,
@@ -9,6 +9,7 @@ export function ConfirmationDialog({
   confirmLabel,
   pending = false,
   error,
+  children,
   onConfirm,
   onCancel,
 }: {
@@ -18,6 +19,7 @@ export function ConfirmationDialog({
   confirmLabel: string;
   pending?: boolean;
   error?: string;
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -65,6 +67,7 @@ export function ConfirmationDialog({
         <p className="eyebrow">CẦN BẠN XÁC NHẬN</p>
         <h2 id={titleId}>{title}</h2>
         <p id={descriptionId}>{description}</p>
+        {children}
         {error ? <p className="notice notice-danger" role="alert">{error}</p> : null}
         <div className="btn-group confirmation-dialog-actions">
           <button

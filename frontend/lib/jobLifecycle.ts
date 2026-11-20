@@ -10,12 +10,12 @@ export function recruiterJobActions(status: JobStatus): RecruiterJobAction[] {
 }
 
 export function recruiterJobActionLabel(action: RecruiterJobAction): string {
-  if (action === "REOPEN") return "Khôi phục về bản nháp";
+  if (action === "REOPEN") return "Mở lại tin";
   return action === "SUBMIT_FOR_APPROVAL" ? "Gửi quản trị viên duyệt" : "Đóng tin";
 }
 
 export function nextRecruiterJobStatus(action: RecruiterJobAction): JobStatus {
-  if (action === "REOPEN") return "DRAFT";
+  if (action === "REOPEN") return "PUBLISHED";
   return action === "SUBMIT_FOR_APPROVAL" ? "PENDING_APPROVAL" : "CLOSED";
 }
 

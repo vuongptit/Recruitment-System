@@ -100,6 +100,13 @@ export class CreateJobDto {
   deadline!: string;
 }
 
+export class ReopenJobDto {
+  @ApiPropertyOptional({ format: 'date' })
+  @IsOptional()
+  @IsDateString({ strict: true })
+  deadline?: string;
+}
+
 export class UpdateJobDto extends PartialType(OmitType(CreateJobDto, ['currency'] as const)) {
   @ApiPropertyOptional({ minLength: 3, maxLength: 3 })
   @IsOptional()

@@ -115,15 +115,25 @@ describe('JobService publishing lifecycle', () => {
     service = new JobService(prisma, companies, indexing, events);
   });
 
-  it('restores a closed job with an old deadline to an editable draft', async () => {
+  it('republishes a closed job with a replacement deadline and retains its approval', async () => {
     const deadline = new Date('2020-01-01');
-    findUnique.mockResolvedValueOnce(job(JobStatus.CLOSED, { deadline }))
-      .mockResolvedValueOnce(job(JobStatus.DRAFT, { deadline, aggregateVersion: 2 }));
+    const approval = { reviewedAt: new Date('2019-12-29'), reviewedBy: ADMIN_ID, publishedAt: new Date('2019-12-29') };
+    findUnique.mockResolvedValueOnce(job(JobStatus.CLOSED, { deadline, ...approval }))
+      .mockResolvedValueOnce(job(JobStatus.PUBLISHED, { deadline: new Date('2099-12-31'), aggregateVersion: 2, ...approval }));
 
-    const result = await service.reopen(RECRUITER_ID, 'Bearer token', JOB_ID);
+    const result = await service.reopen(RECRUITER_ID, 'Bearer token', JOB_ID, '2099-12-31');
 
-    expect(result.status).toBe(JobStatus.DRAFT);
-    expect(append).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: JobStatus.DRAFT }), JobEventAction.UPDATED);
+    expect(result).toMatchObject({ status: JobStatus.PUBLISHED, reviewedBy: ADMIN_ID, deadline: '2099-12-31' });
+    expect(updateMany.mock.calls[0][0].data).toEqual({ status: JobStatus.PUBLISHED, deadline: new Date('2099-12-31'), aggregateVersion: { increment: 1 } });
+    expect(append).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: JobStatus.PUBLISHED }), JobEventAction.UPDATED);
+  });
+
+  it('blocks reopening suspended jobs and rejects expired deadlines', async () => {
+    findUnique.mockResolvedValueOnce(job(JobStatus.CLOSED, { isSuspended: true }))
+      .mockResolvedValueOnce(job(JobStatus.CLOSED, { deadline: new Date('2020-01-01') }));
+    await expect(service.reopen(RECRUITER_ID, 'Bearer token', JOB_ID)).rejects.toMatchObject({ code: 'JOB_SUSPENDED' });
+    await expect(service.reopen(RECRUITER_ID, 'Bearer token', JOB_ID)).rejects.toMatchObject({ code: 'JOB_DEADLINE_PASSED' });
+    expect(updateMany).not.toHaveBeenCalled();
   });
 
   it('deletes a never-submitted draft and its dependent indexing records', async () => {

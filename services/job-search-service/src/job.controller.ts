@@ -46,6 +46,7 @@ import {
   CreateJobDto,
   JobDto,
   RejectJobDto,
+  ReopenJobDto,
   UpdateJobDto,
 } from './job.dto';
 import { ActiveJobStatsDto } from './job-stats.dto';
@@ -622,13 +623,14 @@ export class JobController {
   @Patch(':id/reopen')
   @Roles(SystemRole.RECRUITER)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Restore a closed job as a draft' })
+  @ApiOperation({ summary: 'Republish a closed job with a valid application deadline' })
   reopen(
     @CurrentUser() user: AuthUser,
     @Headers('authorization') authorization: string,
     @Param('id', JOB_ID_PIPE) jobId: string,
+    @Body() dto: ReopenJobDto,
   ): Promise<JobDto> {
-    return this.jobs.reopen(user.id, authorization, jobId);
+    return this.jobs.reopen(user.id, authorization, jobId, dto?.deadline);
   }
 
   @Delete(':id')

@@ -1153,16 +1153,17 @@ export async function closeRecruiterJob(jobId: string, signal?: AbortSignal): Pr
   return { ...response, data: toJob(response.data) };
 }
 
-export async function reopenRecruiterJob(jobId: string): Promise<ApiEnvelope<Job>> {
+export async function reopenRecruiterJob(jobId: string, deadline: string): Promise<ApiEnvelope<Job>> {
   if (isDemoPerson2Api) {
     const job = demo.jobs.find((item) => item.id === jobId);
     if (!job) throw new ApiClientError({ code: "JOB_NOT_FOUND", status: 404 });
-    job.status = "DRAFT";
+    job.status = "PUBLISHED";
+    job.deadline = deadline;
     return { data: { ...job }, meta: null };
   }
   assertCanonicalUuidV4(jobId, "jobId");
   const response = await requestApi<BackendJob>(`${API_PATHS.jobs}${jobId}/reopen`, {
-    method: "PATCH", privateData: true, maxRetries: 0,
+    method: "PATCH", body: { deadline }, privateData: true, maxRetries: 0,
   });
   return { ...response, data: toJob(response.data) };
 }

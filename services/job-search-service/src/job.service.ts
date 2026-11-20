@@ -41,14 +41,6 @@ const BULK_DETAIL_VISIBLE_STATUSES: JobStatus[] = [
 ];
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
 
-function salaryChanged(
-  stored: Prisma.Decimal | null,
-  next: number | null | undefined,
-): boolean {
-  if (stored === null) return next !== null && next !== undefined;
-  return next === null || next === undefined || !stored.equals(next);
-}
-
 @Injectable()
 export class JobService {
   constructor(
@@ -408,28 +400,7 @@ export class JobService {
       deadline:
         dto.deadline ?? current.deadline.toISOString().slice(0, 10),
     };
-    const mapped = this.validateAndMap(merged);
-    const data: Prisma.JobUpdateManyMutationInput = mapped;
-    // Compare normalized values, not field presence: the recruiter UI always
-    // resubmits the whole form, so a deadline-only edit must stay PUBLISHED.
-    const criticalChanged =
-      mapped.title !== current.title ||
-      mapped.description !== current.description ||
-      mapped.requirements !== current.requirements ||
-      mapped.isNegotiable !== current.isNegotiable ||
-      mapped.currency !== current.currency ||
-      salaryChanged(current.salaryMin, mapped.salaryMin) ||
-      salaryChanged(current.salaryMax, mapped.salaryMax);
-    if (
-      current.status === JobStatus.PUBLISHED &&
-      criticalChanged
-    ) {
-      data.status = JobStatus.PENDING_APPROVAL;
-      data.publishedAt = null;
-      data.rejectionReason = null;
-      data.reviewedBy = null;
-      data.reviewedAt = null;
-    }
+    const data = this.validateAndMap(merged);
 
     const updated = await this.commitChange(
       JobEventAction.UPDATED,
@@ -516,18 +487,24 @@ export class JobService {
     );
   }
 
-  async reopen(recruiterId: string, authorization: string, jobId: string): Promise<JobDto> {
+  async reopen(recruiterId: string, authorization: string, jobId: string, newDeadline?: string): Promise<JobDto> {
     const company = await this.companies.getRecruiterCompany(recruiterId, authorization);
     const job = await this.prisma.job.findUnique({ where: { id: jobId } });
     this.requireManagePermission(job, company, recruiterId);
     this.requireStatus(job, JobStatus.CLOSED, 'reopen');
+    if (company.verifiedStatus !== 'VERIFIED') {
+      throw new ApiException('COMPANY_NOT_VERIFIED', 'Only members of a VERIFIED company can reopen jobs', HttpStatus.FORBIDDEN);
+    }
+    const deadline = newDeadline === undefined ? job.deadline : new Date(`${newDeadline}T00:00:00.000Z`);
+    if (newDeadline !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(newDeadline) ||
+        !Number.isFinite(deadline.getTime()) || deadline.toISOString().slice(0, 10) !== newDeadline)) {
+      throw new ApiException('INVALID_DEADLINE', 'Use a valid calendar date for the deadline', HttpStatus.BAD_REQUEST);
+    }
+    this.requireFutureDeadline(deadline);
 
     return this.transition(jobId, JobStatus.CLOSED, job.aggregateVersion, {
-      status: JobStatus.DRAFT,
-      publishedAt: null,
-      reviewedBy: null,
-      reviewedAt: null,
-      rejectionReason: null,
+      status: JobStatus.PUBLISHED,
+      deadline,
     }, JobEventAction.UPDATED);
   }
 

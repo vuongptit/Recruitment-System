@@ -165,24 +165,44 @@ test("existing evaluation is fetched and shown instead of inviting a duplicate s
 });
 
 
-test("published Job edits require confirmation and do not call publish after backend requeues them", async ({ page }) => {
+test("editing already published content saves directly without a new approval request", async ({ page }) => {
   let updates = 0;
   let publishes = 0;
   await page.route(`${gateway}/jobs/mine`, (route) => reply(route, [job]));
   await page.route(`${gateway}/jobs/${jobId}`, (route) => {
     updates += 1;
-    return reply(route, { ...job, ...route.request().postDataJSON(), status: "PENDING_APPROVAL", aggregateVersion: 8 });
+    return reply(route, { ...job, ...route.request().postDataJSON(), status: "PUBLISHED", aggregateVersion: 8 });
   });
   await page.route(`${gateway}/jobs/${jobId}/publish`, (route) => { publishes += 1; return reply(route, { code: "INVALID_TRANSITION" }, 409); });
   await authenticate(page, "RECRUITER", `/recruiter/jobs/${jobId}/edit`);
   await page.locator("#title").fill("Published Engineer Updated");
   await page.getByRole("button", { name: "Lưu thay đổi", exact: true }).click();
-  await expect(page.getByRole("alertdialog")).toBeVisible();
-  expect(updates).toBe(0);
-  await page.getByRole("alertdialog").getByRole("button", { name: "Lưu và gửi duyệt lại", exact: true }).click();
-  await expect(page.getByText("Đã lưu thay đổi. Tin đang chờ quản trị viên duyệt trước khi công khai.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Đã lưu thay đổi.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
   expect(updates).toBe(1);
   expect(publishes).toBe(0);
+});
+
+test("closed job can reopen from the recruiter workspace with a new deadline", async ({ page }) => {
+  await page.route(`${gateway}/jobs/mine`, (route) => reply(route, [{ ...job, status: "CLOSED", deadline: "2020-01-01" }]));
+  await page.route(`${gateway}/companies/by-user/${accountId}`, (route) => reply(route, { companyId, memberRole: "OWNER", verifiedStatus: "VERIFIED" }));
+  await page.route(`${gateway}/jobs/${jobId}/reopen`, (route) => {
+    expect(route.request().method()).toBe("PATCH");
+    expect(route.request().postDataJSON()).toEqual({ deadline: "2099-12-31" });
+    return reply(route, { ...job, aggregateVersion: 8 });
+  });
+  await authenticate(page, "RECRUITER", "/recruiter/jobs");
+  await page.getByLabel("Trạng thái", { exact: true }).selectOption("CLOSED");
+  await page.getByRole("button", { name: "Mở lại tin", exact: true }).click();
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog.getByLabel("Hạn nộp hồ sơ")).toHaveValue("");
+  await dialog.getByLabel("Hạn nộp hồ sơ").fill("2099-12-31");
+  await dialog.getByRole("button", { name: "Mở lại tin" }).click();
+  await expect(page.getByText(/Đã mở lại tin/)).toBeVisible();
+  await expect(page.getByLabel("Trạng thái", { exact: true })).toHaveValue("PUBLISHED");
+  await expect(page.getByRole("row").filter({ hasText: job.title })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("recruiter-job-management.png"), fullPage: true });
 });
 
 test("deadline-only edits keep a published Job public without the re-review dialog", async ({ page }) => {

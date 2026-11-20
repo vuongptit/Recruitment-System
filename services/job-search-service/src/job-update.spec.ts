@@ -20,6 +20,8 @@ const input = (): CreateJobDto => ({
 
 function harness(overrides: Partial<Job> = {}) {
   let row: Job = {
+    isSuspended: false,
+    suspensionReason: null,
     ...input(), id: JOB, companyId: COMPANY, createdBy: USER,
     salaryMin: null, salaryMax: null, deadline: new Date('2099-12-31T00:00:00Z'),
     status: JobStatus.DRAFT, aggregateVersion: 1, publishedAt: null,
@@ -126,11 +128,11 @@ describe('Job update browser contract', () => {
       ['salaryMax', { salaryMax: 25000000 }],
       ['currency', { currency: 'usd' }],
       ['isNegotiable', { isNegotiable: true, salaryMin: undefined, salaryMax: undefined }],
-    ] as const)('sends the job back to PENDING_APPROVAL when %s changes', async (_, changes) => {
+    ] as const)('keeps the job published when %s changes', async (_, changes) => {
       const test = published();
       const response = await test.service.update(USER, 'Bearer mock', JOB, fullForm(changes));
-      expect(response.status).toBe(JobStatus.PENDING_APPROVAL);
-      expect(test.row().publishedAt).toBeNull();
+      expect(response.status).toBe(JobStatus.PUBLISHED);
+      expect(test.row().publishedAt).toEqual(publishedAt);
     });
 
     it('compares normalized text so surrounding whitespace is not a content change', async () => {

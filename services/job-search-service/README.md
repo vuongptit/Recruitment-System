@@ -122,8 +122,10 @@ failure. Key/configuration outages return a sanitized `503`; responses never
 contain the token, PEM, JWKS URL or upstream body.
 
 Salary is either negotiable (both bounds null) or a complete range where
-`salaryMin <= salaryMax`. Deadline must be later than today. Editing critical
-content on a PUBLISHED job moves it back to `PENDING_APPROVAL`. PostgreSQL and
+`salaryMin <= salaryMax`. Deadline must be later than today. First publication
+requires admin approval. Edits to a PUBLISHED job retain its status and review
+metadata. A recruiter can reopen a CLOSED job with a valid deadline if their
+company is verified and the job is not suspended. PostgreSQL and
 the AI filtering projection both store salary as `NUMERIC(15,2)`; Kafka
 serializes a present bound as a fixed two-decimal string to avoid JSON number
 precision loss.
