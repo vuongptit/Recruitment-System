@@ -44,7 +44,12 @@ test("Candidate messages and notifications keep one consistent workspace", async
   await session(page, "CANDIDATE");
   await page.goto("/messages");
   await openWorkspaceMenu(page);
-  await expect(page.getByRole("navigation", { name: "Khu vực ứng viên" })).toHaveCount(1);
+  const navigation = page.getByRole("navigation", { name: "Khu vực ứng viên" });
+  await expect(navigation).toHaveCount(1);
+  const links = navigation.getByRole("link");
+  await expect(links.nth(2)).toHaveText("Công ty");
+  await expect(links.nth(3)).toHaveText("Hồ sơ cá nhân");
+  await expect(links.nth(4)).toHaveText("Quản lý CV");
   await expect(page.locator(".candidate-workspace")).toHaveCount(1);
   const sidebar = page.locator("#workspace-sidebar");
   const header = page.locator(".workspace-header");
