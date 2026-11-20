@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import { Camera, LoaderCircle } from "lucide-react";
-import { LoadingState, PageHeader, StatusBadge } from "@/components/ui";
+import { ArrowRight, BriefcaseBusiness, Camera, CheckCircle2, Circle, Eye, FileText, LoaderCircle, Mail, MapPin, Pencil, Phone, Plus } from "lucide-react";
+import { LoadingState, PageHeader } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { UploadProgress } from "../../../components/UploadProgress";
 import type { UploadStep } from "../../../lib/signedFileUpload";
@@ -15,9 +15,11 @@ import {
   profileSectionLabels,
   uploadPersonalFile,
   type CandidateProfile,
+  type CandidateCv,
   type ProfileBlock,
   type PersonalUploadCheckpoint,
 } from "../../../lib/person1Api";
+import styles from "./CandidateProfile.module.css";
 type Field = {
   name: string;
   label: string;
@@ -104,6 +106,15 @@ const blocks: {
     ],
   },
 ];
+const profileTabs = [
+  ["overview", "Tổng quan"], ["experiences", "Kinh nghiệm"], ["educations", "Học vấn"],
+  ["skills", "Kỹ năng"], ["projects", "Dự án"], ["certificates", "Chứng chỉ"],
+] as const;
+type ProfileTab = (typeof profileTabs)[number][0];
+const blockTitles: Record<(typeof blocks)[number]["key"], string> = {
+  experiences: "Kinh nghiệm làm việc", skills: "Kỹ năng chuyên môn",
+  educations: "Học vấn", projects: "Dự án", certificates: "Chứng chỉ",
+};
 function Fields({
   fields,
   value,
@@ -164,35 +175,17 @@ function BlockItemDetails({
   if (blockKey === "experiences") {
     const timeDisplay = [
       item.startDate,
-      item.isCurrent ? "Đang làm việc" : item.endDate || "Hiện tại",
+      item.isCurrent ? "Hiện tại" : item.endDate,
     ]
       .filter(Boolean)
       .join(" — ");
 
     return (
-      <div className="person1-item-details">
-        <div className="person1-item-row">
-          <span className="person1-item-label">Công ty:</span>
-          <strong className="person1-item-value">{String(item.companyName ?? "")}</strong>
-        </div>
-        {item.position ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Vị trí:</span>
-            <span className="person1-item-value">{String(item.position)}</span>
-          </div>
-        ) : null}
-        {timeDisplay ? (
-          <div className="person1-item-row">
-            <span className="person1-item-label">Thời gian:</span>
-            <span className="person1-item-value">{timeDisplay}</span>
-          </div>
-        ) : null}
-        {item.description ? (
-          <div className="person1-item-row person1-item-desc">
-            <span className="person1-item-label">Mô tả:</span>
-            <p className="person1-item-text">{String(item.description)}</p>
-          </div>
-        ) : null}
+      <div className={styles.entryText}>
+        <strong>{String(item.position || item.companyName || "")}</strong>
+        {item.position && item.companyName ? <p className={styles.muted}>{String(item.companyName)}</p> : null}
+        {timeDisplay ? <p className={styles.muted}>{timeDisplay}</p> : null}
+        {item.description ? <p className={styles.summary}>{String(item.description)}</p> : null}
       </div>
     );
   }
@@ -350,6 +343,7 @@ function BlockEditor({
 }) {
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const [editing, setEditing] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -380,6 +374,7 @@ function BlockEditor({
       onSaved(result.data);
       setDraft({});
       setEditing(null);
+      setOpen(false);
     } catch (e) {
       setError(person1Error(e));
     } finally {
@@ -405,24 +400,35 @@ function BlockEditor({
     }
   }
   return (
-    <section className="card form-stack">
-      <div className="section-head"><h2>{block.label}</h2><StatusBadge tone="neutral">{items.length} mục</StatusBadge></div>
+    <section className={styles.card} aria-label={block.label}>
+      <div className={styles.sectionHead}>
+        <h2>{blockTitles[block.key]}</h2>
+        <button className="btn btn-ghost" type="button" disabled={busy} aria-expanded={open} onClick={() => {
+          setDraft({}); setEditing(null); setError(""); setOpen(true);
+        }}><Plus size={16} aria-hidden="true" /> Thêm {block.label.toLowerCase()}</button>
+      </div>
       {items.length ? (
-        <ul className="person1-items">
+        <ul className={block.key === "skills" ? styles.skills : styles.items}>
           {items.map((item) => (
             <li
               key={item.id}
               className={editing === item.id ? "person1-item-editing" : undefined}
             >
-              <BlockItemDetails blockKey={block.key} item={item} />
-              <div className="btn-group">
+              {block.key === "skills" ? <strong>{item.name}{item.level ? ` · ${item.level}` : ""}</strong> :
+                <div className={styles.entry}>
+                  {block.key === "experiences" ? <span className={styles.entryIcon}><BriefcaseBusiness size={18} aria-hidden="true" /></span> : null}
+                  <BlockItemDetails blockKey={block.key} item={item} />
+                </div>}
+              <div className={styles.itemActions}>
                 <button
                   type="button"
-                  className="btn"
+                  className="btn btn-ghost"
                   disabled={busy}
                   onClick={() => {
                     setEditing(item.id);
                     setDraft(item);
+                    setError("");
+                    setOpen(true);
                   }}
                 >
                   {editing === item.id ? "Đang sửa" : "Sửa"}
@@ -440,9 +446,9 @@ function BlockEditor({
           ))}
         </ul>
       ) : (
-        <p className="muted">Chưa có thông tin.</p>
+        <p className={styles.muted}>Chưa có {block.label.toLowerCase()} trong hồ sơ.</p>
       )}
-      <form noValidate onSubmit={save}>
+      {open ? <form className={styles.blockForm} noValidate onSubmit={save}>
         <fieldset disabled={busy} className="form-stack person1-fieldset">
           <h3>{editing ? `Chỉnh sửa ${block.label.toLowerCase()}` : `Thêm ${block.label.toLowerCase()}`}</h3>
           <Fields
@@ -457,21 +463,21 @@ function BlockEditor({
             <button className="btn btn-primary">
               {busy ? "Đang lưu…" : "Lưu " + block.label.toLowerCase()}
             </button>
-            {editing ? (
-              <button
+            <button
                 type="button"
                 className="btn"
                 onClick={() => {
                   setEditing(null);
                   setDraft({});
+                  setError("");
+                  setOpen(false);
                 }}
               >
-                Hủy sửa
-              </button>
-            ) : null}
+                Hủy
+            </button>
           </div>
         </fieldset>
-      </form>
+      </form> : null}
       {error ? (
         <p role="alert" className="notice notice-danger">
           {error}
@@ -483,6 +489,7 @@ function BlockEditor({
         description="Thông tin này sẽ được xóa khỏi hồ sơ."
         confirmLabel="Xóa"
         pending={busy}
+        error={deleting ? error : undefined}
         onConfirm={() => void remove()}
         onCancel={() => setDeleting(null)}
       />
@@ -495,10 +502,16 @@ export default function ProfilePage() {
   const [draft, setDraft] = useState<Record<string, unknown>>({});
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [reload, setReload] = useState(0);
   const [editingGeneral, setEditingGeneral] = useState(false);
+  const [tab, setTab] = useState<ProfileTab>("overview");
+  const [cvs, setCvs] = useState<CandidateCv[]>([]);
+  const [cvLoading, setCvLoading] = useState(true);
+  const [cvError, setCvError] = useState(false);
+  const previewRef = useRef<HTMLDialogElement>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const [avatarNotice, setAvatarNotice] = useState("");
@@ -508,7 +521,7 @@ export default function ProfilePage() {
     if (!account) return;
     const controller = new AbortController();
     setLoading(true);
-    setError("");
+    setLoadError("");
     requestApi<CandidateProfile>("/api/profile/" + account.id, {
       privateData: true,
       signal: controller.signal,
@@ -522,13 +535,27 @@ export default function ProfilePage() {
           !controller.signal.aborted &&
           !(e instanceof ApiClientError && e.status === 404)
         )
-          setError(person1Error(e));
+          setLoadError(person1Error(e));
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
   }, [account, reload]);
+  useEffect(() => {
+    if (!account?.id) return;
+    const controller = new AbortController();
+    setCvLoading(true);
+    setCvError(false);
+    requestApi<CandidateCv[]>("/api/profile/cvs", { privateData: true, signal: controller.signal })
+      .then(result => { if (!controller.signal.aborted) setCvs(result.data); })
+      .catch(() => { if (!controller.signal.aborted) setCvError(true); })
+      .finally(() => { if (!controller.signal.aborted) setCvLoading(false); });
+    return () => controller.abort();
+  }, [account?.id, reload]);
+  useEffect(() => {
+    if (editingGeneral && tab === "overview") document.getElementById("profile-editor")?.focus();
+  }, [editingGeneral, tab]);
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formIssue = person1FormError(e.currentTarget);
@@ -605,72 +632,147 @@ export default function ProfilePage() {
       setAvatarStep(null);
     }
   }
+  const missing = profile?.missingSections ?? [];
+  const completion = profile?.completionPercent ?? 0;
+  const cv = cvs.find((item) => item.isDefault) ?? cvs[0];
+  const openEditor = () => { setTab("overview"); setEditingGeneral(true); };
+  const completionItems = [
+    { label: "Thông tin cá nhân", complete: Boolean(profile?.fullName && profile.headline && profile.phone && profile.address) },
+    { label: "Giới thiệu bản thân", complete: Boolean(profile?.summary) },
+    { label: "Kinh nghiệm làm việc", complete: Boolean(profile?.experiences?.length) },
+    { label: "Kỹ năng chuyên môn", complete: Boolean(profile?.skills?.length) },
+    { label: "Chứng chỉ", complete: Boolean(profile?.certificates?.length) },
+  ] as const;
+  const blockOrder = ["experiences", "skills", "educations", "projects", "certificates"] as const;
+  const name = profile?.fullName || "Tên của bạn";
+  const initials = (profile?.fullName?.trim() || account?.email || "UV").split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase();
+
   return (
-    <main className="form-stack candidate-profile-page">
-      <PageHeader eyebrow="ỨNG VIÊN · HỒ SƠ" title="Hồ sơ cá nhân" description="Quản lý thông tin cá nhân, kỹ năng, kinh nghiệm và hồ sơ nghề nghiệp của bạn."
-        action={<Link className="btn btn-primary" href="/candidate/profile/cvs">Quản lý CV</Link>} />
-      {loading ? <LoadingState label="Đang tải hồ sơ…" /> : !profile && error ? null : <>
-        <section className="candidate-profile-hero card">
-          <div className="candidate-profile-banner" aria-hidden="true" />
-          <div className="candidate-profile-hero-body">
-            <div className="candidate-profile-avatar-wrap">
-              {profile?.avatarUrl ? <img className="candidate-profile-avatar" src={profile.avatarUrl} alt="Ảnh đại diện" /> : <span className="candidate-profile-avatar candidate-profile-initials" aria-label="Chưa có ảnh đại diện">{(profile?.fullName || account?.email || "UV").slice(0, 1).toUpperCase()}</span>}
-              <label className="candidate-avatar-upload" title="Thay ảnh đại diện" aria-disabled={busy}>
-                {avatarBusy ? <LoaderCircle size={16} aria-hidden="true" /> : <Camera size={16} aria-hidden="true" />}<span className="sr-only">Thay ảnh đại diện</span>
-                <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} aria-describedby="avatar-feedback" onChange={(e) => { void avatar(e.target.files?.[0]); e.currentTarget.value = ""; }} />
-              </label>
-            </div>
-            <div className="candidate-profile-identity">
-              <h2>{profile?.fullName || "Tên của bạn"}</h2>
-              <p className="candidate-profile-headline">{profile?.headline || "Thêm vị trí mong muốn"}</p>
-              <div className="candidate-profile-contact">
-                {profile?.address ? <span>⌖ {profile.address}</span> : null}
-                {account?.email ? <span>✉ {account.email}</span> : null}
-                {profile?.phone ? <span>☎ {profile.phone}</span> : null}
+    <main className={styles.page}>
+      <PageHeader title="Hồ sơ cá nhân" description="Xây dựng hồ sơ và tiếp cận cơ hội nghề nghiệp phù hợp."
+        action={<button className="btn" type="button" disabled={loading || !!loadError} onClick={() => previewRef.current?.showModal()}><Eye size={17} aria-hidden="true" /> Xem trước hồ sơ</button>} />
+      {loadError ? <div className={styles.sectionHead} role="alert">
+        <p>{loadError}</p><button className="btn" type="button" onClick={() => setReload(n => n + 1)}>Tải lại hồ sơ</button>
+      </div> : null}
+      {notice ? <p role="status" className="notice notice-success">{notice}</p> : null}
+      {loading ? <LoadingState label="Đang tải hồ sơ…" /> : !loadError ? <>
+        <div className={styles.layout}>
+          <section className={styles.hero} aria-label="Thông tin ứng viên">
+            <div className={styles.cover} aria-hidden="true" />
+            <div className={styles.heroBody}>
+              <div className={styles.heroActions}>
+                <div className={styles.avatarWrap}>
+                  {profile?.avatarUrl ? <img className={styles.avatar} src={profile.avatarUrl} alt="Ảnh đại diện" /> : <span className={styles.avatar} aria-label="Chưa có ảnh đại diện">{initials}</span>}
+                  <label className={styles.avatarUpload} title="Thay ảnh đại diện" aria-disabled={busy}>
+                    {avatarBusy ? <LoaderCircle size={16} aria-hidden="true" /> : <Camera size={16} aria-hidden="true" />}
+                    <span className="sr-only">Thay ảnh đại diện</span>
+                    <input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} aria-describedby="avatar-hint" onChange={(event) => { void avatar(event.target.files?.[0]); event.currentTarget.value = ""; }} />
+                  </label>
+                </div>
+                <button className="btn btn-primary" type="button" disabled={busy} onClick={openEditor}><Pencil size={16} aria-hidden="true" /> Chỉnh sửa hồ sơ</button>
+              </div>
+              <h2>{name}</h2>
+              <p className={styles.headline}>{profile?.headline || "Thêm vị trí mong muốn"}</p>
+              <div className={styles.contacts}>
+                {profile?.address ? <span><MapPin size={15} aria-hidden="true" /> {profile.address}</span> : null}
+                {account?.email ? <span><Mail size={15} aria-hidden="true" /> {account.email}</span> : null}
+                {profile?.phone ? <span><Phone size={15} aria-hidden="true" /> {profile.phone}</span> : null}
+              </div>
+              <span className="sr-only" id="avatar-hint">JPG, PNG hoặc WEBP. Ảnh gốc tối đa 20 MiB, 25 triệu điểm ảnh.</span>
+              <div id="avatar-feedback" aria-busy={avatarBusy}>
+                <UploadProgress step={avatarStep} />
+                {avatarError ? <p className="notice notice-danger" role="alert">{avatarError} Bạn có thể chọn lại ảnh bằng nút máy ảnh.</p> : null}
+                {avatarError && !busy && (avatarAttempt.current?.checkpoint || avatarAttempt.current?.fileId) ? <button className="btn" type="button" onClick={() => void avatar(avatarAttempt.current?.source)}>Thử lưu lại ảnh</button> : null}
+                {avatarNotice ? <p className="notice" role="status">{avatarNotice}</p> : null}
               </div>
             </div>
-            <div className="candidate-completion">
-              <div><strong>Hồ sơ đã hoàn thiện {profile?.completionPercent ?? 0}%</strong><span>{profile?.completionPercent ?? 0}%</span></div>
-              <progress max={100} value={profile?.completionPercent ?? 0} aria-label="Mức độ hoàn thiện hồ sơ" />
-              <p>{profile?.missingSections?.length ? `Còn thiếu: ${profile.missingSections.map((section) => profileSectionLabels[section] ?? "Thông tin bổ sung").join(", ")}` : profile ? "Hồ sơ đã sẵn sàng để nhà tuyển dụng xem." : "Bắt đầu bằng cách bổ sung thông tin cá nhân."}</p>
+          </section>
+
+          <div className={styles.content}>
+            <nav id="profile-section-tabs" className={styles.tabs} aria-label="Các mục hồ sơ">
+              {profileTabs.map(([key, label]) => <button key={key} type="button" aria-pressed={tab === key} onClick={() => setTab(key)}>{label}</button>)}
+            </nav>
+            <div className={styles.stack} hidden={tab !== "overview"}>
+              <section className={styles.card}>
+                <div className={styles.sectionHead}>
+                  <h2>Giới thiệu bản thân</h2>
+                  <button className="btn btn-ghost" type="button" disabled={busy} onClick={openEditor}><Pencil size={16} aria-hidden="true" /> Sửa giới thiệu</button>
+                </div>
+                <p className={profile?.summary ? styles.summary : styles.muted}>{profile?.summary || "Thêm giới thiệu ngắn về kinh nghiệm và mục tiêu nghề nghiệp của bạn."}</p>
+              </section>
+              {editingGeneral ? <section className={styles.card} id="profile-editor" tabIndex={-1} aria-labelledby="profile-editor-title">
+                <h2 id="profile-editor-title">Thông tin cá nhân</h2>
+                <form className="form-stack" noValidate onSubmit={save}>
+                  <fieldset className="person1-fieldset form-grid" disabled={busy}><Fields fields={general} value={draft} set={(field, value) => setDraft(d => ({ ...d, [field]: value }))} /></fieldset>
+                  {error ? <p className="notice notice-danger" role="alert">{error}</p> : null}
+                  <div className="btn-group">
+                    <button className="btn btn-primary" disabled={busy}>{busy ? "Đang lưu…" : "Lưu thông tin chung"}</button>
+                    <button className="btn" type="button" disabled={busy} onClick={() => { setEditingGeneral(false); setDraft(profile ? { ...profile } : {}); setError(""); }}>Hủy</button>
+                  </div>
+                </form>
+              </section> : null}
+              {profile?.githubUrl || profile?.linkedinUrl || profile?.portfolioUrl ? <section className={styles.card}>
+                <h2>Liên kết cá nhân</h2>
+                <div className={styles.links}>
+                  {([["GitHub", profile.githubUrl], ["LinkedIn", profile.linkedinUrl], ["Trang cá nhân", profile.portfolioUrl]] as const).map(([label, url]) =>
+                    url ? <a key={label} href={url} target="_blank" rel="noopener noreferrer" className="btn">{label} <ArrowRight size={15} aria-hidden="true" /></a> : null)}
+                </div>
+              </section> : null}
             </div>
+            {blockOrder.map(key => {
+              const block = blocks.find(item => item.key === key)!;
+              return <div key={key} hidden={tab !== "overview" && tab !== key}>
+                <BlockEditor block={block} items={profile?.[key] ?? []} onSaved={setProfile} />
+              </div>;
+            })}
           </div>
-          <div className="candidate-avatar-feedback" id="avatar-feedback" aria-busy={avatarBusy}>
-            <p className="muted">JPG, PNG hoặc WEBP · Ảnh gốc tối đa 20 MiB, 25 triệu điểm ảnh. Ảnh được tự động tối ưu trước khi tải lên.</p>
-            <UploadProgress step={avatarStep} />
-            {avatarError ? <p className="notice notice-danger" role="alert">{avatarError} Bạn có thể chọn lại ảnh bằng nút máy ảnh.</p> : null}
-            {avatarError && !busy && (avatarAttempt.current?.checkpoint || avatarAttempt.current?.fileId) ? <button className="btn" type="button" onClick={() => void avatar(avatarAttempt.current?.source)}>Thử lưu lại ảnh</button> : null}
-            {avatarNotice ? <p className="notice" role="status">{avatarNotice}</p> : null}
-          </div>
-        </section>
-        <div className="candidate-profile-grid">
-          <div className="candidate-profile-main-column">
-            <section className="card candidate-profile-intro"><h2>Giới thiệu bản thân</h2><p>{profile?.summary || "Thêm phần giới thiệu ngắn để nhà tuyển dụng hiểu rõ hơn về kinh nghiệm và mục tiêu nghề nghiệp của bạn."}</p></section>
-            <section className="card form-stack candidate-general-profile" id="profile-editor">
-              <div className="section-head"><h2>Thông tin cá nhân</h2><button type="button" className="btn" onClick={() => setEditingGeneral((value) => !value)}>{editingGeneral ? "Đóng chỉnh sửa" : "✎ Chỉnh sửa hồ sơ"}</button></div>
-              {editingGeneral ? <form className="form-stack" noValidate onSubmit={save}>
-                <fieldset className="person1-fieldset form-grid" disabled={busy}><Fields fields={general} value={draft} set={(name, value) => setDraft((d) => ({ ...d, [name]: value }))} /></fieldset>
-                <div className="btn-group"><button className="btn btn-primary">{busy ? "Đang lưu…" : "Lưu thông tin chung"}</button><button className="btn" type="button" onClick={() => { setEditingGeneral(false); setDraft(profile ? { ...profile } : {}); }}>Hủy</button></div>
-              </form> : <div className="candidate-profile-facts">
-                <div><span>Họ và tên</span><strong>{profile?.fullName || "Chưa cập nhật"}</strong></div>
-                <div><span>Chức danh</span><strong>{profile?.headline || "Chưa cập nhật"}</strong></div>
-                <div><span>Số điện thoại</span><strong>{profile?.phone || "Chưa cập nhật"}</strong></div>
-                <div><span>Địa điểm</span><strong>{profile?.address || "Chưa cập nhật"}</strong></div>
-                {profile?.githubUrl ? <div><span>GitHub</span><a href={profile.githubUrl} target="_blank" rel="noopener noreferrer" className="person1-item-link"><strong>{profile.githubUrl}</strong></a></div> : null}
-                {profile?.linkedinUrl ? <div><span>LinkedIn</span><a href={profile.linkedinUrl} target="_blank" rel="noopener noreferrer" className="person1-item-link"><strong>{profile.linkedinUrl}</strong></a></div> : null}
-                {profile?.portfolioUrl ? <div><span>Trang web cá nhân</span><a href={profile.portfolioUrl} target="_blank" rel="noopener noreferrer" className="person1-item-link"><strong>{profile.portfolioUrl}</strong></a></div> : null}
-              </div>}
+
+          <aside className={styles.aside} aria-label="Tóm tắt hồ sơ và CV">
+            <section className={styles.card}>
+              <h2>Mức độ hoàn thiện hồ sơ</h2>
+              <div className={styles.score}><strong>{completion}%</strong><span>{completion === 100 ? "Đã hoàn thiện" : "Đã hoàn thành"}</span></div>
+              <progress className={styles.progress} max={100} value={completion} aria-label="Mức độ hoàn thiện hồ sơ" />
+              <ul className={styles.checklist}>
+                {completionItems.map(item => {
+                  const complete = item.complete;
+                  const Icon = complete ? CheckCircle2 : Circle;
+                  return <li key={item.label} data-complete={complete}><Icon size={16} aria-hidden="true" /><span><span className="sr-only">{complete ? "Đã hoàn thành: " : "Chưa hoàn thành: "}</span>{item.label}</span></li>;
+                })}
+              </ul>
+              {missing.length ? <p className={styles.muted}>Còn thiếu: {missing.map(section => profileSectionLabels[section] ?? "Thông tin bổ sung").join(", ")}</p> : null}
+              {completion < 100 ? <button className={styles.textAction} type="button" disabled={busy} onClick={() => {
+                const next = missing[0];
+                const section = profileTabs.find(([key]) => key === next);
+                if (!section) openEditor();
+                else { setTab(section[0]); document.getElementById("profile-section-tabs")?.scrollIntoView({ block: "nearest" }); }
+              }}>Hoàn thiện hồ sơ <ArrowRight size={16} aria-hidden="true" /></button> : null}
             </section>
-            {blocks.filter((block) => block.key === "experiences" || block.key === "projects").map((block) => <BlockEditor key={block.key} block={block} items={profile?.[block.key] ?? []} onSaved={setProfile} />)}
-          </div>
-          <aside className="candidate-profile-aside">
-            {blocks.filter((block) => block.key === "skills" || block.key === "educations" || block.key === "certificates").map((block) => <BlockEditor key={block.key} block={block} items={profile?.[block.key] ?? []} onSaved={setProfile} />)}
-            <section className="card candidate-profile-cv"><h2>CV đã tải lên</h2><p>Quản lý CV, tạo CV trực tuyến hoặc đặt CV mặc định khi ứng tuyển.</p><Link className="btn" href="/candidate/profile/cvs">Mở thư viện CV →</Link></section>
+            <section className={styles.card}>
+              <div className={styles.sectionHead}><h2>CV của tôi</h2><Link className={styles.textAction} href="/candidate/profile/cvs">Quản lý CV</Link></div>
+              {cvError ? <p className={styles.muted}>Chưa tải được danh sách CV. Mở trang quản lý để thử lại.</p> :
+                cvLoading ? <p className={styles.muted} role="status">Đang tải CV…</p> :
+                cv ? <div className={styles.cvRow}>
+                  <span className={styles.fileIcon}><FileText size={21} aria-hidden="true" /></span>
+                  <div><strong>{cv.title}</strong><p className={styles.muted}>{cv.isDefault ? "CV mặc định · " : ""}{cv.type === "UPLOAD" ? "Tệp PDF" : "CV trực tuyến"}</p></div>
+                </div> : <p className={styles.muted}>Bạn chưa có CV. Tải lên một bản PDF hoặc tạo CV trực tuyến.</p>}
+              <Link className={styles.textAction} href="/candidate/profile/cvs#upload-cv"><Plus size={16} aria-hidden="true" /> Tải CV mới lên</Link>
+            </section>
           </aside>
         </div>
-      </>}
-      {error ? <div className="notice notice-danger" role="alert">{error}<button className="btn" onClick={() => setReload((n) => n + 1)}>Tải lại hồ sơ</button></div> : null}
-      {notice ? <p role="status" className="notice">{notice}</p> : null}
+        <dialog ref={previewRef} className={styles.preview} aria-labelledby="profile-preview-title">
+          <div className={styles.sectionHead}>
+            <h2 id="profile-preview-title">Xem trước hồ sơ</h2>
+            <button className="btn" type="button" onClick={() => previewRef.current?.close()}>Đóng</button>
+          </div>
+          <div className={styles.stack}>
+            <div><h3>{name}</h3><p className={styles.muted}>{[profile?.headline, profile?.address].filter(Boolean).join(" · ")}</p></div>
+            {profile?.summary ? <section><h3>Giới thiệu bản thân</h3><p className={styles.summary}>{profile.summary}</p></section> : null}
+            {blockOrder.map(key => profile?.[key]?.length ? <section key={key}><h3>{blockTitles[key]}</h3>
+              <ul className={styles.items}>{profile[key].map(item => <li key={item.id}><BlockItemDetails blockKey={key} item={item} /></li>)}</ul>
+            </section> : null)}
+          </div>
+        </dialog>
+      </> : null}
     </main>
   );
 }

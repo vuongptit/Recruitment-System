@@ -142,7 +142,7 @@ export default function CvsPage() {
     <main className="form-stack">
       <PageHeader eyebrow="ỨNG VIÊN · CV" title="CV của tôi" description={`${cvs.length}/5 CV đang hoạt động. Chọn CV mặc định hoặc cập nhật nội dung cho từng vị trí.`}
         action={<div className="btn-group"><Link className="btn" href="/candidate/profile">Hồ sơ</Link><Link className="btn btn-primary" href="/candidate/profile/cvs/builder">Tạo CV trực tuyến</Link></div>} />
-      <form className="card form-stack" noValidate onSubmit={upload}>
+      <form id="upload-cv" className="card form-stack" noValidate onSubmit={upload}>
         <div className="section-head"><div><h2>Tải CV PDF</h2><p className="help">Lưu bản PDF để sử dụng khi ứng tuyển.</p></div></div>
         <fieldset
           disabled={pending || loading || cvs.length >= 5}

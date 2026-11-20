@@ -119,8 +119,9 @@ test("avatar optimizes a large PNG before signing and saving, and shows invalid 
   await input.setInputFiles({ name: "portrait.png", mimeType: "image/png", buffer: source });
   const feedback = page.locator("#avatar-feedback");
   await expect(feedback.getByRole("status")).toHaveText("Đã cập nhật ảnh đại diện.");
-  await expect(page.getByRole("img", { name: "Ảnh đại diện", exact: true })).toBeVisible();
-  await expect.poll(() => page.getByRole("img", { name: "Ảnh đại diện", exact: true }).evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  const portrait = page.getByRole("region", { name: "Thông tin ứng viên" }).getByRole("img", { name: "Ảnh đại diện", exact: true });
+  await expect(portrait).toBeVisible();
+  await expect.poll(() => portrait.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   expect(signatures).toBe(1);
   expect(uploadedType).toBe("image/webp");
   expect(uploaded!.length).toBeLessThanOrEqual(128 * 1024);
@@ -760,6 +761,7 @@ test("registration rejects malformed email before sending any OTP", async ({ pag
 
 test("profile handles current experience dates and renders readable completion sections", async ({ page }) => {
   await base(page);
+  await page.route(api + "/profile/cvs", route => reply(route, [{ id: cvId, title: "CV kỹ sư", type: "UPLOAD", isDefault: true }]));
   let body: unknown;
   await page.route(api + "/profile/experiences", route => {
     body = route.request().postDataJSON();
@@ -767,7 +769,18 @@ test("profile handles current experience dates and renders readable completion s
   });
   await login(page);
   await expect(page.getByText("Còn thiếu: Học vấn", { exact: true })).toBeVisible();
-  const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "Kinh nghiệm", exact: true }) });
+  await expect(page.getByText("CV kỹ sư", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Tải CV mới lên" })).toHaveAttribute("href", "/candidate/profile/cvs#upload-cv");
+  await page.getByRole("button", { name: "Xem trước hồ sơ", exact: true }).click();
+  await expect(page.getByRole("dialog").getByText(profile.summary, { exact: true })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); window.scrollTo(0, 0); });
+  await page.screenshot({ path: test.info().outputPath("candidate-profile.png"), fullPage: true });
+  await page.getByRole("navigation", { name: "Các mục hồ sơ" }).getByRole("button", { name: "Kinh nghiệm", exact: true }).click();
+  const section = page.getByRole("region", { name: "Kinh nghiệm", exact: true });
+  await section.getByRole("button", { name: "Thêm kinh nghiệm", exact: true }).click();
   await section.getByLabel("Công ty").fill("CareerHub");
   await section.getByLabel("Vị trí", { exact: false }).fill("Kỹ sư phần mềm");
   await section.getByLabel("Ngày bắt đầu").fill("2024-01-01");
