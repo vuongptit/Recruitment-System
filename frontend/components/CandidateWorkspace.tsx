@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Search, Building2, Heart, Files, CalendarDays, UserRound, FileText, Sparkles, Settings, WandSparkles } from "lucide-react";
+import { LayoutDashboard, Search, Building2, Heart, Files, CalendarDays, UserRound, FileText, Sparkles, WandSparkles } from "lucide-react";
 import { useCurrentAccount } from "./SessionGate";
 import { requestApi } from "../lib/apiClient";
 import type { CandidateProfile } from "../lib/person1Api";
@@ -21,7 +21,6 @@ const links: WorkspaceLink[] = [
   { label: "Quản lý CV", href: "/candidate/profile/cvs", icon: FileText, aliases: ["/candidate/cvs/"] },
   { label: "Gợi ý việc làm", href: "/candidate/ai/recommendations", icon: Sparkles },
   { label: "Trợ lý AI", href: "/candidate/ai", icon: WandSparkles, exact: true },
-  { label: "Cài đặt tài khoản", href: "/candidate/settings", icon: Settings },
 ];
 const CandidateWorkspaceContext = createContext(false);
 export function CandidateWorkspace({ children }: { children: ReactNode }) {

@@ -84,6 +84,7 @@ button, a { touch-action: manipulation; }
 .logout-button { color: var(--muted); }
 .logout-button:hover { color: var(--danger); background: #fff2f2; }
 .notification-bell { min-width: 38px; min-height: 38px; }
+.account-settings[aria-current="page"] { background: var(--primary-tint); color: var(--primary); }
 .workspace-menu-button, .workspace-menu-overlay { display: none; }
 .workspace-sidebar { top: 72px; height: calc(100dvh - 72px); padding: 22px 12px; scrollbar-width: thin; }
 .workspace-identity { padding: 0 10px 20px; gap: 10px; }
@@ -405,6 +406,10 @@ button, a { touch-action: manipulation; }
   width: 100% !important;
   margin: 0 !important;
   padding-inline: 24px !important;
+}
+@media (max-width: 420px) {
+  .candidate-workspace .workspace-header .topbar-inner { padding-inline: 10px !important; gap: 6px; }
+  .candidate-workspace .workspace-header .notification-bell { min-width: 36px; }
 }
 
 /* Full-viewport Chat Workspace */

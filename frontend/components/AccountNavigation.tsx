@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, MessageSquare, LogOut, Plus, ArrowUpRight } from "lucide-react";
+import { Bell, MessageSquare, LogOut, Plus, ArrowUpRight, Settings } from "lucide-react";
 import { useCurrentAccount } from "./SessionGate";
 import { signOut } from "../lib/authSession";
 import { portalHome, portalLabel, portalSection, type AccountRole } from "../lib/portalRoutes";
@@ -174,6 +174,14 @@ export function AccountNavigation({
           )}
           <span className="account-copy"><strong>{displayName}</strong><small>{portalLabel(role)}</small></span>
         </Link>
+        {role === "CANDIDATE" ? <Link
+          prefetch={false}
+          href="/candidate/settings"
+          aria-label="Cài đặt tài khoản"
+          aria-current={pathname === "/candidate/settings" || pathname.startsWith("/candidate/settings/") ? "page" : undefined}
+          title="Cài đặt tài khoản"
+          className="notification-bell account-settings"
+        ><Settings size={20} strokeWidth={1.7} aria-hidden="true" /></Link> : null}
         <button className="notification-bell logout-button" type="button" disabled={pending} onClick={() => void logout()} aria-label={pending ? "Đang thoát…" : "Đăng xuất"} title="Đăng xuất"><LogOut size={19} aria-hidden="true" /></button>
       </> : <>
         {portal === "CANDIDATE" && <Link prefetch={false} className="recruiter-entry portal-switch" href="/recruiter">Nhà tuyển dụng <ArrowUpRight size={14} aria-hidden="true" /></Link>}

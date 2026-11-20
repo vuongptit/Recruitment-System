@@ -46,15 +46,25 @@ test("Candidate messages and notifications keep one consistent workspace", async
   await openWorkspaceMenu(page);
   await expect(page.getByRole("navigation", { name: "Khu vực ứng viên" })).toHaveCount(1);
   await expect(page.locator(".candidate-workspace")).toHaveCount(1);
-  await expect(page.locator('nav[aria-label="Khu vực ứng viên"] a[href="/candidate/messages"]')).toHaveAttribute("aria-current", "page");
+  const sidebar = page.locator("#workspace-sidebar");
+  const header = page.locator(".workspace-header");
+  await expect(sidebar.getByRole("link", { name: /^Tin nhắn/ })).toHaveCount(0);
+  await expect(sidebar.locator('a[href="/candidate/notifications"], a[href="/candidate/settings"]')).toHaveCount(0);
+  if (await page.getByRole("button", { name: "Đóng menu", exact: true }).isVisible()) {
+    await page.keyboard.press("Escape");
+  }
+  await expect(header.getByRole("link", { name: /^Tin nhắn/ })).toHaveAttribute("href", "/candidate/messages");
   await noPageOverflow(page);
-  await openWorkspaceMenu(page);
-  await page.locator('nav[aria-label="Khu vực ứng viên"] a[href="/candidate/notifications"]').click();
+  await header.getByRole("link", { name: /^Thông báo/ }).click();
   await expect(page.getByRole("heading", { name: "Thông báo", exact: true })).toBeVisible();
   await expect(page.locator(".candidate-workspace")).toHaveCount(1);
   await noPageOverflow(page);
   await page.evaluate(async () => { await document.fonts.ready; });
-  await page.screenshot({ path: `/tmp/recruitment-fe-candidate-${info.project.name}.png`, fullPage: true });
+  await header.getByRole("link", { name: "Cài đặt tài khoản", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Cài đặt tài khoản", exact: true })).toBeVisible();
+  await expect(header.getByRole("link", { name: "Cài đặt tài khoản", exact: true })).toHaveAttribute("aria-current", "page");
+  await noPageOverflow(page);
+  await page.screenshot({ path: info.outputPath("candidate-account-navigation.png"), fullPage: true });
 });
 
 test("Report validation retains the job context and sends only a valid report", async ({ page }) => {
