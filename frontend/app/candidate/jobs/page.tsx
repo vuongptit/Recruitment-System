@@ -27,12 +27,11 @@ import {
   type PublicJobSearchFilters,
   type PublicJobSearchForm,
 } from "../../../lib/publicJobSearch";
-import { canLoadMoreRecommendations, mergeRecommendationPage, recommendationFallbackView, recommendationSourceView } from "../../../lib/recommendationPresentation";
+import { recommendationFallbackView, recommendationSourceView } from "../../../lib/recommendationPresentation";
 import {
   type Job,
   type JobRecommendation,
   type PublicCompanyProfile,
-  type RecommendationSource,
   type SearchMode,
   getPublicCompany,
   getPublicJobs,
@@ -40,6 +39,8 @@ import {
   type FallbackReason,
   getRecommendationsForCandidate,
 } from "../../../lib/person2Api";
+
+const RECOMMENDATION_LIMIT = 3;
 
 function RecommendationCard({
   item,
@@ -114,18 +115,12 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
   const [recs, setRecs] = useState<JobRecommendation[]>([]);
   const [recommendationError, setRecommendationError] = useState("");
   const [searchRestartNotice, setSearchRestartNotice] = useState("");
-  const [recommendationRestartNotice, setRecommendationRestartNotice] = useState("");
   const [recommendationReloadKey, setRecommendationReloadKey] = useState(0);
   const [recommendationLoading, setRecommendationLoading] = useState(true);
-  const [recommendationCursor, setRecommendationCursor] = useState<string | null>(null);
-  const [nextRecommendationCursor, setNextRecommendationCursor] = useState<string | null>(null);
-  const [recommendationSource, setRecommendationSource] = useState<RecommendationSource | null>(null);
   const searchRestartedRef = useRef(false);
-  const recommendationRestartedRef = useRef(false);
   const restoreListFocusRef = useRef(false);
   const jobListRef = useRef<HTMLElement>(null);
   const cardListRef = useRef<HTMLDivElement>(null);
-  const recommendationSentinelRef = useRef<HTMLDivElement>(null);
   const scope = useMemo(() => publicJobSearchScope(filters, limit), [filters, limit]);
 
   useEffect(() => {
@@ -242,62 +237,31 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
   }, [scope, filters, mode, page, limit, cursor, reloadKey]);
 
   useEffect(() => {
-    let active = true;
-    const controller = new AbortController();
     if (!canRecommend) {
       setRecs([]);
       setRecommendationLoading(false);
       setRecommendationError("");
-      setNextRecommendationCursor(null);
+      setRecommendationFallback(undefined);
       return;
     }
-    const continuation = Boolean(recommendationCursor);
+    const controller = new AbortController();
     setRecommendationLoading(true);
     setRecommendationError("");
-    getRecommendationsForCandidate({ cursor: recommendationCursor, limit: 10 }, controller.signal)
+    getRecommendationsForCandidate({ limit: RECOMMENDATION_LIMIT }, controller.signal)
       .then((response) => {
-        if (!active) return;
-        const source = (response.meta?.source as RecommendationSource | undefined) ?? response.data[0]?.source ?? "LATEST";
-        const candidateCursor = response.meta?.nextCursor ?? null;
-        setRecs((current) => mergeRecommendationPage(current, response.data, continuation));
-        setRecommendationSource(source);
+        if (controller.signal.aborted) return;
+        setRecs(response.data.slice(0, RECOMMENDATION_LIMIT));
         setRecommendationFallback(response.meta?.fallbackReason as FallbackReason | undefined);
-        setNextRecommendationCursor(canLoadMoreRecommendations(source, candidateCursor) ? candidateCursor : null);
-        recommendationRestartedRef.current = false;
       })
       .catch((reason: unknown) => {
-        if (!active || (reason instanceof ApiClientError && reason.code === "REQUEST_CANCELLED")) return;
-        const restart = reason instanceof ApiClientError ? cursorRestartView(reason.code) : null;
-        if (restart?.code === "RECOMMENDATION_CURSOR_STALE" && !recommendationRestartedRef.current) {
-          recommendationRestartedRef.current = true;
-          setRecommendationRestartNotice(restart.message);
-          setRecommendationCursor(null);
-          setNextRecommendationCursor(null);
-          if (!recommendationCursor) setRecommendationReloadKey((value) => value + 1);
-          return;
-        }
+        if (controller.signal.aborted || (reason instanceof ApiClientError && reason.code === "REQUEST_CANCELLED")) return;
         setRecommendationError(toUserMessage(reason));
       })
       .finally(() => {
-        if (active) setRecommendationLoading(false);
+        if (!controller.signal.aborted) setRecommendationLoading(false);
       });
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [canRecommend, recommendationCursor, recommendationReloadKey]);
-
-  const canLoadMoreRecommendation = canLoadMoreRecommendations(recommendationSource, nextRecommendationCursor);
-
-  useEffect(() => {
-    const sentinel = recommendationSentinelRef.current;
-    if (!sentinel || !canLoadMoreRecommendation || recommendationLoading || !nextRecommendationCursor) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) setRecommendationCursor(nextRecommendationCursor);
-    }, { rootMargin: "160px" });
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [canLoadMoreRecommendation, nextRecommendationCursor, recommendationLoading]);
+    return () => controller.abort();
+  }, [canRecommend, recommendationReloadKey]);
 
   function change<K extends keyof PublicJobSearchForm>(field: K, value: PublicJobSearchForm[K]) {
     setForm((current) => ({ ...current, [field]: value, ...(field === "experienceBand" ? { experienceYears: "" } : {}) }));
@@ -404,10 +368,6 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
   }
 
   function restartRecommendations() {
-    recommendationRestartedRef.current = false;
-    setRecommendationCursor(null);
-    setNextRecommendationCursor(null);
-    setRecommendationRestartNotice("");
     setRecommendationReloadKey((value) => value + 1);
   }
 
@@ -568,20 +528,11 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
             const fallback = recommendationFallbackView(recommendationFallback);
             return <div className={discovery.recommendationEmpty}><EmptyState title={fallback?.title ?? "Chưa có việc làm phù hợp"} description={fallback?.description ?? "Hãy thử lại khi có tin tuyển dụng mới."} />{fallback?.action === "UPLOAD_CV" ? <Link className="btn btn-secondary" href="/candidate/profile/cvs">{fallback.actionLabel}</Link> : <button className="btn" type="button" onClick={restartRecommendations}>Làm mới gợi ý</button>}</div>;
           })() : null}
-          {recommendationRestartNotice ? <p className="notice" role="status">{recommendationRestartNotice}</p> : null}
-          {recommendationError ? <ErrorState message={recommendationError} onRetry={() => setRecommendationReloadKey((value) => value + 1)} /> : null}
+          {recommendationError ? <ErrorState message={recommendationError} onRetry={restartRecommendations} /> : null}
           {recommendationLoading && recs.length === 0 ? <LoadingState label="Đang tải gợi ý việc làm" /> : null}
           <div className={discovery.recommendationGrid}>
             {recs.map((item) => <RecommendationCard key={item.id} item={item} loading={recommendationLoading} onRetry={restartRecommendations} />)}
           </div>
-          {recommendationLoading && recs.length > 0 ? <p className="help" role="status">Đang tải thêm gợi ý…</p> : null}
-          {canLoadMoreRecommendation ? (
-            <div className="btn-group pagination-actions">
-              <button className="btn btn-secondary" type="button" disabled={recommendationLoading} onClick={() => setRecommendationCursor(nextRecommendationCursor)}>Xem thêm gợi ý AI</button>
-              <div ref={recommendationSentinelRef} className="recommendation-sentinel" aria-hidden="true" />
-            </div>
-          ) : null}
-          {recommendationSource === "AI" && recs.length > 0 && !recommendationLoading && !nextRecommendationCursor ? <p className="help">Đã tải hết gợi ý AI.</p> : null}
         </section>
     </main>
   );

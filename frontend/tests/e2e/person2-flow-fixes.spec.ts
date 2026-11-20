@@ -241,6 +241,28 @@ test("an empty fallback retains NO_ACTIVE_CV guidance instead of a blank recomme
   await expect(page.getByRole("link", { name: "Mở quản lý CV", exact: true })).toHaveAttribute("href", "/candidate/profile/cvs");
 });
 
+test("job suggestions show the first three ranked items without loading the next page", async ({ page }) => {
+  const items = Array.from({ length: 4 }, (_, index) => ({
+    ...job,
+    id: `${jobId.slice(0, -1)}${index + 1}`,
+    title: `Gợi ý ${index + 1}`,
+    score: 0.9 - index * 0.1,
+  }));
+  const searchParams: URLSearchParams[] = [];
+  await page.route(`${gateway}/jobs/search**`, route => reply(route, { items: [], total: 0, source: "POSTGRESQL", hasMore: false }));
+  await page.route(`${gateway}/jobs/recommended**`, route => {
+    searchParams.push(new URL(route.request().url()).searchParams);
+    return reply(route, { items, source: "AI", fallbackReason: null, nextCursor: "next-suggestions" });
+  });
+  await authenticate(page, "CANDIDATE", "/candidate/jobs");
+  const suggestions = page.locator("#suitable-jobs");
+  await suggestions.scrollIntoViewIfNeeded();
+  await expect(suggestions.getByRole("link", { name: /^Gợi ý \d$/ })).toHaveText(["Gợi ý 1", "Gợi ý 2", "Gợi ý 3"]);
+  await expect(suggestions.getByRole("button", { name: "Xem thêm gợi ý AI" })).toHaveCount(0);
+  expect(searchParams.at(-1)?.get("limit")).toBe("3");
+  expect(searchParams.some(params => params.has("cursor"))).toBe(false);
+});
+
 test("an Offer expiring while its confirmation is open is not sent", async ({ page }) => {
   let responses = 0;
   await page.clock.setFixedTime(new Date("2099-01-01T00:00:00Z"));
