@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 class TokenSessionTransactions {
-  static final Duration REFRESH_FAMILY_LIFETIME = Duration.ofDays(7);
+  static final Duration REFRESH_FAMILY_LIFETIME = Duration.ofDays(30);
 
   private final AuthUserRepository users;
   private final RefreshSessionRepository sessions;
