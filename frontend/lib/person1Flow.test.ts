@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { passwordError, validatePersonalFile, personalFileUploadError, landing, loginRoute, loginDestination, profileDateError } from "./person1Api";
-import { validateBuilder, contentFromProfile } from "./cvPdf";
+import { buildCvDocument, cvLayout, resolveCvDesign, validateBuilder, contentFromProfile } from "./cvPdf";
 import { clearApiSession, requestApi, setApiSession } from "./apiClientCore";
 test("registration password validates Unicode letters and bcrypt byte boundary", () => {
   assert.equal(passwordError("MậtKhẩu123"), null);
@@ -49,6 +49,25 @@ test("builder rejects foreign shapes and oversized content", () => {
     }).sections,
     [],
   );
+});
+
+test("CV PDF templates use distinct document structures and retain layout adjustments", () => {
+  const cv = { fullName: "Nguyễn An", headline: "Kỹ sư", contact: "an@example.test", summary: "Giới thiệu",
+    sections: [{ title: "Kinh nghiệm", text: "Phát triển sản phẩm" }, { title: "Kỹ năng", text: "TypeScript" }] };
+  const professional = buildCvDocument(cv, "classic");
+  const minimal = buildCvDocument(cv, "minimal");
+  const modern = buildCvDocument(cv, "modern");
+  const creative = buildCvDocument(cv, "creative");
+  assert.match(JSON.stringify(professional.content[0]), /"alignment":"center".*"canvas"/);
+  assert.doesNotMatch(JSON.stringify(minimal.content[0]), /"canvas"/);
+  assert.ok(modern.content.some(node => "columns" in node));
+  assert.match(JSON.stringify(creative.content[0]), /"columns".*"fillColor"/);
+  const design = resolveCvDesign("modern", { fontSize: 12, horizontalMargin: 24, columns: 2, personalPosition: "right", leftWidth: 70, pageNumbers: true });
+  const custom = buildCvDocument({ ...cv, design }, "modern");
+  assert.equal(custom.defaultStyle.fontSize, 12);
+  assert.ok(custom.pageMargins[0] > modern.pageMargins[0]);
+  assert.equal(custom.footer?.(2, 3).text, "2 / 3");
+  assert.equal(cvLayout({ ...cv, design }, "modern").design.personalPosition, "right");
 });
 test("upload configuration failures explain the recovery without exposing provider details", () => {
   for (const [status, payload] of [

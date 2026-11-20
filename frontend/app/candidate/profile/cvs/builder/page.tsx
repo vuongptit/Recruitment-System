@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { Check, FileText } from "lucide-react";
+import { Check, Circle, ClipboardCheck, FileText, SlidersHorizontal } from "lucide-react";
 import { LoadingState, PageHeader } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import {
   cvTemplates,
   type CvTemplateId,
   renderCvPdf,
+  resolveCvDesign,
   validateBuilder,
 } from "../../../../../lib/cvPdf";
 import {
@@ -26,6 +27,11 @@ import {
   type PersonalUploadCheckpoint,
 } from "../../../../../lib/person1Api";
 import styles from "../CvLibrary.module.css";
+import builder from "./CvBuilder.module.css";
+import { CvDesignTools } from "./CvDesignTools";
+import { CvLiveDocument } from "./CvLiveDocument";
+
+const panels = [["content", "Nội dung", FileText], ["design", "Thiết kế", SlidersHorizontal], ["review", "Kiểm tra", ClipboardCheck]] as const;
 const empty: BuilderContent = {
   fullName: "",
   headline: "",
@@ -43,6 +49,7 @@ export default function BuilderPage() {
   const [content, setContent] = useState<BuilderContent>(empty);
   const [title, setTitle] = useState("CV của tôi");
   const [template, setTemplate] = useState<CvTemplateId>("modern");
+  const [panel, setPanel] = useState<(typeof panels)[number][0]>("content");
   const [original, setOriginal] = useState<CandidateCv | null>(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
@@ -72,7 +79,7 @@ export default function BuilderPage() {
       : requestApi<CandidateProfile>("/api/profile/" + account.id, {
           privateData: true,
           signal: controller.signal,
-        }).then((r) => setContent(contentFromProfile(r.data)));
+        }).then((r) => { if (!controller.signal.aborted) setContent(contentFromProfile(r.data)); });
     load
       .catch((e) => {
         if (
@@ -99,13 +106,22 @@ export default function BuilderPage() {
   useEffect(() => {
     if (preview && pdfDialog.current && !pdfDialog.current.open) pdfDialog.current.showModal();
   }, [preview]);
-  function change(name: keyof Omit<BuilderContent, "sections">, value: string) {
+  function change(name: "fullName" | "headline" | "contact" | "summary", value: string) {
     setContent((c) => ({ ...c, [name]: value }));
   }
+  const design = resolveCvDesign(template, content.design);
+  const snapshot = { ...content, design };
+  const checks = [
+    { label: "Họ và tên", complete: !!content.fullName.trim(), hint: "Thêm họ tên để nhà tuyển dụng nhận diện bạn." },
+    { label: "Vị trí mong muốn", complete: !!content.headline.trim(), hint: "Thêm tên vị trí phù hợp với công việc bạn ứng tuyển." },
+    { label: "Thông tin liên hệ", complete: !!content.contact.trim(), hint: "Bổ sung email hoặc số điện thoại để nhà tuyển dụng liên hệ." },
+    { label: "Giới thiệu", complete: !!content.summary.trim(), hint: "Tóm tắt kinh nghiệm và điểm mạnh liên quan đến vị trí." },
+    { label: "Nội dung chuyên môn", complete: content.sections.some(section => section.title.trim() && section.text.trim()), hint: "Thêm kinh nghiệm, học vấn, dự án hoặc kỹ năng." },
+  ];
   async function currentPdf(): Promise<Blob> {
-    const fingerprint = JSON.stringify({ content, template });
+    const fingerprint = JSON.stringify({ snapshot, template });
     if (pdfCache.current?.fingerprint === fingerprint) return pdfCache.current.blob;
-    const blob = await renderCvPdf(content, template);
+    const blob = await renderCvPdf(snapshot, template);
     pdfCache.current = { fingerprint, blob };
     return blob;
   }
@@ -130,13 +146,13 @@ export default function BuilderPage() {
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const formIssue = person1FormError(e.currentTarget);
-    if (formIssue) { setError(formIssue); return; }
+    if (formIssue) { setPanel("content"); setError(formIssue); return; }
     if (pending) return;
     setPending(true);
     setError("");
     try {
       // The title is metadata: renaming must not regenerate or resend the PDF.
-      const fingerprint = JSON.stringify({ content, template });
+      const fingerprint = JSON.stringify({ snapshot, template });
       if (staged.current?.fingerprint !== fingerprint) {
         setUploadStep("preparing");
         const blob = await currentPdf();
@@ -154,7 +170,7 @@ export default function BuilderPage() {
         title: title.trim(),
         templateId: template,
         contentSchemaVersion: 1,
-        contentJson: content,
+        contentJson: snapshot,
         fileId,
         ...(original
           ? { expectedAggregateVersion: original.aggregateVersion }
@@ -192,25 +208,19 @@ export default function BuilderPage() {
         <LoadingState label="Đang tải nội dung…" />
       ) : (
         <>
-        <section className={styles.templateGallery} aria-labelledby="cv-template-heading">
-          <h2 id="cv-template-heading">Thư viện mẫu CV</h2>
-          <div className={styles.templateGrid} role="group" aria-label="Mẫu CV">
-            {(Object.entries(cvTemplates) as [CvTemplateId, typeof cvTemplates[CvTemplateId]][]).map(([id, sample]) => (
-              <button className={styles.templateCard} type="button" key={id} aria-pressed={template === id} disabled={pending || loadFailed} onClick={() => setTemplate(id)}>
-                <span className={styles.templateArt} data-template={id} style={{ color: sample.accent }} aria-hidden="true"><span className={styles.templateSheet}><FileText size={21} /><i /><i /><i /></span>{template === id ? <Check size={16} /> : null}</span>
-                <strong>{sample.label}</strong><span className={styles.muted}>{sample.description}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-        <div className={styles.builderGrid}>
-        <form className="card form-stack" noValidate onSubmit={save}>
-          <h2 className={styles.builderTitle}>Nội dung CV</h2>
+        <div className={builder.workbench}>
+        <form className={`card form-stack ${builder.editor}`} noValidate onSubmit={save}>
+          <nav className={builder.panels} aria-label="Công cụ tạo CV">
+            {panels.map(([key, label, Icon]) => <button key={key} type="button" aria-pressed={panel === key} onClick={() => setPanel(key)}><Icon size={17} aria-hidden="true" /> {label}</button>)}
+          </nav>
           <UploadProgress step={uploadStep} />
+          {error ? <p className="notice notice-danger" role="alert">{error}</p> : null}
           <fieldset
+            hidden={panel !== "content"}
             disabled={pending || loadFailed}
             className="person1-fieldset form-grid"
           >
+            <h2 className={`${builder.editorHeading} span-2`}>Nội dung CV</h2>
             <label className="field">
               Tên CV
               <input
@@ -323,7 +333,23 @@ export default function BuilderPage() {
             >
               Thêm mục
             </button>
-            <div className="btn-group span-2">
+          </fieldset>
+          {panel === "design" ? <fieldset className="person1-fieldset" disabled={pending || loadFailed}>
+            <CvDesignTools template={template} design={design}
+              onDesign={next => setContent(current => ({ ...current, design: next }))}
+              onTemplate={next => { setTemplate(next); setContent(current => ({ ...current, design: resolveCvDesign(next) })); }} />
+          </fieldset> : null}
+          {panel === "review" ? <section className={builder.review} aria-labelledby="cv-review-heading">
+            <h2 id="cv-review-heading">Kiểm tra trước khi lưu</h2>
+            <p>{checks.filter(check => check.complete).length} / {checks.length} mục nội dung đã có thông tin.</p>
+            <ul>{checks.map(check => <li key={check.label} data-complete={check.complete}>
+              {check.complete ? <Check size={17} aria-hidden="true" /> : <Circle size={17} aria-hidden="true" />}
+              <div><strong>{check.label}</strong><p>{check.complete ? "Đã có thông tin" : check.hint}</p></div>
+            </li>)}</ul>
+            <button className="btn" type="button" onClick={() => setPanel("content")}>Quay lại chỉnh nội dung</button>
+          </section> : null}
+          <fieldset className={`person1-fieldset ${builder.actions}`} disabled={pending || loadFailed}>
+            <div className="btn-group">
               <button className="btn" type="button" onClick={() => void pdf()}>
                 Xem trước PDF
               </button>
@@ -346,27 +372,14 @@ export default function BuilderPage() {
             </p>
           ) : null}
         </form>
-        {!loadFailed ? <aside className={styles.livePreview} aria-labelledby="cv-live-preview">
+        {!loadFailed ? <aside className={builder.preview} aria-labelledby="cv-live-preview">
           <div className={styles.dialogHeader}><h2 id="cv-live-preview">Xem trước trực tiếp</h2><span className={styles.muted}>{cvTemplates[template].label}</span></div>
-          <article className={styles.livePaper} style={{ borderTopColor: cvTemplates[template].accent, lineHeight: cvTemplates[template].lineHeight }}>
-            <h3 style={{ color: cvTemplates[template].accent, fontSize: cvTemplates[template].nameSize }}>{content.fullName || "Họ và tên"}</h3>
-            <p className={styles.liveHeadline}>{content.headline || "Vị trí mong muốn"}</p>
-            {content.contact ? <p className={styles.muted}>{content.contact}</p> : null}
-            {content.summary ? <p>{content.summary}</p> : null}
-            {content.sections.filter(section => section.text.trim()).map((section, index) => <section key={index}>
-              <h4 style={{ color: cvTemplates[template].accent }}>{section.title}</h4><p>{section.text}</p>
-            </section>)}
-          </article>
-          <p className={styles.muted}>Chọn “Xem trước PDF” để kiểm tra bố cục và ngắt trang của bản xuất.</p>
+          <div className={builder.previewStage}><CvLiveDocument content={snapshot} template={template} /></div>
+          <div className={builder.previewFooter}><p className={styles.muted}>Xem bản PDF để kiểm tra ngắt trang.</p><button className="btn" type="button" disabled={pending} onClick={() => void pdf()}>Mở bản PDF</button></div>
         </aside> : null}
         </div>
         </>
       )}
-      {error ? (
-        <p className="notice notice-danger" role="alert">
-          {error}
-        </p>
-      ) : null}
       <dialog ref={pdfDialog} className={`${styles.dialog} ${styles.pdfDialog}`} aria-labelledby="builder-pdf-title" onClose={() => {
         if (lastPreview.current) URL.revokeObjectURL(lastPreview.current);
         lastPreview.current = "";

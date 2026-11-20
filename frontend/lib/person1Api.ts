@@ -195,12 +195,24 @@ export interface CandidateCv {
   contentJson?: BuilderContent;
   revisionNumber: number;
 }
+export interface CvDesign {
+  fontSize: number;
+  lineHeight: number;
+  horizontalMargin: number;
+  verticalMargin: number;
+  columns: 1 | 2;
+  leftWidth: number;
+  personalPosition: "top" | "left" | "right";
+  accent: string;
+  pageNumbers: boolean;
+}
 export interface BuilderContent {
   fullName: string;
   headline: string;
   contact: string;
   summary: string;
   sections: { title: string; text: string }[];
+  design?: CvDesign;
 }
 interface UploadCapability {
   fileId: string;

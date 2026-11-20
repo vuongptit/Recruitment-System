@@ -510,8 +510,16 @@ test("CV Builder exports Vietnamese PDF then publishes a private snapshot", asyn
   await expect(
     page.getByRole("textbox", { name: "Họ tên", exact: true }),
   ).toHaveValue("Nguyễn Văn An", { timeout: 15000 });
+  await page.getByRole("button", { name: "Thiết kế", exact: true }).click();
   await page.getByRole("button", { name: /Sáng tạo/ }).click();
   await expect(page.getByRole("button", { name: /Sáng tạo/ })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Tăng cỡ chữ nội dung", exact: true }).click();
+  await page.getByLabel("Vị trí thông tin cá nhân").selectOption("right");
+  await page.getByLabel("Đánh số trang PDF").check();
+  await expect(page.getByRole("article", { name: "Bản bố cục CV trực tiếp" })).toHaveAttribute("data-personal", "right");
+  await page.getByRole("button", { name: "Kiểm tra", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Kiểm tra trước khi lưu" })).toBeVisible();
+  await page.getByRole("button", { name: "Quay lại chỉnh nội dung" }).click();
   await page.getByRole("textbox", { name: "Họ tên", exact: true }).fill("Nguyễn Minh An");
   await expect(page.getByRole("complementary", { name: "Xem trước trực tiếp" })).toContainText("Nguyễn Minh An");
   await page.getByRole("textbox", { name: "Họ tên", exact: true }).fill("Nguyễn Văn An");
@@ -534,6 +542,7 @@ test("CV Builder exports Vietnamese PDF then publishes a private snapshot", asyn
   expect(stored?.fileId).toBe(fileId);
   expect(stored?.contentSchemaVersion).toBe(1);
   expect(stored?.templateId).toBe("creative");
+  expect(stored?.contentJson).toMatchObject({ design: { fontSize: 10.5, columns: 2, personalPosition: "right", pageNumbers: true } });
   expect((stored?.contentJson as Record<string, unknown>).fullName).toBe(
     "Nguyễn Văn An",
   );
