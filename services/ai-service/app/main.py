@@ -17,7 +17,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.responses import Response
 
-from app.chat_provider import AnthropicChatProvider
+from app.chat_provider import AnthropicChatProvider, GeminiChatProvider
 from app.chat_recommendation import HttpCandidateJobRecommendationClient
 from app.chat_service import ChatResult, ChatService
 from app.chat_store import RedisChatStore
@@ -199,7 +199,7 @@ def create_app(
     async def lifespan(lifespan_app: FastAPI) -> AsyncIterator[None]:
         owned_authenticator: JwksJwtAuthenticator | None = None
         owned_store: RedisChatStore | None = None
-        owned_provider: AnthropicChatProvider | None = None
+        owned_provider: AnthropicChatProvider | GeminiChatProvider | None = None
         owned_recommendation_client: HttpCandidateJobRecommendationClient | None = None
         owned_service: ChatService | None = None
         owned_chat_executor: ThreadPoolExecutor | None = None
@@ -252,12 +252,25 @@ def create_app(
                         global_rate_limit=runtime_settings.chat_global_rate_limit,
                         lock_ttl_seconds=runtime_settings.chat_session_lock_seconds,
                     )
-                    owned_provider = AnthropicChatProvider(
-                        api_key=runtime_settings.anthropic_api_key,
-                        model=runtime_settings.anthropic_model,
-                        timeout_seconds=runtime_settings.chat_provider_timeout_seconds,
-                        max_output_tokens=runtime_settings.chat_max_output_tokens,
-                    )
+                    provider_name = runtime_settings.chat_provider
+                    if not provider_name:
+                        provider_name = (
+                            "gemini" if runtime_settings.gemini_api_key else "anthropic"
+                        )
+                    if provider_name == "gemini":
+                        owned_provider = GeminiChatProvider(
+                            api_key=runtime_settings.gemini_api_key,
+                            model=runtime_settings.gemini_model,
+                            timeout_seconds=runtime_settings.chat_provider_timeout_seconds,
+                            max_output_tokens=runtime_settings.chat_max_output_tokens,
+                        )
+                    else:
+                        owned_provider = AnthropicChatProvider(
+                            api_key=runtime_settings.anthropic_api_key,
+                            model=runtime_settings.anthropic_model,
+                            timeout_seconds=runtime_settings.chat_provider_timeout_seconds,
+                            max_output_tokens=runtime_settings.chat_max_output_tokens,
+                        )
                     if runtime_settings.chat_recommendation_tool_enabled:
                         recommendation_client_type = (
                             HttpCandidateJobRecommendationClient

@@ -15,6 +15,7 @@ from app.chat_provider import (
     MY_JOB_RECOMMENDATION_TOOL,
     MY_JOB_RECOMMENDATION_TOOL_CHOICE,
     AnthropicChatProvider,
+    GeminiChatProvider,
     ChatProviderUnavailable,
     ChatText,
     MyJobRecommendationIntent,
@@ -293,3 +294,97 @@ def test_provider_transport_enforces_total_deadline_across_response_stream(
                 tuple(response.iter_raw())
 
     assert inner.closed is True
+
+
+def test_gemini_provider_returns_chat_text() -> None:
+    class FakeGeminiTransport(httpx.BaseTransport):
+        def handle_request(self, request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [{"text": "  Chào bạn, tôi là CareerHub AI!  "}]
+                            }
+                        }
+                    ]
+                },
+                request=request,
+            )
+
+    client = httpx.Client(transport=FakeGeminiTransport())
+    provider = GeminiChatProvider(
+        api_key="fake-gemini-key",
+        model="gemini-1.5-flash",
+        timeout_seconds=5,
+        max_output_tokens=512,
+        client=client,
+    )
+
+    decision = provider.decide(
+        (ChatTurn("Chào", "Chào bạn"),),
+        "Tôi muốn hỏi về tuyển dụng",
+        recommendation_tool_enabled=False,
+    )
+    assert decision == ChatText(answer="Chào bạn, tôi là CareerHub AI!")
+
+
+def test_gemini_provider_returns_recommendation_intent() -> None:
+    class FakeGeminiToolTransport(httpx.BaseTransport):
+        def handle_request(self, request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "candidates": [
+                        {
+                            "content": {
+                                "parts": [
+                                    {
+                                        "functionCall": {
+                                            "name": "get_my_job_recommendations",
+                                            "args": {},
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                request=request,
+            )
+
+    client = httpx.Client(transport=FakeGeminiToolTransport())
+    provider = GeminiChatProvider(
+        api_key="fake-gemini-key",
+        model="gemini-1.5-flash",
+        timeout_seconds=5,
+        max_output_tokens=512,
+        client=client,
+    )
+
+    decision = provider.decide(
+        (),
+        "Gợi ý việc làm phù hợp cho tôi",
+        recommendation_tool_enabled=True,
+    )
+    assert decision == MyJobRecommendationIntent()
+
+
+def test_gemini_provider_handles_errors() -> None:
+    class FakeErrorTransport(httpx.BaseTransport):
+        def handle_request(self, request: httpx.Request) -> httpx.Response:
+            return httpx.Response(500, json={"error": "server down"}, request=request)
+
+    client = httpx.Client(transport=FakeErrorTransport())
+    provider = GeminiChatProvider(
+        api_key="fake-gemini-key",
+        model="gemini-1.5-flash",
+        timeout_seconds=5,
+        max_output_tokens=512,
+        client=client,
+    )
+
+    with pytest.raises(ChatProviderUnavailable, match="HTTP 500"):
+        provider.decide((), "test", recommendation_tool_enabled=False)
+

@@ -192,6 +192,153 @@ class AnthropicChatProvider:
             raise ChatProviderUnavailable("chat provider invalid response")
 
 
+class GeminiChatProvider:
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        timeout_seconds: int,
+        max_output_tokens: int,
+        client: httpx.Client | None = None,
+    ) -> None:
+        self._api_key = api_key
+        self._model = model
+        self._max_output_tokens = max_output_tokens
+        self._timeout_seconds = timeout_seconds
+        self._owns_client = client is None
+        self._client = client or httpx.Client(
+            timeout=float(timeout_seconds),
+            transport=_TotalDeadlineTransport(float(timeout_seconds)),
+            trust_env=False,
+        )
+
+    def close(self) -> None:
+        if not self._owns_client:
+            return
+        try:
+            self._client.close()
+        except Exception:
+            pass
+
+    def decide(
+        self,
+        history: Sequence[ChatTurn],
+        current_message: str,
+        *,
+        recommendation_tool_enabled: bool,
+    ) -> ChatProviderDecision:
+        contents: list[dict[str, Any]] = []
+        for turn in history:
+            contents.append({
+                "role": "user",
+                "parts": [{"text": turn.user_message}],
+            })
+            contents.append({
+                "role": "model",
+                "parts": [{"text": turn.assistant_message}],
+            })
+        contents.append({
+            "role": "user",
+            "parts": [{"text": current_message}],
+        })
+
+        system_instruction_text = (
+            SYSTEM_PROMPT_WITH_RECOMMENDATIONS
+            if recommendation_tool_enabled
+            else SYSTEM_PROMPT
+        )
+
+        payload: dict[str, Any] = {
+            "system_instruction": {
+                "parts": [{"text": system_instruction_text}]
+            },
+            "contents": contents,
+            "generationConfig": {
+                "maxOutputTokens": self._max_output_tokens,
+                "temperature": 0.5,
+            },
+        }
+
+        if recommendation_tool_enabled:
+            payload["tools"] = [
+                {
+                    "function_declarations": [
+                        {
+                            "name": MY_JOB_RECOMMENDATION_TOOL_NAME,
+                            "description": (
+                                "Fetch up to a few current job suggestions for the authenticated Candidate. "
+                                "Use only when the Candidate explicitly asks for personalized job "
+                                "recommendations. Identity, CV and preferences are resolved by the server."
+                            ),
+                            "parameters": {
+                                "type": "OBJECT",
+                                "properties": {},
+                            },
+                        }
+                    ]
+                }
+            ]
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self._model}:generateContent?key={self._api_key}"
+
+        try:
+            response = self._client.post(
+                url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+            )
+        except (httpx.TimeoutException, httpx.RequestError) as error:
+            raise ChatProviderUnavailable("gemini provider network error") from error
+        except Exception as error:
+            raise ChatProviderUnavailable("gemini provider request failed") from error
+
+        if response.status_code != 200:
+            raise ChatProviderUnavailable(f"gemini provider error HTTP {response.status_code}")
+
+        try:
+            data = response.json()
+        except Exception as error:
+            raise ChatProviderUnavailable("gemini provider returned non-json") from error
+
+        candidates = data.get("candidates")
+        if not isinstance(candidates, list) or not candidates:
+            raise ChatProviderUnavailable("gemini provider returned no candidates")
+
+        candidate = candidates[0]
+        content = candidate.get("content", {})
+        parts = content.get("parts", [])
+        if not isinstance(parts, list) or not parts:
+            raise ChatProviderUnavailable("gemini provider returned empty parts")
+
+        # Check for function call
+        if recommendation_tool_enabled:
+            for part in parts:
+                if isinstance(part, dict):
+                    func_call = part.get("functionCall")
+                    if isinstance(func_call, dict) and func_call.get("name") == MY_JOB_RECOMMENDATION_TOOL_NAME:
+                        return MyJobRecommendationIntent()
+
+        # Check for text response
+        text_parts: list[str] = []
+        for part in parts:
+            if isinstance(part, dict) and "text" in part:
+                text_val = part["text"]
+                if isinstance(text_val, str):
+                    text_parts.append(text_val)
+
+        answer = unicodedata.normalize("NFC", "\n".join(text_parts)).strip()
+        if (
+            not answer
+            or len(answer) > MAXIMUM_ANSWER_CHARACTERS
+            or len(answer.encode("utf-8")) > MAXIMUM_ANSWER_BYTES
+            or _contains_unsafe_control(answer)
+        ):
+            raise ChatProviderUnavailable("gemini provider returned invalid answer")
+
+        return ChatText(answer=answer)
+
+
 def _contains_unsafe_control(value: str) -> bool:
     return any(
         (ord(character) < 32 and character not in {"\n", "\t"})

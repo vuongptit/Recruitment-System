@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
+DEFAULT_GEMINI_MODEL = "gemini-1.5-flash"
 _MODEL_PATTERN = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,126}[a-z0-9])?$")
 
 
@@ -20,8 +21,11 @@ class Settings:
     database_connect_timeout_seconds: int = 2
     database_statement_timeout_ms: int = 2_000
     chat_enabled: bool = False
+    chat_provider: str = ""
     redis_url: str = ""
     chat_redis_key_secret: str = ""
+    gemini_api_key: str = ""
+    gemini_model: str = DEFAULT_GEMINI_MODEL
     anthropic_api_key: str = ""
     anthropic_model: str = DEFAULT_ANTHROPIC_MODEL
     chat_provider_timeout_seconds: int = 15
@@ -74,10 +78,16 @@ class Settings:
                 default=2_000,
             ),
             chat_enabled=_boolean("CHAT_ENABLED", default=False),
+            chat_provider=os.getenv("CHAT_PROVIDER", "").strip().lower(),
             redis_url=os.getenv("REDIS_URL", "").strip(),
             chat_redis_key_secret=os.getenv(
                 "CHAT_REDIS_KEY_SECRET",
                 "",
+            ).strip(),
+            gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip(),
+            gemini_model=os.getenv(
+                "GEMINI_MODEL",
+                DEFAULT_GEMINI_MODEL,
             ).strip(),
             anthropic_api_key=os.getenv("ANTHROPIC_API_KEY", "").strip(),
             anthropic_model=os.getenv(
@@ -307,9 +317,24 @@ class Settings:
         ):
             raise RuntimeError("REDIS_URL is invalid for chat")
         self._validate_secret("CHAT_REDIS_KEY_SECRET", self.chat_redis_key_secret)
-        self._validate_secret("ANTHROPIC_API_KEY", self.anthropic_api_key)
-        if not _MODEL_PATTERN.fullmatch(self.anthropic_model):
-            raise RuntimeError("ANTHROPIC_MODEL is invalid")
+        provider = self.chat_provider
+        if not provider:
+            if self.gemini_api_key:
+                provider = "gemini"
+            elif self.anthropic_api_key:
+                provider = "anthropic"
+            else:
+                provider = "gemini"
+        if provider == "gemini":
+            self._validate_secret("GEMINI_API_KEY", self.gemini_api_key, min_length=16)
+            if not _MODEL_PATTERN.fullmatch(self.gemini_model):
+                raise RuntimeError("GEMINI_MODEL is invalid")
+        elif provider == "anthropic":
+            self._validate_secret("ANTHROPIC_API_KEY", self.anthropic_api_key, min_length=16)
+            if not _MODEL_PATTERN.fullmatch(self.anthropic_model):
+                raise RuntimeError("ANTHROPIC_MODEL is invalid")
+        else:
+            raise RuntimeError(f"Unsupported CHAT_PROVIDER: {provider}")
         if not self.jwt_issuer or len(self.jwt_issuer) > 512:
             raise RuntimeError("JWT_ISSUER is invalid for chat")
         if not self.jwt_audience or len(self.jwt_audience) > 512:
@@ -371,13 +396,13 @@ class Settings:
             raise RuntimeError("CHAT_JOB_RECOMMENDATION_URL is invalid")
 
     @staticmethod
-    def _validate_secret(name: str, value: str) -> None:
+    def _validate_secret(name: str, value: str, min_length: int = 32) -> None:
         try:
             encoded = value.encode("ascii")
         except UnicodeEncodeError as error:
             raise RuntimeError(f"{name} is invalid") from error
         if (
-            not 32 <= len(encoded) <= 512
+            not min_length <= len(encoded) <= 512
             or b"replace-with" in encoded.lower()
             or any(byte < 0x21 or byte > 0x7E for byte in encoded)
         ):

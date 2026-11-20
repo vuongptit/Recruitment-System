@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ApiSessionBoundary } from "@/components/ApiSessionBoundary";
 import { NotificationProvider } from "@/components/NotificationProvider";
 import { SiteSettingsProvider } from "@/components/SiteSettingsContext";
+import { FloatingChatWidget } from "@/components/FloatingChatWidget";
 import "./globals.css";
 import "./portal.css";
 
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
           <NotificationProvider>
             <ApiSessionBoundary>
               {children}
+              <FloatingChatWidget />
             </ApiSessionBoundary>
           </NotificationProvider>
         </SiteSettingsProvider>
