@@ -8,6 +8,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -22,6 +23,15 @@ export enum JobSearchSort {
   RELEVANCE = 'RELEVANCE',
   NEWEST = 'NEWEST',
   SALARY_DESC = 'SALARY_DESC',
+}
+
+export enum JobExperienceBand {
+  NONE = '0',
+  ONE = '1',
+  TWO = '2',
+  THREE = '3',
+  FOUR = '4',
+  FIVE_OR_MORE = '5_PLUS',
 }
 
 export enum JobSearchSource {
@@ -76,6 +86,11 @@ export class JobSearchQueryDto {
   @Min(0)
   salaryMax?: number;
 
+  @ApiPropertyOptional({ enum: ['VND'] })
+  @IsOptional()
+  @IsIn(['VND'])
+  salaryCurrency?: 'VND';
+
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
   @Transform(toSkills)
@@ -91,6 +106,11 @@ export class JobSearchQueryDto {
   @Min(0)
   @Max(60)
   experienceYears?: number;
+
+  @ApiPropertyOptional({ enum: JobExperienceBand })
+  @IsOptional()
+  @IsEnum(JobExperienceBand)
+  experienceBand?: JobExperienceBand;
 
   @ApiPropertyOptional({ enum: JobType })
   @IsOptional()

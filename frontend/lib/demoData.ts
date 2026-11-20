@@ -477,8 +477,10 @@ export async function getPublicJobs(search: {
   location?: string;
   salaryMin?: number;
   salaryMax?: number;
+  salaryCurrency?: "VND";
   skills?: string[];
   experienceYears?: number;
+  experienceBand?: "0" | "1" | "2" | "3" | "4" | "5_PLUS";
   jobType?: "FULL_TIME" | "PART_TIME" | "REMOTE" | "INTERNSHIP";
   sort?: "RELEVANCE" | "NEWEST" | "SALARY_DESC";
   mode: SearchMode;
@@ -500,13 +502,17 @@ export async function getPublicJobs(search: {
         item.department.toLowerCase().includes(keyword);
       const matchSource = allowedSource ? item.source === allowedSource : true;
       const matchLocation = search.location ? item.location.toLocaleLowerCase("vi").includes(search.location.toLocaleLowerCase("vi")) : true;
+      const matchCurrency = !search.salaryCurrency || item.currency === search.salaryCurrency;
       const matchSalaryMin = search.salaryMin === undefined || item.isNegotiable || (item.salaryMax ?? item.salaryMin) >= search.salaryMin;
       const matchSalaryMax = search.salaryMax === undefined || item.isNegotiable || item.salaryMin <= search.salaryMax;
       const matchSkills = !search.skills?.length || search.skills.every((skill) => item.skills.some((value) => value.toLocaleLowerCase("vi") === skill.toLocaleLowerCase("vi")));
-      const matchExperience = search.experienceYears === undefined || (item.experienceYears ?? 0) <= search.experienceYears;
+      const years = item.experienceYears ?? 0;
+      const matchExperience = search.experienceBand === "5_PLUS" ? years >= 5
+        : search.experienceBand !== undefined ? years === Number(search.experienceBand)
+        : search.experienceYears === undefined || years <= search.experienceYears;
       const expectedType = search.jobType === "FULL_TIME" ? "FULLTIME" : search.jobType === "PART_TIME" ? "PARTTIME" : search.jobType;
       const matchType = !expectedType || item.type === expectedType;
-      return matchKeyword && matchSource && matchLocation && matchSalaryMin && matchSalaryMax && matchSkills && matchExperience && matchType;
+      return matchKeyword && matchSource && matchLocation && matchCurrency && matchSalaryMin && matchSalaryMax && matchSkills && matchExperience && matchType;
     })
     .sort((a, b) => search.sort === "SALARY_DESC"
       ? (b.salaryMax ?? b.salaryMin) - (a.salaryMax ?? a.salaryMin)

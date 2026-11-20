@@ -75,8 +75,8 @@ test("candidate job search keeps primary search clear and advanced filters funct
   await expect(page.getByRole("searchbox", { name: "Vị trí hoặc từ khóa" })).toBeVisible();
   const sidebar = page.viewportSize()!.width >= 980;
   const toggle = page.getByRole("button", { name: /^Bộ lọc/ });
-  if (sidebar) await expect(advanced).toBeVisible();
-  else await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(advanced).toHaveCount(0);
+  await expect(toggle).toHaveCount(0);
   const mainNav = page.getByRole("navigation", { name: "Điều hướng chính" });
   const tabs = ["Trang chủ", "Tìm việc làm", "Công ty"];
   await expect(mainNav).toBeVisible();
@@ -84,6 +84,8 @@ test("candidate job search keeps primary search clear and advanced filters funct
   await expect(page.getByRole("complementary", { name: "Chi tiết công việc" })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("search-basic.png"), fullPage: true, animations: "disabled" });
   await page.locator("#q").fill("Frontend");
+  await expect(advanced).toHaveCount(0);
+  await expect(toggle).toHaveCount(0);
   await page.getByRole("button", { name: "Địa điểm làm việc", exact: true }).click();
   const location = page.getByRole("dialog", { name: "Chọn địa điểm làm việc" });
   await location.getByRole("textbox", { name: "Tìm tỉnh/thành phố" }).fill("ha noi");
@@ -100,11 +102,24 @@ test("candidate job search keeps primary search clear and advanced filters funct
   await expect(advanced).toBeVisible();
   await expect(displayOptions).not.toHaveAttribute("open", "");
   await advanced.getByRole("radio", { name: "Làm việc từ xa", exact: true }).check();
+  await advanced.getByRole("radio", { name: "2 năm", exact: true }).check();
+  const lowerSalary = advanced.getByRole("slider", { name: "Lương tối thiểu" });
+  const upperSalary = advanced.getByRole("slider", { name: "Lương tối đa" });
+  await lowerSalary.press("ArrowRight");
+  await upperSalary.press("ArrowLeft");
+  await expect(lowerSalary).toHaveAttribute("aria-valuetext", "1 triệu VNĐ");
+  await expect(upperSalary).toHaveAttribute("aria-valuetext", "99 triệu VNĐ");
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await page.screenshot({ path: info.outputPath("search-advanced.png"), fullPage: true, animations: "disabled" });
   await page.getByRole("button", { name: "Áp dụng bộ lọc", exact: true }).click();
   await expect.poll(() => searches.at(-1)?.searchParams.get("q")).toBe("Frontend");
   await expect.poll(() => searches.at(-1)?.searchParams.get("jobType")).toBe("REMOTE");
+  const appliedQuery = searches.at(-1)!.searchParams;
+  expect(appliedQuery.get("experienceBand")).toBe("2");
+  expect(appliedQuery.has("experienceYears")).toBe(false);
+  expect(appliedQuery.get("salaryMin")).toBe("1000000");
+  expect(appliedQuery.get("salaryMax")).toBe("99000000");
+  expect(appliedQuery.get("salaryCurrency")).toBe("VND");
   await expect(page.getByRole("region", { name: "Kết quả tìm việc", exact: true }).getByRole("link", { name: /Remote Engineer/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Kết quả tìm việc", exact: true })).toBeFocused();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
@@ -127,6 +142,8 @@ test("candidate job search keeps primary search clear and advanced filters funct
   await mainNav.getByRole("link", { name: "Tìm việc làm" }).click();
   await expect(page).toHaveURL(/\/candidate\/jobs$/);
   await expect(page.getByRole("searchbox", { name: "Vị trí hoặc từ khóa" })).toHaveValue("");
+  await expect(advanced).toHaveCount(0);
+  await expect(toggle).toHaveCount(0);
 });
 
 test("homepage passes keyword and selected province/ward into the first search stage", async ({ page }) => {

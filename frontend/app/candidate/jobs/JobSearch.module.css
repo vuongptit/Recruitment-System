@@ -31,7 +31,7 @@
 .filterHeader h2, .dialogHeader h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; line-height: 1.4; }
 .filterHeader svg, .dialogHeader h2 svg { color: var(--primary, #087f46); flex: none; }
 .filterForm { display: grid; gap: 10px; padding: 8px 12px 12px; }
-.filterForm :global(.label), .types legend { font-size: 13px; font-weight: 700; margin: 0; }
+.filterForm :global(.label), .types legend, .salaryRange legend { font-size: 13px; font-weight: 700; margin: 0; }
 .filterForm :global(.input), .filterForm :global(.select) { width: 100%; min-height: 40px; padding: 7px 9px; min-width: 0; font-size: 14px; }
 .types { border: 0; margin: 0; padding: 0; min-width: 0; }
 .types legend { padding: 0; margin-bottom: 2px; padding-inline-end: 6px; }
@@ -39,7 +39,20 @@
 .types input { margin: 0; width: 14px; height: 14px; accent-color: var(--primary); }
 .filterGroup { display: grid; gap: 6px; }
 .filterGroup :global(.help) { margin: 0; }
-.salaryInputs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.salaryRange { margin: 0; padding: 4px 0 0; border: 0; border-block-start: 1px solid var(--job-border); min-inline-size: 0; }
+.salaryRange legend { padding-inline: 0 6px; }
+.salaryRange legend span { color: var(--job-muted); font-weight: 500; }
+.salaryValues, .salaryScale { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; color: var(--job-muted); font-size: 12px; }
+.salaryValues strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.salaryScale { font-size: 11px; }
+.salaryTrack { position: relative; height: 40px; }
+.salaryTrack::before { content: ""; position: absolute; inset: calc(50% - 2px) 12px auto; height: 4px; border-radius: 4px; background: linear-gradient(to right, var(--surface-3) var(--salary-start), var(--primary) var(--salary-start), var(--primary) var(--salary-end), var(--surface-3) var(--salary-end)); }
+.salaryTrack input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; appearance: none; border: 0; background: transparent; pointer-events: none; }
+.salaryTrack input:focus-visible { z-index: 1; outline-offset: -2px; border-radius: 8px; }
+.salaryTrack input::-webkit-slider-runnable-track { height: 4px; background: transparent; }
+.salaryTrack input::-moz-range-track { height: 4px; background: transparent; }
+.salaryTrack input::-webkit-slider-thumb { appearance: none; width: 24px; height: 24px; margin-top: -10px; border: 2px solid var(--primary); border-radius: 50%; background: var(--surface-1); pointer-events: auto; cursor: grab; }
+.salaryTrack input::-moz-range-thumb { box-sizing: border-box; width: 24px; height: 24px; border: 2px solid var(--primary); border-radius: 50%; background: var(--surface-1); pointer-events: auto; cursor: grab; }
 .textButton { display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; border: 0; border-radius: 4px; color: #096840; background: none; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .textButton:hover { text-decoration: underline; }
 .displayOptions { border-top: 1px solid var(--job-border); padding-top: 5px; }
@@ -60,26 +73,26 @@
 .activeFilters button { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-height: 24px; padding: 3px 7px; border: 1px solid var(--job-border); border-radius: 6px; background: var(--job-soft); color: var(--focus); overflow-wrap: anywhere; text-align: start; font: inherit; font-size: 11px; cursor: pointer; }
 .activeFilters button:hover { border-color: #66a584; }
 .activeFilters svg { flex: none; }
-.results, .resultList { display: grid; gap: 8px; min-width: 0; }
+.results, .resultList { display: grid; gap: 12px; min-width: 0; }
 .resultList { grid-template-columns: minmax(0, 1fr); }
 .resultList:empty { display: none; }
 .results { scroll-margin-top: 80px; min-width: 0; }
 .jobCard { position: relative; min-width: 0; overflow-wrap: anywhere; border: 1px solid var(--job-border); border-radius: 12px; background: var(--job-surface); transition: background-color .16s ease, border-color .16s ease; }
 .jobCard:hover { border-color: #86b99b; background: color-mix(in srgb, var(--job-soft) 35%, var(--job-surface)); }
-.jobLink { display: grid; gap: 6px; padding: 10px 11px; border-radius: inherit; color: inherit; text-decoration: none; }
+.jobLink { display: grid; align-content: center; gap: 10px; min-height: 160px; padding: 16px; border-radius: inherit; color: inherit; text-decoration: none; }
 .jobLink:hover { color: inherit; text-decoration: none; }
-.jobIdentity { display: flex; align-items: center; gap: 10px; min-width: 0; padding-inline-end: 36px; }
-.jobIdentity > span { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 7px; font-size: 14px; }
-.jobIdentity h3 { margin: 0; font-size: clamp(13px, 1.05vw, 16px); line-height: 1.35; font-weight: 700; }
-.jobIdentity p { margin: 3px 0 0; font-size: 11px; line-height: 1.35; color: var(--job-muted); }
+.jobIdentity { display: flex; align-items: center; gap: 14px; min-width: 0; padding-inline-end: 36px; }
+.jobIdentity > span { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 10px; font-size: 17px; }
+.jobIdentity h3 { margin: 0; font-size: clamp(16px, 1.4vw, 21px); line-height: 1.35; font-weight: 700; }
+.jobIdentity p { margin: 4px 0 0; font-size: 14px; line-height: 1.35; color: var(--job-muted); }
 .jobCard:has(.saveIcon) .saveIcon { position: absolute; inset-block-start: 9px; inset-inline-end: 7px; }
 .salary { color: #086840; font-size: 14px; }
 .jobMeta { display: flex; flex-wrap: wrap; gap: 5px 12px; color: var(--job-muted); font-size: 12px; align-items: center; }
 .jobMeta span { display: inline-flex; align-items: center; gap: 4px; }
 .tags { display: flex; flex-wrap: wrap; gap: 5px; }
-.tags span { max-width: 100%; border-radius: 4px; background: var(--surface-2); color: var(--job-muted); padding: 2px 6px; font-size: 11px; overflow-wrap: anywhere; font-weight: 500; min-width: 34px; text-align: center; }
+.tags span { max-width: 100%; border-radius: 5px; background: var(--surface-2); color: var(--job-muted); padding: 4px 8px; font-size: 12px; overflow-wrap: anywhere; font-weight: 500; min-width: 34px; text-align: center; }
 .cardFoot { display: flex; gap: 8px; font-size: 12px; color: var(--job-muted); align-items: center; flex-wrap: wrap; }
-.cardFoot time { margin-inline-start: auto; color: var(--job-muted); font-size: 10px; }
+.cardFoot time { margin-inline-start: auto; color: var(--job-muted); font-size: 12px; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--job-muted); font-size: 13px; }
 .loadMore { justify-self: center; }
 .blank { padding: 12px; text-align: center; }
@@ -102,8 +115,9 @@
 .types + .types, .types + .filterGroup { border-top: 1px solid var(--job-border); padding-top: 6px; }
 .saveIcon { color: var(--job-muted); min-height: 38px; min-width: 38px; }
 .saveIcon:hover { color: var(--focus); background: var(--job-soft); }
-.jobMeta, .salary { font-size: 12px; }
-.cardFoot strong { color: #166648; font-size: 11px; }
+.jobMeta { font-size: 14px; }
+.salary { font-size: 15px; }
+.cardFoot strong { color: #166648; font-size: 12px; }
 
 @media (min-width: 980px) {
   .searchHeader { padding-top: 8px; padding-bottom: 22px; }
@@ -111,13 +125,14 @@
   .keyword input, .location button, .searchBar > button { min-height: 38px; }
   .types label { min-height: 23px; }
   .filterForm > :global(.btn) { min-height: 38px; }
-  .workspace { grid-template-columns: clamp(185px, 19vw, 250px) minmax(0, 1fr); }
+  .workspace:has(> .filters) { grid-template-columns: clamp(185px, 17vw, 235px) minmax(0, 1fr); }
   .filters { position: sticky; top: 76px; max-height: calc(100dvh - 92px); overflow-y: auto; }
-  .jobLink { grid-template-columns: minmax(0, 1.35fr) minmax(0, .8fr) minmax(0, 1fr); gap: 16px; align-items: center; padding: 12px 54px 12px 14px; min-height: 72px; }
+  .jobLink { grid-template-columns: minmax(0, 1.6fr) minmax(0, .85fr) minmax(0, 1fr); gap: clamp(18px, 2.2vw, 36px); align-items: center; padding: 20px 66px 20px 24px; min-height: 144px; }
   .jobIdentity { padding-inline-end: 0; }
-  .jobMeta, .cardFoot { display: grid; justify-items: start; gap: 4px; }
+  .jobIdentity > span { width: 60px; height: 60px; flex-basis: 60px; }
+  .jobMeta, .cardFoot { display: grid; justify-items: start; gap: 8px; }
   .cardFoot time { margin-inline-start: 0; }
-  .jobCard:has(.saveIcon) .saveIcon { inset-block-start: 50%; transform: translateY(-50%); }
+  .jobCard:has(.saveIcon) .saveIcon { inset-block-start: 50%; inset-inline-end: 16px; transform: translateY(-50%); }
 }
 @media (max-width: 979px) { .types label, .activeFilters button, .saveIcon { min-height: 44px; } }
 @media (max-width: 767px) {

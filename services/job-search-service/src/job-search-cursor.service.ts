@@ -8,6 +8,7 @@ import {
 } from 'crypto';
 import { ApiException } from './common';
 import {
+  JobExperienceBand,
   JobSearchPaginationMode,
   JobSearchQueryDto,
   JobSearchSort,
@@ -48,8 +49,10 @@ interface CanonicalJobSearchScope {
   location: string | null;
   salaryMin: number | null;
   salaryMax: number | null;
+  salaryCurrency?: 'VND';
   skills: string[];
   experienceYears: number | null;
+  experienceBand?: JobExperienceBand;
   jobType: JobType | null;
   companyId: string | null;
   sort: JobSearchSort;
@@ -220,6 +223,13 @@ const canonicalScope = (
     throw invalidCursor();
   }
 
+  if (query.salaryCurrency !== undefined && query.salaryCurrency !== 'VND') {
+    throw invalidCursor();
+  }
+  if (query.experienceBand !== undefined && !Object.values(JobExperienceBand).includes(query.experienceBand)) {
+    throw invalidCursor();
+  }
+
   const experienceYears = query.experienceYears === undefined
     ? null
     : query.experienceYears;
@@ -259,8 +269,10 @@ const canonicalScope = (
     location,
     salaryMin,
     salaryMax,
+    ...(query.salaryCurrency ? { salaryCurrency: query.salaryCurrency } : {}),
     skills: canonicalSkills(query.skills),
     experienceYears,
+    ...(query.experienceBand ? { experienceBand: query.experienceBand } : {}),
     jobType,
     companyId,
     sort,

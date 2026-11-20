@@ -980,8 +980,10 @@ export async function getPublicJobs(search: PublicJobSearchRequest, signal?: Abo
       companyId: search.companyId,
       salaryMin: search.salaryMin,
       salaryMax: search.salaryMax,
+      salaryCurrency: search.salaryCurrency,
       skills: search.skills,
       experienceYears: search.experienceYears,
+      experienceBand: search.experienceBand,
       jobType: search.jobType,
       sort: search.sort,
       pagination: search.mode,
@@ -989,7 +991,7 @@ export async function getPublicJobs(search: PublicJobSearchRequest, signal?: Abo
       limit: search.limit,
       cursor: search.mode === "CURSOR" ? search.cursor : undefined,
     },
-    allowedQueryKeys: ["q", "location", "companyId", "salaryMin", "salaryMax", "skills", "experienceYears", "jobType", "sort", "pagination", "page", "limit", "cursor"],
+    allowedQueryKeys: ["q", "location", "companyId", "salaryMin", "salaryMax", "salaryCurrency", "skills", "experienceYears", "experienceBand", "jobType", "sort", "pagination", "page", "limit", "cursor"],
   });
   return {
     data: response.data.items.map((item) => toJob(item, response.data.source)),

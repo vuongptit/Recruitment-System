@@ -1,5 +1,14 @@
 export type PublicJobSearchSort = "RELEVANCE" | "NEWEST" | "SALARY_DESC";
 export type PublicJobTypeFilter = "" | "FULL_TIME" | "PART_TIME" | "REMOTE" | "INTERNSHIP";
+export const jobSearchExperienceBands = {
+  "0": "Không yêu cầu kinh nghiệm",
+  "1": "1 năm",
+  "2": "2 năm",
+  "3": "3 năm",
+  "4": "4 năm",
+  "5_PLUS": "Từ 5 năm trở lên",
+} as const;
+type ExperienceBand = keyof typeof jobSearchExperienceBands;
 
 export interface PublicJobSearchForm {
   q: string;
@@ -8,6 +17,7 @@ export interface PublicJobSearchForm {
   salaryMax: string;
   skills: string;
   experienceYears: string;
+  experienceBand: "" | ExperienceBand;
   jobType: PublicJobTypeFilter;
   sort: PublicJobSearchSort;
 }
@@ -17,8 +27,10 @@ export interface PublicJobSearchFilters {
   location?: string;
   salaryMin?: number;
   salaryMax?: number;
+  salaryCurrency?: "VND";
   skills?: string[];
   experienceYears?: number;
+  experienceBand?: ExperienceBand;
   jobType?: Exclude<PublicJobTypeFilter, "">;
   sort: PublicJobSearchSort;
 }
@@ -30,6 +42,7 @@ export const emptyPublicJobSearchForm: PublicJobSearchForm = {
   salaryMax: "",
   skills: "",
   experienceYears: "",
+  experienceBand: "",
   jobType: "",
   sort: "RELEVANCE",
 };
@@ -52,6 +65,7 @@ export function validatePublicJobSearch(values: PublicJobSearchForm): Record<str
     const years = Number(values.experienceYears);
     if (!Number.isInteger(years) || years < 0 || years > 60) errors.experienceYears = "Kinh nghiệm phải là số nguyên từ 0 đến 60.";
   }
+  if (values.experienceBand && !Object.hasOwn(jobSearchExperienceBands, values.experienceBand)) errors.experienceBand = "Chọn mốc kinh nghiệm hợp lệ.";
   if (values.q.trim().length > 200) errors.q = "Từ khóa tối đa 200 ký tự.";
   if (values.location.trim().length > 255) errors.location = "Địa điểm tối đa 255 ký tự.";
   return errors;
@@ -66,8 +80,10 @@ export function normalizePublicJobSearch(values: PublicJobSearchForm): PublicJob
   if (location) filters.location = location;
   if (values.salaryMin.trim()) filters.salaryMin = Number(values.salaryMin);
   if (values.salaryMax.trim()) filters.salaryMax = Number(values.salaryMax);
+  if (filters.salaryMin !== undefined || filters.salaryMax !== undefined) filters.salaryCurrency = "VND";
   if (skills.length) filters.skills = skills;
-  if (values.experienceYears.trim()) filters.experienceYears = Number(values.experienceYears);
+  if (values.experienceBand) filters.experienceBand = values.experienceBand;
+  else if (values.experienceYears.trim()) filters.experienceYears = Number(values.experienceYears);
   if (values.jobType) filters.jobType = values.jobType;
   return filters;
 }
@@ -99,12 +115,13 @@ export function readJobSearchQuery(query: URLSearchParams) {
   form.salaryMin = (query.get("salaryMin") ?? "").slice(0, 30);
   form.salaryMax = (query.get("salaryMax") ?? "").slice(0, 30);
   form.experienceYears = (query.get("experienceYears") ?? "").slice(0, 3);
+  form.experienceBand = (query.get("experienceBand") ?? "") as PublicJobSearchForm["experienceBand"];
   form.jobType = (query.get("jobType") ?? "") as PublicJobTypeFilter;
   const sort = query.get("sort");
   if (sort === "NEWEST" || sort === "SALARY_DESC") form.sort = sort;
   for (const key of Object.keys(validatePublicJobSearch(form))) {
     if (key === "salary") { form.salaryMin = ""; form.salaryMax = ""; }
-    else if (key === "jobType" || key === "experienceYears" || key === "skills") form[key] = "";
+    else if (key === "jobType" || key === "experienceYears" || key === "experienceBand" || key === "skills") form[key] = "";
   }
   const requestedLimit = Number(query.get("limit"));
   const limit = [5, 10, 20, 50].includes(requestedLimit) ? requestedLimit : 10;

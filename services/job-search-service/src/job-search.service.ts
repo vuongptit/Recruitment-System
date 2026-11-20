@@ -4,6 +4,7 @@ import { Client, estypes } from '@elastic/elasticsearch';
 import { Job, JobStatus, JobType, Prisma } from '@prisma/client';
 import { ApiException } from './common';
 import {
+  JobExperienceBand,
   JobSearchFacetsDto,
   JobSearchItemDto,
   JobSearchPaginationMode,
@@ -199,11 +200,16 @@ export class JobSearchService {
     if (query.companyId) {
       filter.push({ term: { companyId: query.companyId.toLowerCase() } });
     }
-    if (query.experienceYears !== undefined) {
+    if (query.experienceBand === JobExperienceBand.FIVE_OR_MORE) {
+      filter.push({ range: { experienceYears: { gte: 5 } } });
+    } else if (query.experienceBand !== undefined) {
+      filter.push({ term: { experienceYears: Number(query.experienceBand) } });
+    } else if (query.experienceYears !== undefined) {
       filter.push({
         range: { experienceYears: { lte: query.experienceYears } },
       });
     }
+    if (query.salaryCurrency) filter.push({ term: { currency: query.salaryCurrency } });
     if (query.salaryMin !== undefined) {
       filter.push({
         bool: {
@@ -388,9 +394,14 @@ export class JobSearchService {
     if (query.companyId) {
       and.push({ companyId: query.companyId.toLowerCase() });
     }
-    if (query.experienceYears !== undefined) {
+    if (query.experienceBand === JobExperienceBand.FIVE_OR_MORE) {
+      and.push({ experienceYears: { gte: 5 } });
+    } else if (query.experienceBand !== undefined) {
+      and.push({ experienceYears: Number(query.experienceBand) });
+    } else if (query.experienceYears !== undefined) {
       and.push({ experienceYears: { lte: query.experienceYears } });
     }
+    if (query.salaryCurrency) and.push({ currency: query.salaryCurrency });
     if (query.salaryMin !== undefined) {
       and.push({
         OR: [

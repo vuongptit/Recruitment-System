@@ -1289,6 +1289,7 @@ test("public Job search validates and normalizes all cursor-bound filters", () =
     salaryMax: "25000000",
     skills: "React, TypeScript",
     experienceYears: "2",
+    experienceBand: "" as const,
     jobType: "FULL_TIME" as const,
     sort: "NEWEST" as const,
   };
@@ -1298,12 +1299,16 @@ test("public Job search validates and normalizes all cursor-bound filters", () =
     location: "Hà Nội",
     salaryMin: 18000000,
     salaryMax: 25000000,
+    salaryCurrency: "VND",
     skills: ["React", "TypeScript"],
     experienceYears: 2,
     jobType: "FULL_TIME",
     sort: "NEWEST",
   });
   assert.ok(validatePublicJobSearch({ ...values, salaryMin: "30", salaryMax: "20" }).salary);
+  const exactBand = normalizePublicJobSearch({ ...values, experienceBand: "5_PLUS" });
+  assert.equal(exactBand.experienceBand, "5_PLUS");
+  assert.equal(exactBand.experienceYears, undefined);
 });
 
 test("public Job pagination enforces the offset window and appends cursor pages without duplicates", () => {

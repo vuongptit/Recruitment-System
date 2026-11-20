@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { Job, JobStatus, JobType, Prisma } from '@prisma/client';
 import {
+  JobExperienceBand,
   JobSearchPaginationMode,
   JobSearchQueryDto,
   JobSearchSort,
@@ -14,6 +15,7 @@ import {
 import { JobIndexingService } from './job-indexing.service';
 import { JobSearchService } from './job-search.service';
 import { PrismaService } from './prisma.service';
+import { CompanyClientService } from './company-client.service';
 
 const JOB_ID = '11111111-1111-4111-8111-111111111111';
 const COMPANY_ID = '22222222-2222-4222-8222-222222222222';
@@ -30,6 +32,8 @@ function publishedJob(): Job {
     salaryMin: new Prisma.Decimal(20_000_000),
     salaryMax: new Prisma.Decimal(30_000_000),
     isNegotiable: false,
+    isSuspended: false,
+    suspensionReason: null,
     currency: 'VND',
     location: 'Ha Noi',
     jobType: JobType.FULL_TIME,
@@ -81,7 +85,7 @@ describe('JobSearchService', () => {
     prisma = {
       job: {
         count: jest.fn(),
-        findMany,
+        findMany: (args: Prisma.JobFindManyArgs) => args.where?.isSuspended === true ? Promise.resolve([]) : findMany(args),
       },
       $transaction: transaction,
     } as unknown as PrismaService;
@@ -110,6 +114,7 @@ describe('JobSearchService', () => {
       }),
       indexing,
       cursorService,
+      { suspendedCompanyIds: jest.fn().mockResolvedValue([]) } as unknown as CompanyClientService,
     );
     Object.assign(service, {
       elastic: { search: elasticSearch, openPointInTime, closePointInTime },
@@ -381,6 +386,22 @@ describe('JobSearchService', () => {
     expect(elasticSearch.mock.calls[0][0].query.bool.filter).toEqual(
       expect.arrayContaining([{ term: { companyId: COMPANY_ID } }]),
     );
+  });
+
+  it.each([
+    [JobExperienceBand.NONE, { term: { experienceYears: 0 } }, { experienceYears: 0 }],
+    [JobExperienceBand.TWO, { term: { experienceYears: 2 } }, { experienceYears: 2 }],
+    [JobExperienceBand.FIVE_OR_MORE, { range: { experienceYears: { gte: 5 } } }, { experienceYears: { gte: 5 } }],
+  ] as const)('filters experience band %s and salary currency on both search backends', async (experienceBand, elasticFilter, postgresFilter) => {
+    const request = query({ experienceBand, salaryMin: 15_000_000, salaryCurrency: 'VND' });
+    elasticSearch.mockResolvedValueOnce({ hits: { total: { value: 0, relation: 'eq' }, hits: [] }, aggregations: {} });
+    await service.search(request);
+    expect(elasticSearch.mock.calls[0][0].query.bool.filter).toEqual(expect.arrayContaining([elasticFilter, { term: { currency: 'VND' } }]));
+
+    indexReady.mockReturnValue(false);
+    transaction.mockResolvedValue([0, []]);
+    await service.search(request);
+    expect(findMany.mock.calls[0][0].where.AND).toEqual(expect.arrayContaining([postgresFilter, { currency: 'VND' }]));
   });
 
   it('falls back to PostgreSQL when Elasticsearch fails', async () => {
@@ -687,11 +708,16 @@ describe('JobSearchService', () => {
   it('counts pending opens and returns 429 at concurrent capacity', async () => {
     installService('1');
     const gate = deferred<{ id: string }>();
-    openPointInTime.mockReturnValueOnce(gate.promise);
+    const opening = deferred<void>();
+    openPointInTime.mockImplementationOnce(() => {
+      opening.resolve();
+      return gate.promise;
+    });
     elasticSearch.mockResolvedValue(terminalPitResponse('pit-first-latest'));
     const cursorQuery = query({ pagination: JobSearchPaginationMode.CURSOR });
 
     const first = service.search(cursorQuery);
+    await opening.promise;
     expect(openPointInTime).toHaveBeenCalledTimes(1);
 
     await expect(service.search(cursorQuery)).rejects.toMatchObject({

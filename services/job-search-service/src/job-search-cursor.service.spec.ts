@@ -9,6 +9,7 @@ import {
   JobSearchCursorState,
 } from './job-search-cursor.service';
 import {
+  JobExperienceBand,
   JobSearchPaginationMode,
   JobSearchQueryDto,
   JobSearchSort,
@@ -118,8 +119,10 @@ describe('JobSearchCursorService', () => {
       query({ ...scopedQuery, location: 'Đà Nẵng' }),
       query({ ...scopedQuery, salaryMin: 11_000_000 }),
       query({ ...scopedQuery, salaryMax: 49_000_000 }),
+      query({ ...scopedQuery, salaryCurrency: 'VND' }),
       query({ ...scopedQuery, skills: ['NestJS'] }),
       query({ ...scopedQuery, experienceYears: 4 }),
+      query({ ...scopedQuery, experienceBand: JobExperienceBand.FIVE_OR_MORE }),
       query({ ...scopedQuery, jobType: JobType.REMOTE }),
       query({ ...scopedQuery, companyId: OTHER_COMPANY_ID }),
       query({ ...scopedQuery, sort: JobSearchSort.NEWEST }),
