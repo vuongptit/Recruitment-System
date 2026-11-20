@@ -145,4 +145,64 @@
   .filterDrawer { width: 100%; max-height: 88dvh; margin: auto 0 0; border-radius: 16px 16px 0 0; }
   .activeFilters button { min-height: 44px; }
 }
+
+.discoveryResults {
+  width: 100%;
+  max-width: 1180px;
+  justify-self: center;
+  gap: 16px;
+}
+.discoveryToolbar { display: grid; gap: 10px; }
+.discoveryToolbar .toolbarTop { flex-wrap: wrap; }
+.discoveryToolbar h2 { margin: 0; color: var(--focus); font-size: clamp(21px, 2vw, 26px); }
+.discoveryToolbar .textButton { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; }
+.locationShortcuts { display: flex; flex-wrap: wrap; gap: 8px; }
+.locationShortcuts button {
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 1px solid var(--job-border);
+  border-radius: 999px;
+  background: var(--job-surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.locationShortcuts button:hover { border-color: var(--focus); }
+.locationShortcuts button[aria-pressed="true"] { border-color: #086840; background: #086840; color: #fff; }
+.discoveryResults .jobLink {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  align-content: stretch;
+  align-items: start;
+  height: 100%;
+  min-height: 128px;
+  gap: 8px;
+  padding: 12px;
+}
+.discoveryResults .jobIdentity { gap: 10px; padding-inline-end: 0; }
+.discoveryResults .jobIdentity > span { width: 46px; height: 46px; flex-basis: 46px; }
+.discoveryResults .jobIdentity > div { min-width: 0; }
+.discoveryResults .jobIdentity h3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 15px;
+}
+.discoveryResults .jobIdentity p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.discoveryResults .jobMeta { display: flex; flex-wrap: nowrap; gap: 6px; padding-inline-end: 46px; font-size: 12px; }
+.discoveryResults .jobMeta > * { padding: 4px 7px; border-radius: 6px; background: var(--job-soft); }
+.discoveryResults .jobMeta strong { flex-shrink: 0; font-size: inherit; }
+.discoveryResults .jobMeta span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.discoveryResults .cardFoot { margin-inline-end: 46px; }
+.discoveryResults .jobCard:has(.saveIcon) .saveIcon { inset: auto 7px 7px auto; transform: none; }
+.discoveryResults .skeleton { min-height: 128px; }
+
+@media (min-width: 640px) {
+  .discoveryResults .resultList, .discoveryResults .skeletons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .discoveryResults .resultList, .discoveryResults .skeletons { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (prefers-reduced-motion: reduce) { .jobCard { transition: none; } }

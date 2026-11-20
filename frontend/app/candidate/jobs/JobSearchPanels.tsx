@@ -117,18 +117,20 @@ function JobBookmark({ job, href, activity }: { job: Job; href: string; activity
   </button>;
 }
 
-export function SearchJobCard({ job, company, href, activity }: {
-  job: Job; company?: PublicCompanyProfile; href: string; activity: Activity;
+export function SearchJobCard({ job, company, href, activity, compact }: {
+  job: Job; company?: PublicCompanyProfile; href: string; activity: Activity; compact: boolean;
 }) {
   const status = activity.hasApplied(job.id) ? "Đã ứng tuyển" : !isJobAcceptingApplications(job) ? "Ngừng nhận hồ sơ" : null;
   const companyName = company?.name || job.ownerName;
+  const showSkills = !compact && job.skills.length > 0;
+  const publishedAt = compact ? null : job.publishedAt;
   return <article className={styles.jobCard} data-company-id={job.companyId}>
     <Link className={styles.jobLink} href={href} prefetch={false}>
       <div className={styles.jobIdentity}><CompanyMark name={companyName} src={company?.logoUrl} /><div><h3>{job.title}</h3><p>{companyName}</p></div></div>
       <div className={styles.jobMeta}><strong className={styles.salary}>{displaySalary(job)}</strong><span>{job.location}</span></div>
-      {job.skills.length > 0 || job.publishedAt || status ? <div className={styles.cardFoot}>
-        <div className={styles.tags}>{job.skills.slice(0, 2).map(skill => <span key={skill}>{skill}</span>)}{job.skills.length > 2 ? <span>+{job.skills.length - 2}</span> : null}</div>
-        {job.publishedAt ? <time dateTime={job.publishedAt} title={jobDeadline(job.publishedAt)}>{postedLabel(job.publishedAt)}</time> : null}
+      {showSkills || publishedAt || status ? <div className={styles.cardFoot}>
+        {showSkills ? <div className={styles.tags}>{job.skills.slice(0, 2).map(skill => <span key={skill}>{skill}</span>)}{job.skills.length > 2 ? <span>+{job.skills.length - 2}</span> : null}</div> : null}
+        {publishedAt ? <time dateTime={publishedAt} title={jobDeadline(publishedAt)}>{postedLabel(publishedAt)}</time> : null}
         {status ? <strong>{status}</strong> : null}
       </div> : null}
     </Link>
@@ -136,8 +138,8 @@ export function SearchJobCard({ job, company, href, activity }: {
   </article>;
 }
 
-export function SearchSkeleton() {
+export function SearchSkeleton({ compact }: { compact: boolean }) {
   return <div className={styles.skeletons} role="status"><span className="sr-only">Đang tải danh sách việc làm</span>
-    {[0, 1, 2].map(item => <div key={item} aria-hidden="true" className={styles.skeleton}><span /><span /><span /></div>)}
+    {Array.from({ length: compact ? 6 : 3 }, (_, item) => <div key={item} aria-hidden="true" className={styles.skeleton}><span /><span /><span /></div>)}
   </div>;
 }

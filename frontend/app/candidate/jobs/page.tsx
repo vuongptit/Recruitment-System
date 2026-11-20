@@ -92,7 +92,7 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
   const [filters, setFilters] = useState<PublicJobSearchFilters>(() => normalizePublicJobSearch(form));
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [hasSearched, setHasSearched] = useState(() => initial.searched || !!(initial.form.q || initial.form.location));
+  const [hasSearched, setHasSearched] = useState(initial.searched);
   const [mode, setMode] = useState<SearchMode>(initial.mode);
   const [page, setPage] = useState(initial.page);
   const [limit, setLimit] = useState(initial.limit);
@@ -154,7 +154,7 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
     setForm(next.form);
     setFormErrors({});
     setFiltersOpen(false);
-    setHasSearched(next.searched || !!(next.form.q || next.form.location));
+    setHasSearched(next.searched);
     setMode(next.mode);
     setPage(next.page);
     setLimit(next.limit);
@@ -365,6 +365,20 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
     updateUrl(filters, nextMode);
   }
 
+  function browseByLocation(location: string) {
+    if (location === (filters.location ?? "")) return;
+    const nextFilters = { ...filters, location: location || undefined };
+    resetTraversal();
+    change("location", location);
+    setFilters(nextFilters);
+    updateUrl(nextFilters);
+  }
+
+  function showResultsList() {
+    setHasSearched(true);
+    updateUrl(filters, mode, page, limit, true);
+  }
+
   function changeLimit(nextLimit: number) {
     if (nextLimit === limit) return;
     resetTraversal();
@@ -409,7 +423,7 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
   if (filters.experienceBand) activeFilters.push({ field: "experienceBand", label: jobSearchExperienceBands[filters.experienceBand] });
   else if (filters.experienceYears !== undefined) activeFilters.push({ field: "experienceYears", label: filters.experienceYears === 0 ? jobSearchExperienceBands["0"] : `Kinh nghiệm 0–${filters.experienceYears} năm` });
   const advancedFilters = activeFilters.filter(item => item.field !== "q" && item.field !== "location");
-  const showFilters = activeFilters.length > 0;
+  const showFilters = hasSearched && activeFilters.length > 0;
 
   function removeFilter(field: Exclude<keyof PublicJobSearchForm, "sort">) {
     setForm(current => ({ ...current, [field]: emptyPublicJobSearchForm[field] }));
@@ -507,23 +521,36 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
           </dialog>
         ) : null}
 
-        <section ref={jobListRef} className={styles.results} tabIndex={-1} aria-label="Kết quả tìm việc">
-          <div className={styles.toolbar}>
+        <section ref={jobListRef} className={`${styles.results}${hasSearched ? "" : ` ${styles.discoveryResults}`}`} tabIndex={-1} aria-label={hasSearched ? "Kết quả tìm việc" : "Khám phá việc làm"}>
+          {hasSearched ? <div className={styles.toolbar}>
             <div className={styles.toolbarTop}><h2>{loading && jobs.length === 0 ? "Đang tìm việc làm…" : error ? "Việc làm" : <>{(mode === "OFFSET" ? total : jobs.length).toLocaleString("vi-VN")} việc làm</>}</h2>
               <div className={styles.sortRow}><label htmlFor="sort" className="sr-only">Sắp xếp theo</label><select id="sort" className="select" value={filters.sort} onChange={event => sortBy(event.target.value as PublicJobSearchForm["sort"])}><option value="RELEVANCE">Phù hợp nhất</option><option value="NEWEST">Mới nhất</option><option value="SALARY_DESC">Lương cao nhất</option></select>
                 {showFilters && !wide ? <button type="button" className={styles.filterButton} aria-expanded={filtersOpen} aria-haspopup="dialog" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={17} aria-hidden="true" /> Bộ lọc {advancedFilters.length > 0 ? <span>{advancedFilters.length}</span> : null}</button> : null}
               </div>
             </div>
             {advancedFilters.length ? <div className={styles.activeFilters} aria-label="Bộ lọc đang áp dụng">{advancedFilters.map(item => <button type="button" key={item.field} onClick={() => removeFilter(item.field)} aria-label={`Bỏ bộ lọc ${item.label}`}>{item.label}<X size={13} aria-hidden="true" /></button>)}</div> : null}
-          </div>
+          </div> : <div className={styles.discoveryToolbar}>
+            <div className={styles.toolbarTop}>
+              <h2>Việc làm nổi bật</h2>
+              <button className={styles.textButton} type="button" onClick={showResultsList}>Xem dạng danh sách <ChevronRight size={16} aria-hidden="true" /></button>
+            </div>
+            <div className={styles.locationShortcuts} role="group" aria-label="Lọc nhanh theo địa điểm">
+              {[["", "Toàn quốc"], ["Hà Nội", "Hà Nội"], ["Hồ Chí Minh", "TP. Hồ Chí Minh"], ["Đà Nẵng", "Đà Nẵng"], ["Cần Thơ", "Cần Thơ"]].map(([value, label]) => (
+                <button key={value} type="button" aria-pressed={value === (filters.location ?? "")} onClick={() => browseByLocation(value)}>{label}</button>
+              ))}
+            </div>
+          </div>}
           {activity.error ? <p className="notice notice-danger" role="alert">{activity.error} <button className={styles.textButton} type="button" onClick={activity.reload}>Tải lại danh sách đã lưu</button></p> : null}
           {tooDeep || (hasMore && nextOffsetTooDeep) ? <section className="notice notice-warning" role="status"><p>Đã tới giới hạn phân trang. Bạn có thể tải thêm hoặc thu hẹp bộ lọc.</p><button className="btn" type="button" onClick={switchToCursor}>Tải thêm kết quả</button></section> : null}
           {searchRestartNotice ? <p className="notice" role="status">{searchRestartNotice}</p> : null}
           {error ? <ErrorState message={error} onRetry={() => setReloadKey(value => value + 1)} /> : null}
-          {loading && jobs.length === 0 ? <SearchSkeleton /> : null}
-          {!loading && !error && !tooDeep && jobs.length === 0 ? <div className={styles.blank}><EmptyState title="Chưa có việc làm phù hợp" description="Thử dùng từ khóa ngắn hơn, mở rộng địa điểm hoặc điều chỉnh khoảng lương." />{activeFilters.length ? <button className="btn" onClick={() => resetFilters(true)} type="button">Xóa tìm kiếm</button> : null}</div> : null}
+          {loading && jobs.length === 0 ? <SearchSkeleton compact={!hasSearched} /> : null}
+          {!loading && !error && !tooDeep && jobs.length === 0 ? <div className={styles.blank}>
+            <EmptyState title={hasSearched ? "Chưa có việc làm phù hợp" : "Chưa có tin tuyển dụng"} description={hasSearched ? "Thử dùng từ khóa ngắn hơn, mở rộng địa điểm hoặc điều chỉnh khoảng lương." : filters.location ? `Hãy chọn địa điểm khác để xem thêm việc làm ngoài ${filters.location}.` : "Tin tuyển dụng mới sẽ xuất hiện tại đây."} />
+            {activeFilters.length ? <button className="btn" onClick={() => resetFilters(true)} type="button">{hasSearched ? "Xóa tìm kiếm" : "Xem việc làm toàn quốc"}</button> : null}
+          </div> : null}
           <div className={styles.resultList} ref={cardListRef}>
-            {jobs.map(job => <SearchJobCard key={job.id} job={job} company={companies[job.companyId]} href={detailHref(job.id)} activity={activity} />)}
+            {jobs.map(job => <SearchJobCard key={job.id} job={job} company={companies[job.companyId]} href={detailHref(job.id)} activity={activity} compact={!hasSearched} />)}
           </div>
           {loading && jobs.length > 0 ? <p className="help" role="status">Đang tải thêm kết quả…</p> : null}
           {(jobs.length > 0 || page > 1) && (mode === "OFFSET" ? <nav className={styles.pagination} aria-label="Phân trang việc làm">

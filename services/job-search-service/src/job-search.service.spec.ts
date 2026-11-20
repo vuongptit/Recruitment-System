@@ -185,16 +185,59 @@ describe('JobSearchService', () => {
       { range: { deadline: { gte: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) } } },
     ]));
     expect(request.query.bool.must).toEqual([{
-      multi_match: expect.objectContaining({
-        query: 'NestJS',
-        type: 'best_fields',
-        operator: 'and',
-        fuzziness: 'AUTO',
-        prefix_length: 1,
-        max_expansions: 25,
-      }),
+      dis_max: { queries: [
+        { multi_match: {
+          query: 'NestJS',
+          fields: ['title^4', 'description', 'skills^3', 'companyName^2'],
+          type: 'phrase',
+        } },
+        { multi_match: {
+          query: 'NestJS',
+          fields: ['title^3', 'companyName^2'],
+          type: 'phrase_prefix',
+          slop: 1,
+          max_expansions: 25,
+          boost: 0.25,
+        } },
+      ] },
     }]);
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('expands dev in title and skills while respecting explicit exact phrases', async () => {
+    const emptyResults = { hits: { total: { value: 0, relation: 'eq' }, hits: [] }, aggregations: {} };
+    elasticSearch.mockResolvedValue(emptyResults);
+    await service.search(query({ q: 'dev' }));
+    expect(elasticSearch.mock.calls[0][0].query.bool.must[0].dis_max.queries).toEqual(expect.arrayContaining([
+      { multi_match: { query: 'developer', type: 'phrase', fields: ['title^4', 'skills^3'] } },
+      { multi_match: { query: 'lập trình viên', type: 'phrase', fields: ['title^4', 'skills^3'] } },
+    ]));
+
+    await service.search(query({ q: '"dev"' }));
+    expect(elasticSearch.mock.calls[1][0].query.bool.must[0].dis_max.queries).toEqual([
+      { multi_match: { query: 'dev', type: 'phrase', fields: ['title^4', 'description', 'skills^3', 'companyName^2'] } },
+    ]);
+  });
+
+  it.each(['kế toán', 'KE   TOAN'])('searches %s as a phrase and matches English accounting titles or skills', async (keyword) => {
+    elasticSearch.mockResolvedValue({ hits: { total: { value: 0, relation: 'eq' }, hits: [] }, aggregations: {} });
+    await service.search(query({ q: keyword }));
+    expect(elasticSearch.mock.calls[0][0].query.bool.must).toEqual([{
+      dis_max: { queries: [
+        { multi_match: { query: 'kế toán', type: 'phrase', fields: ['title^4', 'description', 'skills^3', 'companyName^2'] } },
+        { multi_match: { query: 'accountant', type: 'phrase', fields: ['title^4', 'skills^3'] } },
+        { multi_match: { query: 'accounting', type: 'phrase', fields: ['title^4', 'skills^3'] } },
+      ] },
+    }]);
+
+    indexReady.mockReturnValue(false);
+    transaction.mockResolvedValue([0, []]);
+    await service.search(query({ q: keyword }));
+    expect(findMany.mock.calls[0][0].where.AND).toContainEqual({ OR: expect.arrayContaining([
+      { description: { contains: 'kế toán', mode: 'insensitive' } },
+      { title: { contains: 'accountant', mode: 'insensitive' } },
+      { skills: { hasSome: ['kế toán', 'accountant', 'accounting'] } },
+    ]) });
   });
 
   it('returns a signed continuation from PIT sort values and stable sorts',

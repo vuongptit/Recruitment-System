@@ -128,7 +128,9 @@ export function readJobSearchQuery(query: URLSearchParams) {
   const mode = query.get("mode") === "CURSOR" ? "CURSOR" as const : "OFFSET" as const;
   const requestedPage = Number(query.get("page"));
   const page = mode === "OFFSET" && Number.isInteger(requestedPage) && requestedPage >= 1 && !isOffsetWindowTooDeep(requestedPage, limit) ? requestedPage : 1;
-  return { form, limit, mode, page, searched: query.get("search") === "1" };
+  const hasSearchCriteria = Boolean(form.q || form.jobType || form.skills || form.salaryMin || form.salaryMax || form.experienceYears || form.experienceBand);
+  const searched = query.get("search") === "1" || hasSearchCriteria || Boolean(form.location && query.get("browse") !== "1");
+  return { form, limit, mode, page, searched };
 }
 
 export function jobSearchHref(filters: PublicJobSearchFilters, mode: "CURSOR" | "OFFSET", page: number, limit: number, searched: boolean) {
@@ -141,5 +143,6 @@ export function jobSearchHref(filters: PublicJobSearchFilters, mode: "CURSOR" | 
   if (page > 1 && mode === "OFFSET") query.set("page", String(page));
   if (limit !== 10) query.set("limit", String(limit));
   if (searched) query.set("search", "1");
+  else if (filters.location) query.set("browse", "1");
   return `/candidate/jobs${query.size ? `?${query}` : ""}`;
 }

@@ -172,17 +172,25 @@ export class JobSearchService {
       { range: { deadline: { gte: eligibilityDate } } },
     ];
     if (query.q) {
-      must.push({
-        multi_match: {
-          query: query.q.normalize('NFKC').trim(),
-          fields: ['title^4', 'description^2', 'skills^3', 'companyName^2'],
-          type: 'best_fields',
-          operator: 'and',
-          fuzziness: 'AUTO',
-          prefix_length: 1,
-          max_expansions: 25,
-        },
+      const { term, aliases, allowPrefix } = parseKeyword(query.q);
+      const phrase = (text: string, fields: string[]): estypes.QueryDslQueryContainer => ({
+        multi_match: { query: text, fields, type: 'phrase' },
       });
+      const queries = [
+        phrase(term, ['title^4', 'description', 'skills^3', 'companyName^2']),
+        ...aliases.map(alias => phrase(alias, ['title^4', 'skills^3'])),
+      ];
+      if (allowPrefix) {
+        queries.push({ multi_match: {
+          query: term,
+          type: 'phrase_prefix',
+          fields: ['title^3', 'companyName^2'],
+          slop: 1,
+          max_expansions: 25,
+          boost: 0.25,
+        } });
+      }
+      must.push({ dis_max: { queries } });
     }
     if (query.location) {
       filter.push({
@@ -371,13 +379,18 @@ export class JobSearchService {
       { deadline: { gte: today } },
     ];
     if (query.q) {
-      const term = query.q.normalize('NFKC').trim();
+      const { term, aliases } = parseKeyword(query.q);
+      const terms = [term, ...aliases];
+      const contains = (value: string) => ({
+        contains: value.replace(/[\\%_]/g, '\\$&'),
+        mode: 'insensitive' as const,
+      });
       and.push({
         OR: [
-          { title: { contains: term, mode: 'insensitive' } },
-          { description: { contains: term, mode: 'insensitive' } },
-          { requirements: { contains: term, mode: 'insensitive' } },
-          { skills: { has: term } },
+          ...terms.map(text => ({ title: contains(text) })),
+          { description: contains(term) },
+          { requirements: contains(term) },
+          { skills: { hasSome: terms } },
         ],
       });
     }
@@ -677,6 +690,23 @@ export class JobSearchService {
 
 function utcDate(now = new Date()): string {
   return now.toISOString().slice(0, 10);
+}
+
+function parseKeyword(value: string): { term: string; aliases: string[]; allowPrefix: boolean } {
+  const term = value.normalize('NFKC').trim().replace(/\s+/g, ' ');
+  const quoted = term.match(/^(?:"(.+)"|“(.+)”)$/u);
+  const exact = (quoted?.[1] ?? quoted?.[2])?.trim();
+  if (exact) return { term: exact, aliases: [], allowPrefix: false };
+
+  const folded = term.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+  if (folded === 'ke toan') {
+    return { term: 'kế toán', aliases: ['accountant', 'accounting'], allowPrefix: false };
+  }
+  return {
+    term,
+    aliases: folded === 'dev' ? ['developer', 'lập trình viên'] : [],
+    allowPrefix: /[\p{L}\p{N}]{3,}$/u.test(term),
+  };
 }
 
 function pitKeepAlive(expiresAt: number, now = Date.now()): string {
