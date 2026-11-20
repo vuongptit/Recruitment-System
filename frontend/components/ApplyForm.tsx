@@ -5,7 +5,7 @@ import { applicationStatusLabel } from "@/lib/recruitmentLabels";
 import Link from "next/link";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { applicationCooldownView } from "../lib/applicationCooldown";
-import { toUserMessage } from "../lib/apiClient";
+import { ApiClientError, toUserMessage } from "../lib/apiClient";
 import { getActiveCandidateCvs, isDemoPerson2Api, submitCandidateApplication, type ActiveCandidateCv } from "../lib/person2Api";
 import { useCurrentAccount } from "./SessionGate";
 
@@ -63,6 +63,7 @@ export function ApplyForm({ jobId, source = "SEARCH" }: { jobId: string; source?
     finally { locked.current = false; setPending(false); }
   }
   const cooldown = applicationCooldownView(responseError);
+  const isAlreadyApplied = responseError instanceof ApiClientError && responseError.code === "ACTIVE_APPLICATION_EXISTS";
   return (
     <form className="card form-stack" id="apply" noValidate onSubmit={submit}>
       <div className="field">
@@ -81,8 +82,8 @@ export function ApplyForm({ jobId, source = "SEARCH" }: { jobId: string; source?
         <span className="help">Tối đa 2.000 ký tự.</span>
       </div>
       <p className="help">Kiểm tra CV và thư ứng tuyển trước khi gửi. Hồ sơ đã gửi không thể rút; nhà tuyển dụng sẽ xử lý và cập nhật tiến trình trên hệ thống.</p>
-      <button className="btn btn-primary" type="submit" disabled={loading || !!cvError || !cvId || pending || submitted || cooldown !== null} aria-busy={pending}>
-        {pending ? "Đang gửi…" : submitted ? "Đã ứng tuyển" : "Gửi ứng tuyển"}
+      <button className="btn btn-primary" type="submit" disabled={loading || !!cvError || !cvId || pending || submitted || cooldown !== null || isAlreadyApplied} aria-busy={pending}>
+        {pending ? "Đang gửi…" : submitted || isAlreadyApplied ? "Đã ứng tuyển" : "Gửi ứng tuyển"}
       </button>
       {message ? <p className={submitted ? "notice notice-success" : "form-error"} role="status">{message}</p> : null}
       {submitted ? <Link className="btn" href="/candidate/applications">Theo dõi hồ sơ đã gửi</Link> : null}
@@ -90,7 +91,18 @@ export function ApplyForm({ jobId, source = "SEARCH" }: { jobId: string; source?
         <strong>{cooldown.title}</strong><p>{cooldown.description}</p>
         <time dateTime={cooldown.eligibleAt}>Có thể nộp lại: {cooldown.eligibleAtLabel}</time>
       </section> : null}
-      {responseError && !cooldown ? <p className="notice notice-danger" role="alert"><strong>Chưa gửi được hồ sơ.</strong> {toUserMessage(responseError)}</p> : null}
+      {isAlreadyApplied ? (
+        <section className="notice notice-warning" role="alert">
+          <strong>Bạn đã ứng tuyển vị trí này.</strong>
+          <p>Hồ sơ của bạn đang được nhà tuyển dụng xem xét và xử lý.</p>
+          <div style={{ marginTop: "0.5rem" }}>
+            <Link className="btn" href="/candidate/applications">
+              Theo dõi hồ sơ đã gửi
+            </Link>
+          </div>
+        </section>
+      ) : null}
+      {responseError && !cooldown && !isAlreadyApplied ? <p className="notice notice-danger" role="alert"><strong>Chưa gửi được hồ sơ.</strong> {toUserMessage(responseError)}</p> : null}
     </form>
   );
 }

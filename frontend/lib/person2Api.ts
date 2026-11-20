@@ -1275,6 +1275,15 @@ export async function submitCandidateApplication(
   if (isDemoPerson2Api) {
     const job = demo.jobs.find((item) => item.id === values.jobId);
     if (!job) throw new ApiClientError({ code: "JOB_NOT_FOUND", status: 404 });
+    const existing = demo.applications.find(
+      (app) => app.jobId === values.jobId && ["APPLIED", "REVIEWING", "INTERVIEW", "OFFER", "HIRED"].includes(app.status),
+    );
+    if (existing) {
+      throw new ApiClientError({
+        code: "ACTIVE_APPLICATION_EXISTS",
+        status: 409,
+      });
+    }
     const now = new Date().toISOString();
     return {
       data: {
