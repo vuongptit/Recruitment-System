@@ -5,11 +5,12 @@ import { jobStatusLabel } from "@/lib/recruitmentLabels";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCurrentAccount } from "@/components/SessionGate";
+import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { TransientRecoveryState } from "@/components/TransientRecoveryState";
 import { EmptyState, LoadingState, Metric, PageHeader, StatusBadge } from "@/components/ui";
 import { ApiClientError, toUserMessage } from "../../../lib/apiClient";
 import { isRejectedRecruiterJob, recruiterJobActionLabel, recruiterJobActions, recruiterJobEditLabel, type RecruiterJobAction } from "../../../lib/jobLifecycle";
-import { closeRecruiterJob, getCurrentCompanyMembership, getRecruiterJobs, submitJobForApproval, type CompanyMemberRole, type Job, type JobStatus } from "../../../lib/person2Api";
+import { closeRecruiterJob, deleteRecruiterJobDraft, getCurrentCompanyMembership, getRecruiterJobs, reopenRecruiterJob, submitJobForApproval, type CompanyMemberRole, type Job, type JobStatus } from "../../../lib/person2Api";
 import { isRecruiterJobAccessDenied, recruiterJobScopeView } from "../../../lib/recruiterJobAccess";
 import { buildRecruiterJobTable, type RecruiterJobScopeFilter, type RecruiterJobSort } from "../../../lib/recruiterJobTable";
 
@@ -32,6 +33,9 @@ export default function RecruiterJobsPage() {
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
   const [actionStatus, setActionStatus] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Job | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const actionLock = useRef(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -106,18 +110,48 @@ export default function RecruiterJobsPage() {
   }), [jobs, page, pageSize, query, sort, statusFilter, scopeFilter, account?.id]);
 
   async function runJobAction(job: Job, action: RecruiterJobAction) {
-    if (pendingJobId) return;
+    if (actionLock.current) return;
+    actionLock.current = true;
     setPendingJobId(job.id);
     setActionError("");
     setActionStatus("");
     try {
-      const response = action === "SUBMIT_FOR_APPROVAL" ? await submitJobForApproval(job.id) : await closeRecruiterJob(job.id);
+      const operations = { SUBMIT_FOR_APPROVAL: submitJobForApproval, CLOSE: closeRecruiterJob, REOPEN: reopenRecruiterJob };
+      const response = await operations[action](job.id);
       setJobs((current) => current.map((item) => item.id === job.id ? response.data : item));
-      setActionStatus(action === "SUBMIT_FOR_APPROVAL" ? "Đã gửi tin cho quản trị viên duyệt." : "Đã đóng tin tuyển dụng.");
+      const messages = {
+        SUBMIT_FOR_APPROVAL: "Đã gửi tin cho quản trị viên duyệt.",
+        CLOSE: "Đã đóng tin tuyển dụng.",
+        REOPEN: "Đã khôi phục về bản nháp. Hãy cập nhật hạn nộp nếu cần rồi gửi duyệt lại.",
+      };
+      setActionStatus(messages[action]);
+      if (action === "REOPEN" && statusFilter === "CLOSED") { setStatusFilter("DRAFT"); setPage(1); }
     } catch (reason: unknown) {
       setActionError(toUserMessage(reason));
       if (isRecruiterJobAccessDenied(reason)) setReloadKey((value) => value + 1);
     } finally {
+      actionLock.current = false;
+      setPendingJobId(null);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || actionLock.current) return;
+    actionLock.current = true;
+    setPendingJobId(deleteTarget.id);
+    setDeleteError("");
+    setActionError("");
+    setActionStatus("");
+    try {
+      await deleteRecruiterJobDraft(deleteTarget.id);
+      setJobs((current) => current.filter((job) => job.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      setActionStatus("Đã xóa vĩnh viễn bản nháp tuyển dụng.");
+    } catch (reason) {
+      setDeleteError(toUserMessage(reason));
+      if (isRecruiterJobAccessDenied(reason)) setReloadKey((value) => value + 1);
+    } finally {
+      actionLock.current = false;
       setPendingJobId(null);
     }
   }
@@ -263,13 +297,18 @@ export default function RecruiterJobsPage() {
                           key={action}
                           className={action === "CLOSE" ? "btn btn-warning" : "btn btn-secondary"}
                           type="button"
-                          disabled={pendingJobId === job.id}
+                          disabled={pendingJobId !== null}
                           aria-busy={pendingJobId === job.id}
                           onClick={() => { void runJobAction(job, action); }}
                         >
                           {pendingJobId === job.id ? "Đang xử lý…" : recruiterJobActionLabel(action)}
                         </button>
                       ))}
+                      {canManage && job.status === "DRAFT" && !job.rejectionReason ? (
+                        <button className="btn btn-danger" type="button" disabled={pendingJobId !== null} onClick={() => { setDeleteError(""); setDeleteTarget(job); }}>
+                          Xóa vĩnh viễn
+                        </button>
+                      ) : null}
                     </div></td>
                   </tr>
                 );
@@ -284,6 +323,14 @@ export default function RecruiterJobsPage() {
           </>
         ) : null}
       </section>
+      <ConfirmationDialog open={deleteTarget !== null}
+        title="Xóa vĩnh viễn tin tuyển dụng?"
+        description={`Bản nháp “${deleteTarget?.title ?? ""}” sẽ bị xóa và không thể khôi phục. Chỉ bản nháp chưa từng gửi duyệt mới có thể xóa.`}
+        confirmLabel="Xóa vĩnh viễn"
+        pending={pendingJobId !== null}
+        error={deleteError}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleteTarget(null)} />
     </main>
   );
 }

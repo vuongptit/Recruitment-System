@@ -62,12 +62,22 @@ describe('JobService publishing lifecycle', () => {
   let append: jest.Mock;
   let wake: jest.Mock;
   let transaction: jest.Mock;
+  let history: jest.Mock;
+  let moderationCount: jest.Mock;
+  let deleteEvents: jest.Mock;
+  let deleteIndex: jest.Mock;
+  let deleteJob: jest.Mock;
 
   beforeEach(() => {
     findUnique = jest.fn();
     findMany = jest.fn();
     count = jest.fn();
     updateMany = jest.fn().mockResolvedValue({ count: 1 });
+    history = jest.fn();
+    moderationCount = jest.fn().mockResolvedValue(0);
+    deleteEvents = jest.fn();
+    deleteIndex = jest.fn();
+    deleteJob = jest.fn();
     indexAppend = jest.fn().mockResolvedValue(undefined);
     indexWake = jest.fn();
     append = jest.fn().mockResolvedValue('event-id');
@@ -78,7 +88,10 @@ describe('JobService publishing lifecycle', () => {
       verifiedStatus: 'VERIFIED',
     });
     const transactionClient = {
-      job: { findUnique, findMany, count, updateMany },
+      job: { findUnique, findMany, count, updateMany, delete: deleteJob },
+      jobEventOutbox: { findMany: history, deleteMany: deleteEvents },
+      jobIndexSync: { deleteMany: deleteIndex },
+      jobModerationOperation: { count: moderationCount },
     };
     transaction = jest.fn(
       async (callback) => callback(transactionClient),
@@ -100,6 +113,38 @@ describe('JobService publishing lifecycle', () => {
       wake,
     } as unknown as JobEventPublisherService;
     service = new JobService(prisma, companies, indexing, events);
+  });
+
+  it('restores a closed job with an old deadline to an editable draft', async () => {
+    const deadline = new Date('2020-01-01');
+    findUnique.mockResolvedValueOnce(job(JobStatus.CLOSED, { deadline }))
+      .mockResolvedValueOnce(job(JobStatus.DRAFT, { deadline, aggregateVersion: 2 }));
+
+    const result = await service.reopen(RECRUITER_ID, 'Bearer token', JOB_ID);
+
+    expect(result.status).toBe(JobStatus.DRAFT);
+    expect(append).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: JobStatus.DRAFT }), JobEventAction.UPDATED);
+  });
+
+  it('deletes a never-submitted draft and its dependent indexing records', async () => {
+    findUnique.mockResolvedValue(job(JobStatus.DRAFT));
+    history.mockResolvedValue([{ aggregateVersion: 1, payload: { status: JobStatus.DRAFT } }]);
+
+    await service.deleteDraft(RECRUITER_ID, 'Bearer token', JOB_ID);
+
+    expect(deleteIndex).toHaveBeenCalledWith({ where: { jobId: JOB_ID } });
+    expect(deleteEvents).toHaveBeenCalledWith({ where: { jobId: JOB_ID } });
+    expect(deleteJob).toHaveBeenCalledWith({ where: { id: JOB_ID } });
+  });
+
+  it('preserves restored drafts that previously went through approval', async () => {
+    findUnique.mockResolvedValue(job(JobStatus.DRAFT, { aggregateVersion: 3 }));
+    history.mockResolvedValue([JobStatus.DRAFT, JobStatus.PENDING_APPROVAL, JobStatus.DRAFT]
+      .map((status, index) => ({ aggregateVersion: index + 1, payload: { status } })));
+
+    await expect(service.deleteDraft(RECRUITER_ID, 'Bearer token', JOB_ID)).rejects.toThrow();
+    expect(deleteEvents).not.toHaveBeenCalled();
+    expect(deleteJob).not.toHaveBeenCalled();
   });
 
   it('submits DRAFT and commits versioned outbox atomically', async () => {

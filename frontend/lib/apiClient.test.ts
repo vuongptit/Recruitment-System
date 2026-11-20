@@ -1169,7 +1169,7 @@ test("recruiter Job actions are derived only from the backend status", () => {
   assert.deepEqual(recruiterJobActions("DRAFT"), ["SUBMIT_FOR_APPROVAL"]);
   assert.deepEqual(recruiterJobActions("PENDING_APPROVAL"), []);
   assert.deepEqual(recruiterJobActions("PUBLISHED"), ["CLOSE"]);
-  assert.deepEqual(recruiterJobActions("CLOSED"), []);
+  assert.deepEqual(recruiterJobActions("CLOSED"), ["REOPEN"]);
   assert.deepEqual(recruiterJobActions("EXPIRED"), []);
 });
 

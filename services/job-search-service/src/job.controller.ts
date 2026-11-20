@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -616,6 +617,31 @@ export class JobController {
     @Param('id', JOB_ID_PIPE) jobId: string,
   ): Promise<JobDto> {
     return this.jobs.close(user.id, authorization, jobId);
+  }
+
+  @Patch(':id/reopen')
+  @Roles(SystemRole.RECRUITER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore a closed job as a draft' })
+  reopen(
+    @CurrentUser() user: AuthUser,
+    @Headers('authorization') authorization: string,
+    @Param('id', JOB_ID_PIPE) jobId: string,
+  ): Promise<JobDto> {
+    return this.jobs.reopen(user.id, authorization, jobId);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles(SystemRole.RECRUITER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Permanently delete a draft that has never been submitted for approval' })
+  deleteDraft(
+    @CurrentUser() user: AuthUser,
+    @Headers('authorization') authorization: string,
+    @Param('id', JOB_ID_PIPE) jobId: string,
+  ): Promise<void> {
+    return this.jobs.deleteDraft(user.id, authorization, jobId);
   }
 
   @Patch(':id/approve')

@@ -327,6 +327,8 @@ export function normalizeError(code: string): string {
     REAPPLICATION_COOLDOWN: "Bạn đang trong thời gian chờ trước khi có thể ứng tuyển lại.",
     ACTIVE_APPLICATION_EXISTS: "Bạn đã ứng tuyển vị trí này.",
     JOB_STATE_CHANGED: "Trạng thái tin tuyển dụng vừa thay đổi. Hãy tải lại và so sánh trước khi tiếp tục.",
+    JOB_DELETE_NOT_ALLOWED: "Chỉ xóa được bản nháp chưa từng gửi duyệt và có lịch sử đầy đủ.",
+    JOB_SUSPENDED: "Tin đang bị quản trị viên gỡ. Hãy liên hệ quản trị viên để được hỗ trợ.",
     JOB_ACCESS_DENIED: "Bạn không có quyền thao tác với tin tuyển dụng này. Danh sách sẽ được đồng bộ lại.",
     JOB_SEARCH_PAGE_TOO_DEEP: "Kết quả quá sâu. Hãy lọc hẹp hơn hoặc chuyển sang tải thêm.",
     MEDIA_UPLOAD_RATE_LIMITED: "Bạn tải tệp quá nhiều lần. Hãy chờ rồi thử lại.",

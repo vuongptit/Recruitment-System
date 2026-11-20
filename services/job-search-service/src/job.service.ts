@@ -516,6 +516,56 @@ export class JobService {
     );
   }
 
+  async reopen(recruiterId: string, authorization: string, jobId: string): Promise<JobDto> {
+    const company = await this.companies.getRecruiterCompany(recruiterId, authorization);
+    const job = await this.prisma.job.findUnique({ where: { id: jobId } });
+    this.requireManagePermission(job, company, recruiterId);
+    this.requireStatus(job, JobStatus.CLOSED, 'reopen');
+
+    return this.transition(jobId, JobStatus.CLOSED, job.aggregateVersion, {
+      status: JobStatus.DRAFT,
+      publishedAt: null,
+      reviewedBy: null,
+      reviewedAt: null,
+      rejectionReason: null,
+    }, JobEventAction.UPDATED);
+  }
+
+  async deleteDraft(recruiterId: string, authorization: string, jobId: string): Promise<void> {
+    const company = await this.companies.getRecruiterCompany(recruiterId, authorization);
+    const job = await this.prisma.job.findUnique({ where: { id: jobId } });
+    this.requireManagePermission(job, company, recruiterId);
+    this.requireStatus(job, JobStatus.DRAFT, 'delete');
+
+    await this.prisma.$transaction(async (transaction) => {
+      // Lock this version before deleting its dependent records. Concurrent edits
+      // and submissions use the same version check and cannot race the deletion.
+      const locked = await transaction.job.updateMany({
+        where: { id: jobId, status: JobStatus.DRAFT, aggregateVersion: job.aggregateVersion, isSuspended: false },
+        data: { aggregateVersion: { increment: 1 } },
+      });
+      if (locked.count !== 1) {
+        throw new ApiException('JOB_STATE_CHANGED', 'Job changed during deletion', HttpStatus.CONFLICT);
+      }
+      const history = await transaction.jobEventOutbox.findMany({
+        where: { jobId },
+        orderBy: { aggregateVersion: 'asc' },
+        select: { aggregateVersion: true, payload: true },
+      });
+      const neverSubmitted = history.length === job.aggregateVersion && history.every((event, index) =>
+        event.aggregateVersion === index + 1 &&
+        (event.payload as { status?: string } | null)?.status === JobStatus.DRAFT,
+      );
+      const hasModeration = await transaction.jobModerationOperation.count({ where: { jobId } });
+      if (!neverSubmitted || hasModeration || job.publishedAt || job.reviewedAt) {
+        throw new ApiException('JOB_DELETE_NOT_ALLOWED', 'Only a draft that has never been submitted for review can be permanently deleted', HttpStatus.CONFLICT);
+      }
+      await transaction.jobIndexSync.deleteMany({ where: { jobId } });
+      await transaction.jobEventOutbox.deleteMany({ where: { jobId } });
+      await transaction.job.delete({ where: { id: jobId } });
+    });
+  }
+
   async approve(adminId: string, jobId: string): Promise<JobDto> {
     const job = await this.requireJob(jobId);
     this.requireStatus(job, JobStatus.PENDING_APPROVAL, 'approve');

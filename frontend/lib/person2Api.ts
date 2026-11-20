@@ -1153,6 +1153,33 @@ export async function closeRecruiterJob(jobId: string, signal?: AbortSignal): Pr
   return { ...response, data: toJob(response.data) };
 }
 
+export async function reopenRecruiterJob(jobId: string): Promise<ApiEnvelope<Job>> {
+  if (isDemoPerson2Api) {
+    const job = demo.jobs.find((item) => item.id === jobId);
+    if (!job) throw new ApiClientError({ code: "JOB_NOT_FOUND", status: 404 });
+    job.status = "DRAFT";
+    return { data: { ...job }, meta: null };
+  }
+  assertCanonicalUuidV4(jobId, "jobId");
+  const response = await requestApi<BackendJob>(`${API_PATHS.jobs}${jobId}/reopen`, {
+    method: "PATCH", privateData: true, maxRetries: 0,
+  });
+  return { ...response, data: toJob(response.data) };
+}
+
+export async function deleteRecruiterJobDraft(jobId: string): Promise<void> {
+  if (isDemoPerson2Api) {
+    const index = demo.jobs.findIndex((item) => item.id === jobId);
+    if (index < 0) throw new ApiClientError({ code: "JOB_NOT_FOUND", status: 404 });
+    demo.jobs.splice(index, 1);
+    return;
+  }
+  assertCanonicalUuidV4(jobId, "jobId");
+  await requestApi<void>(`${API_PATHS.jobs}${jobId}`, {
+    method: "DELETE", privateData: true, maxRetries: 0,
+  });
+}
+
 export async function getCandidateBookmarks(signal?: AbortSignal): Promise<ApiEnvelope<CandidateBookmark[]>> {
   if (isDemoPerson2Api) {
     const job = demo.jobs[0];
