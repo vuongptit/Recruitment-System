@@ -14,7 +14,6 @@ import {
   RotateCw,
   ArrowUpRight,
   Clock,
-  Sparkles,
   Inbox,
   Briefcase,
 } from "lucide-react";
@@ -23,6 +22,11 @@ import { useNotifications } from "@/components/NotificationProvider";
 import { LoadingState, ErrorState } from "@/components/ui";
 import { notificationDestination, type InboxNotification } from "@/lib/notificationState";
 import { notificationPresentation } from "@/lib/notificationPresentation";
+import { applicationStatusLabel } from "@/lib/recruitmentLabels";
+import { portalSection } from "@/lib/portalRoutes";
+import { requestApi } from "@/lib/apiClientCore";
+import { conversationIdentity, type ChatIdentityView } from "@/lib/chatIdentity";
+import type { ChatConversation } from "@/lib/chatApi";
 
 type FilterTab = "all" | "unread" | "messages" | "recruitment";
 
@@ -113,7 +117,30 @@ function formatNotificationTime(dateStr: string): string {
   }
 }
 
-function NotificationsList({ role }: { role: string }) {
+function formatInterviewSchedule(startStr?: unknown, endStr?: unknown): string | null {
+  if (typeof startStr !== "string" || !startStr) return null;
+  try {
+    const start = new Date(startStr);
+    if (isNaN(start.getTime())) return null;
+    const days = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+    const dayOfWeek = days[start.getDay()];
+    const dateFormatted = `${dayOfWeek}, ngày ${start.getDate().toString().padStart(2, "0")}/${(start.getMonth() + 1).toString().padStart(2, "0")}/${start.getFullYear()}`;
+    const startTime = start.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+    if (typeof endStr === "string" && endStr) {
+      const end = new Date(endStr);
+      if (!isNaN(end.getTime())) {
+        const endTime = end.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", hour12: false });
+        return `${startTime} - ${endTime} · ${dateFormatted}`;
+      }
+    }
+    return `${startTime} · ${dateFormatted}`;
+  } catch {
+    return null;
+  }
+}
+
+function NotificationsList({ accountId, role }: { accountId: string; role: string }) {
   const {
     notifications,
     loading,
@@ -128,6 +155,25 @@ function NotificationsList({ role }: { role: string }) {
   } = useNotifications();
 
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [conversations, setConversations] = useState<Map<string, ChatConversation>>(new Map());
+
+  // Load chat conversations to resolve counterpart identity and avatar
+  useEffect(() => {
+    let active = true;
+    void requestApi<ChatConversation[]>("/api/chat/chats", { privateData: true })
+      .then((res) => {
+        if (!active || !res.data) return;
+        const map = new Map<string, ChatConversation>();
+        for (const conv of res.data) {
+          map.set(conv.id, conv);
+        }
+        setConversations(map);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -176,14 +222,14 @@ function NotificationsList({ role }: { role: string }) {
         <div className="notifications-title-area">
           <h1>
             Thông báo
-            {unreadCount > 0 && (
+            {counts.unread > 0 && (
               <span className="notifications-badge-pill">
-                {unreadCount} chưa đọc
+                {counts.unread} chưa đọc
               </span>
             )}
           </h1>
           <p className="notifications-subtitle">
-            Theo dõi hồ sơ ứng tuyển, lời mời phỏng vấn và tin nhắn mới nhất
+            Theo dõi tin nhắn mới, cập nhật hồ sơ ứng tuyển và lịch phỏng vấn kịp thời.
           </p>
         </div>
 
@@ -193,9 +239,9 @@ function NotificationsList({ role }: { role: string }) {
             className="btn btn-secondary btn-notif-action"
             onClick={() => void refresh()}
             disabled={loading}
-            title="Tải lại danh sách thông báo"
+            title="Làm mới danh sách"
           >
-            <RotateCw size={15} className={loading ? "animate-spin" : ""} />
+            <RotateCw size={15} className={loading ? "spin" : ""} />
             Làm mới
           </button>
           <button
@@ -303,6 +349,63 @@ function NotificationsList({ role }: { role: string }) {
           const Icon = meta.icon;
           const timeFormatted = formatNotificationTime(notification.created_at);
 
+          const isMessageType = notification.type === "new_message" || notification.type.toLowerCase().includes("message");
+          const isInterviewType = notification.type.toLowerCase().includes("interview");
+          const isApplicationType = notification.type.toLowerCase().includes("application");
+          const isOfferType = notification.type.toLowerCase().includes("offer");
+          const isVideoCallType = notification.type === "video_call" || notification.type.toLowerCase().includes("video");
+
+          // Extract sender info for message notification
+          const convId = typeof notification.metadata?.conversation_id === "string" ? notification.metadata.conversation_id : null;
+          const conv = convId ? conversations.get(convId) : undefined;
+          const identity: ChatIdentityView | null = conv ? conversationIdentity(conv, accountId) : null;
+          const metaSenderName = typeof notification.metadata?.sender_name === "string" ? notification.metadata.sender_name : null;
+          const senderName = identity?.name || metaSenderName || (
+            presentation.title.startsWith("Tin nhắn mới từ ")
+              ? presentation.title.replace("Tin nhắn mới từ ", "")
+              : (role === "CANDIDATE" ? "Nhà tuyển dụng" : "Ứng viên")
+          );
+          const senderRole = identity?.description || (role === "CANDIDATE" ? "Nhà tuyển dụng" : "Ứng viên");
+          const senderAvatar = identity?.imageUrl;
+          const senderInitial = (senderName || "U").trim().slice(0, 1).toUpperCase();
+
+          // Interview schedule format
+          const scheduleFormatted = isInterviewType
+            ? formatInterviewSchedule(notification.metadata?.scheduled_start, notification.metadata?.scheduled_end)
+            : null;
+
+          // Application status label
+          const toStatus = typeof notification.metadata?.to_status === "string" ? notification.metadata.to_status : "";
+          const statusLabel = toStatus ? applicationStatusLabel(toStatus) : "";
+
+          // Display title
+          const cardTitle = isMessageType
+            ? `Tin nhắn mới từ ${senderName}`
+            : presentation.title;
+
+          // Action link button text
+          const actionText = isMessageType
+            ? "Mở cuộc trò chuyện"
+            : isInterviewType
+            ? "Xem chi tiết lịch phỏng vấn"
+            : isOfferType
+            ? "Xem thư nhận việc"
+            : isVideoCallType
+            ? "Tham gia cuộc gọi"
+            : "Xem chi tiết";
+
+          const ActionIcon = isMessageType
+            ? MessageSquare
+            : isInterviewType
+            ? CalendarDays
+            : isOfferType
+            ? Award
+            : isVideoCallType
+            ? Video
+            : ArrowUpRight;
+
+          const targetUrl = destination || (isMessageType && convId ? `${portalSection(role, "messages")}?chat=${convId}` : null);
+
           return (
             <article
               key={notification.id}
@@ -328,20 +431,110 @@ function NotificationsList({ role }: { role: string }) {
                   )}
                 </div>
 
-                <h3>{presentation.title}</h3>
-                <p className="notification-body">{presentation.body}</p>
+                <h3>{cardTitle}</h3>
+
+                {/* Specific rich detail card for messages */}
+                {isMessageType && (
+                  <div className="notification-detail-box">
+                    <div className="notification-sender-info">
+                      {senderAvatar ? (
+                        <img
+                          src={senderAvatar}
+                          alt={senderName}
+                          className="notification-sender-avatar"
+                          width={36}
+                          height={36}
+                        />
+                      ) : (
+                        <span className="notification-sender-avatar">{senderInitial}</span>
+                      )}
+                      <div className="notification-sender-meta">
+                        <span className="notification-sender-name">{senderName}</span>
+                        <span className="notification-sender-role">{senderRole}</span>
+                      </div>
+                    </div>
+                    <blockquote className="notification-quote-body">
+                      &ldquo;{notification.body}&rdquo;
+                    </blockquote>
+                  </div>
+                )}
+
+                {/* Specific rich detail card for interview schedule */}
+                {isInterviewType && (
+                  <div className="notification-detail-box">
+                    {scheduleFormatted ? (
+                      <div className="notification-detail-pill schedule">
+                        <CalendarDays size={15} />
+                        <span>Thời gian: {scheduleFormatted}</span>
+                      </div>
+                    ) : null}
+                    <p className="notification-body" style={{ margin: 0 }}>
+                      {presentation.body}
+                    </p>
+                  </div>
+                )}
+
+                {/* Specific rich detail card for application status */}
+                {isApplicationType && !isInterviewType && (
+                  <div className="notification-detail-box">
+                    {statusLabel && statusLabel !== "Chưa rõ trạng thái" ? (
+                      <div className="notification-detail-pill application">
+                        <Briefcase size={15} />
+                        <span>Trạng thái: {statusLabel}</span>
+                      </div>
+                    ) : null}
+                    <p className="notification-body" style={{ margin: 0 }}>
+                      {presentation.body}
+                    </p>
+                  </div>
+                )}
+
+                {/* Specific rich detail card for offers */}
+                {isOfferType && (
+                  <div className="notification-detail-box">
+                    <div className="notification-detail-pill offer">
+                      <Award size={15} />
+                      <span>Thư mời nhận việc</span>
+                    </div>
+                    <p className="notification-body" style={{ margin: 0 }}>
+                      {presentation.body}
+                    </p>
+                  </div>
+                )}
+
+                {/* Specific rich detail card for video calls */}
+                {isVideoCallType && (
+                  <div className="notification-detail-box">
+                    <div className="notification-detail-pill call">
+                      <Video size={15} />
+                      <span>
+                        {typeof notification.metadata?.room_name === "string"
+                          ? `Phòng: ${notification.metadata.room_name}`
+                          : "Cuộc gọi phỏng vấn video"}
+                      </span>
+                    </div>
+                    <p className="notification-body" style={{ margin: 0 }}>
+                      {presentation.body}
+                    </p>
+                  </div>
+                )}
+
+                {/* Fallback plain body for generic notifications */}
+                {!isMessageType && !isInterviewType && !isApplicationType && !isOfferType && !isVideoCallType && (
+                  <p className="notification-body">{presentation.body}</p>
+                )}
 
                 <div className="notification-footer-actions">
-                  {destination && (
+                  {targetUrl && (
                     <Link
-                      href={destination}
+                      href={targetUrl}
                       className="btn-notif-action btn-notif-primary"
                       onClick={() => {
                         if (!notification.is_read) void markAsRead(notification.id);
                       }}
                     >
-                      Xem chi tiết
-                      <ArrowUpRight size={14} />
+                      <ActionIcon size={14} />
+                      {actionText}
                     </Link>
                   )}
 
@@ -382,5 +575,5 @@ function NotificationsList({ role }: { role: string }) {
 
 export default function NotificationsScreen() {
   const account = useCurrentAccount();
-  return account ? <NotificationsList role={account.role} /> : <LoadingState />;
+  return account ? <NotificationsList accountId={account.id} role={account.role} /> : <LoadingState />;
 }

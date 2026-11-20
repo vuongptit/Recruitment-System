@@ -156,13 +156,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     finally { if (isCurrent()) { mutationLock.current = false; setMarking(false); } }
   }
 
-  async function markConversationAsRead(conversationId: string) {
+  const markConversationAsRead = useCallback(async (conversationId: string) => {
     if (!isCurrent() || !conversationId) return;
     const matching = notificationsRef.current.filter(
-      n => !n.is_read && (n.metadata?.conversation_id === conversationId || (n.type === "new_message" && n.metadata?.conversation_id === conversationId))
+      (n) => !n.is_read && n.metadata?.conversation_id === conversationId
     );
     if (matching.length > 0) {
-      recordUpdates(matching.map(n => ({ ...n, is_read: true })));
+      recordUpdates(matching.map((n) => ({ ...n, is_read: true })));
     }
     try {
       await requestApi(`/api/notifications/conversations/${encodeURIComponent(conversationId)}/read`, {
@@ -173,13 +173,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } catch {
       for (const n of matching) {
         try {
-          await requestApi(`/api/notifications/${encodeURIComponent(n.id)}/read`, { method: "PATCH", privateData: true, maxRetries: 0 });
+          await requestApi(`/api/notifications/${encodeURIComponent(n.id)}/read`, {
+            method: "PATCH",
+            privateData: true,
+            maxRetries: 0,
+          });
         } catch {}
       }
     } finally {
       await fetchUnreadCount();
     }
-  }
+  }, [isCurrent, recordUpdates, fetchUnreadCount]);
 
   useEffect(() => {
     identity.current = accountId;
@@ -189,9 +193,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     loadLock.current = false; mutationLock.current = false; callLock.current = false;
     setMarking(false); setCallPending(false); setLoading(false); setCallError("");
     setInboxOwner(accountId);
-    if (accountId) void fetchUnreadCount();
+    if (accountId) {
+      void fetchUnreadCount();
+      void refresh();
+    }
     return () => { identity.current = undefined; ++countRevision.current; };
-  }, [accountId, fetchUnreadCount]);
+  }, [accountId, fetchUnreadCount, refresh]);
 
   useEffect(() => {
     if (!accountId) return;

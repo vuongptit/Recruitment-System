@@ -82,7 +82,7 @@ function ChatInterface({ accountId, role }: { accountId: string; role: AccountRo
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedId = searchParams.get("chat");
-  const { markConversationAsRead, notifications } = useNotifications();
+  const { markConversationAsRead } = useNotifications();
 
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);

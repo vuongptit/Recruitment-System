@@ -19,8 +19,20 @@ export function mergeNotifications(current: InboxNotification[], incoming: Inbox
 export function notificationDestination(notification: InboxNotification, role: string): string | null {
   const metadata = notification.metadata;
   const conversationId = metadata?.conversation_id;
-  if (typeof conversationId === "string" && conversationId && (role === "CANDIDATE" || role === "RECRUITER")) return `${portalSection(role, "messages")}?chat=${encodeURIComponent(conversationId)}`;
-  if (notification.type.toLowerCase().includes("interview") && role === "CANDIDATE") return "/candidate/interviews";
+  if (typeof conversationId === "string" && conversationId && (role === "CANDIDATE" || role === "RECRUITER")) {
+    return `${portalSection(role, "messages")}?chat=${encodeURIComponent(conversationId)}`;
+  }
+  const callId = metadata?.call_id;
+  if (typeof callId === "string" && callId && (notification.type === "video_call" || notification.type.toLowerCase().includes("video"))) {
+    return `/${role.toLowerCase()}/calls/${encodeURIComponent(callId)}`;
+  }
+  const offerId = metadata?.offer_id;
+  if (typeof offerId === "string" && offerId && role === "CANDIDATE") {
+    return `/candidate/offers/${encodeURIComponent(offerId)}`;
+  }
+  if (notification.type.toLowerCase().includes("interview") && role === "CANDIDATE") {
+    return "/candidate/interviews";
+  }
   const applicationId = metadata?.application_id;
   if (typeof applicationId === "string" && applicationId && ["CANDIDATE", "RECRUITER"].includes(role)) {
     return `/${role.toLowerCase()}/applications/${encodeURIComponent(applicationId)}`;
