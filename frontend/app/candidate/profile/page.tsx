@@ -403,9 +403,10 @@ function BlockEditor({
     <section className={styles.card} aria-label={block.label}>
       <div className={styles.sectionHead}>
         <h2>{blockTitles[block.key]}</h2>
-        <button className="btn btn-ghost" type="button" disabled={busy} aria-expanded={open} onClick={() => {
+        <button className={`btn btn-ghost ${styles.addButton}`} type="button" disabled={busy} aria-expanded={open}
+          aria-label={`Thêm ${block.label.toLowerCase()}`} title={`Thêm ${block.label.toLowerCase()}`} onClick={() => {
           setDraft({}); setEditing(null); setError(""); setOpen(true);
-        }}><Plus size={16} aria-hidden="true" /> Thêm {block.label.toLowerCase()}</button>
+        }}><Plus size={20} aria-hidden="true" /></button>
       </div>
       {items.length ? (
         <ul className={block.key === "skills" ? styles.skills : styles.items}>

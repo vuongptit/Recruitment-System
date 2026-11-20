@@ -96,6 +96,7 @@
 .card h2, .preview h2 { margin: 0; font-size: 17px; line-height: 1.45; }
 .sectionHead { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .card .sectionHead > :global(.btn) { min-height: 40px; padding: 6px 10px; color: var(--profile-accent); }
+.card .sectionHead > .addButton { min-width: 44px; min-height: 44px; padding: 0; justify-content: center; }
 .summary, .muted { margin: 0; overflow-wrap: anywhere; line-height: 1.65; }
 .summary { white-space: pre-wrap; }
 .muted { font-size: 13px; color: var(--profile-muted); }
