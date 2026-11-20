@@ -58,7 +58,7 @@ export function PasswordToggle({ visible, onToggle, disabled = false }: { visibl
 
 export function GoogleAuthButton({ href, label, onUnavailable, disabled = false }: { href: string; label: string; onUnavailable: () => void; disabled?: boolean }) {
   const content = <><img src="/figma/login/bc562.svg" width={20} height={20} alt="" aria-hidden="true" /><span>{label}</span></>;
-  return process.env.NEXT_PUBLIC_GOOGLE_LOGIN_ENABLED === "true" && !disabled
+  return process.env.NEXT_PUBLIC_GOOGLE_LOGIN_ENABLED !== "false" && !disabled
     ? <a className="auth-google" href={href}>{content}</a>
     : <button className="auth-google" type="button" onClick={onUnavailable} disabled={disabled}>{content}</button>;
 }

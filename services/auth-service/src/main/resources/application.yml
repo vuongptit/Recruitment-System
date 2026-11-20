@@ -102,3 +102,6 @@ management:
       show-details: never
       probes:
         enabled: true
+  health:
+    mail:
+      enabled: false
