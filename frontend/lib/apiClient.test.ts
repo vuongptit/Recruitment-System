@@ -1211,6 +1211,19 @@ test("recruiter Job table clamps an outdated page after client filters change", 
   assert.equal(result.to, 1);
 });
 
+test("recruiter Job table filters by scope MINE using createdBy and currentUserId", () => {
+  const rows: RecruiterJobTableRow[] = [
+    { id: "1", title: "Job 1", status: "PUBLISHED", location: "HN", department: "IT", ownerName: "An", deadline: "2026-09-10", updatedAt: "2026-08-20", createdBy: "user-1" },
+    { id: "2", title: "Job 2", status: "PUBLISHED", location: "HN", department: "IT", ownerName: "Bình", deadline: "2026-09-11", updatedAt: "2026-08-21", createdBy: "user-2" },
+  ];
+  const allResult = buildRecruiterJobTable(rows, { query: "", status: "ALL", sort: "UPDATED_DESC", page: 1, pageSize: 10, scope: "ALL", currentUserId: "user-1" });
+  assert.equal(allResult.filteredCount, 2);
+
+  const mineResult = buildRecruiterJobTable(rows, { query: "", status: "ALL", sort: "UPDATED_DESC", page: 1, pageSize: 10, scope: "MINE", currentUserId: "user-1" });
+  assert.equal(mineResult.filteredCount, 1);
+  assert.equal(mineResult.items[0].id, "1");
+});
+
 test("recruiter Job scope explains the backend list boundary for OWNER and MEMBER", () => {
   assert.match(recruiterJobScopeView("OWNER").description, /mọi tin/);
   assert.match(recruiterJobScopeView("MEMBER").description, /do bạn tạo/);

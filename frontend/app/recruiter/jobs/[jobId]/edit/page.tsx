@@ -5,6 +5,7 @@ import { jobStatusLabel } from "@/lib/recruitmentLabels";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useCurrentAccount } from "@/components/SessionGate";
 import { ErrorState, LoadingState, PageHeader, StatusBadge } from "@/components/ui";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { ConflictRecoveryPanel } from "@/components/ConflictRecoveryPanel";
@@ -18,9 +19,11 @@ import {
   type RecruiterJobFormValues,
 } from "../../../../../lib/jobForm";
 import {
+  getCurrentCompanyMembership,
   getRecruiterJob,
   submitJobForApproval,
   updateRecruiterJob,
+  type CompanyMemberRole,
   type Job,
 } from "../../../../../lib/person2Api";
 
@@ -44,6 +47,8 @@ function toDraft(job: Job): RecruiterJobFormValues {
 }
 
 export default function EditRecruiterJobPage() {
+  const account = useCurrentAccount();
+  const [membershipRole, setMembershipRole] = useState<CompanyMemberRole | null>(null);
   const params = useParams<{ jobId: string }>();
   const jobId = params.jobId;
   const [job, setJob] = useState<Job | null>(null);
@@ -59,6 +64,15 @@ export default function EditRecruiterJobPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [conflict, setConflict] = useState<ConflictSnapshot<RecruiterJobFormValues, Job> | null>(null);
   const [conflictStage, setConflictStage] = useState<"SAVE" | "SUBMIT">("SAVE");
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    getCurrentCompanyMembership(controller.signal)
+      .then((res) => { if (active) setMembershipRole(res.data.memberRole); })
+      .catch(() => { if (active) setMembershipRole(null); });
+    return () => { active = false; controller.abort(); };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -164,6 +178,31 @@ export default function EditRecruiterJobPage() {
   if (loading) return <main><LoadingState label="Đang tải bản nháp tuyển dụng" /></main>;
   if (loadError || !job || !draft) {
     return <main><ErrorState message={loadError || "Không tìm thấy tin tuyển dụng."} onRetry={() => setReloadKey((value) => value + 1)} /></main>;
+  }
+
+  const canManage = Boolean(membershipRole === "OWNER" || (account?.id && job.createdBy === account.id));
+
+  if (membershipRole && !canManage) {
+    return (
+      <main>
+        <PageHeader
+          eyebrow="CHỈNH SỬA TIN"
+          title="Không có quyền chỉnh sửa"
+          description="Tin tuyển dụng này do thành viên khác trong công ty tạo."
+          action={<Link className="btn" href="/recruiter/jobs">Về danh sách</Link>}
+        />
+        <article className="panel stack">
+          <p className="notice notice-warning">
+            Bạn không có quyền chỉnh sửa tin này vì tin do thành viên khác trong công ty tạo. Chỉ người tạo tin hoặc Chủ sở hữu công ty mới có quyền sửa tin.
+          </p>
+          <div className="btn-group">
+            <Link className="btn btn-primary" href={`/recruiter/jobs/${job.id}/preview`}>Xem chi tiết tin</Link>
+            <Link className="btn btn-secondary" href={`/recruiter/jobs/${job.id}`}>Hồ sơ ứng tuyển</Link>
+            <Link className="btn btn-ghost" href="/recruiter/jobs">Về danh sách tin</Link>
+          </div>
+        </article>
+      </main>
+    );
   }
 
   const editable = ["DRAFT", "PENDING_APPROVAL", "PUBLISHED"].includes(job.status);

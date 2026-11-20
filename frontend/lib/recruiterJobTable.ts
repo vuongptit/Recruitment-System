@@ -1,6 +1,7 @@
 import type { JobStatus } from "./demoData";
 
 export type RecruiterJobSort = "UPDATED_DESC" | "DEADLINE_ASC" | "TITLE_ASC";
+export type RecruiterJobScopeFilter = "ALL" | "MINE";
 
 export interface RecruiterJobTableRow {
   id: string;
@@ -11,6 +12,7 @@ export interface RecruiterJobTableRow {
   ownerName: string;
   deadline: string;
   updatedAt: string;
+  createdBy?: string;
 }
 
 export interface RecruiterJobTableOptions {
@@ -19,6 +21,8 @@ export interface RecruiterJobTableOptions {
   sort: RecruiterJobSort;
   page: number;
   pageSize: number;
+  scope?: RecruiterJobScopeFilter;
+  currentUserId?: string;
 }
 
 export interface RecruiterJobTableResult<T> {
@@ -43,6 +47,9 @@ export function buildRecruiterJobTable<T extends RecruiterJobTableRow>(
   const query = options.query.normalize("NFKC").trim().toLocaleLowerCase("vi-VN");
   const pageSize = Math.max(1, Math.floor(options.pageSize));
   const filtered = jobs.filter((job) => {
+    if (options.scope === "MINE" && options.currentUserId && job.createdBy !== options.currentUserId) {
+      return false;
+    }
     const searchable = [job.title, job.location, job.department, job.ownerName]
       .join(" ")
       .normalize("NFKC")

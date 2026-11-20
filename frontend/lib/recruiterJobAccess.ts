@@ -12,13 +12,13 @@ export function recruiterJobScopeView(role: RecruiterJobScopeRole): RecruiterJob
   if (role === "OWNER") {
     return {
       label: "Chủ sở hữu · Toàn công ty",
-      description: "Bạn đang xem mọi tin tuyển dụng thuộc công ty, gồm cả tin do thành viên khác tạo.",
+      description: "Bạn đang xem mọi tin tuyển dụng thuộc công ty và có toàn quyền quản lý.",
       tone: "success",
     };
   }
   return {
-    label: "Thành viên · Tin của bạn",
-    description: "Bạn có thể xem và quản lý những tin do bạn tạo.",
+    label: "Thành viên · Toàn công ty",
+    description: "Bạn có thể xem mọi tin tuyển dụng của công ty và quản lý những tin do bạn tạo.",
     tone: "info",
   };
 }

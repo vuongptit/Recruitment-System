@@ -219,7 +219,7 @@ export class JobController {
   @Roles(SystemRole.RECRUITER)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'List manageable jobs (OWNER: all company; MEMBER: own)',
+    summary: 'List company jobs (OWNER: manage all; MEMBER: view all, manage own)',
   })
   @ApiOkResponse({ schema: envelope(true) })
   listMine(
