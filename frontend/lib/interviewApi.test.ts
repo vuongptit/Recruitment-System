@@ -4,13 +4,16 @@ import {
   confirmInterview,
   feedbackConclusionLabel,
   interviewModeLabel,
+  interviewScheduleError,
   interviewStartGmt7,
   joinInterviewRoom,
   requestRescheduleInterview,
+  rescheduleInterviewByRecruiter,
   scheduleInterview,
   schedulingRequestIdentity,
   submitInterviewFeedback,
 } from "./interviewApi";
+import { ApiClientError } from "./apiClientCore";
 import { listChatMessages, mergeConversationMessages, parseCallMessage, sendChatMessage, type ChatMessage } from "./chatApi";
 import { mergeNotifications, notificationDestination } from "./notificationState";
 
@@ -137,6 +140,49 @@ test("interview lifecycle endpoints call confirm, reschedule, join, and feedback
     });
     assert.equal(fRes.data.conclusion, "PASS");
     assert.equal(calls.length, 4);
+  } finally {
+    globalThis.fetch = previousFetch;
+    delete process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+});
+
+test("rescheduleInterviewByRecruiter strips unknown fields before sending to backend", async () => {
+  process.env.NEXT_PUBLIC_API_BASE_URL = "http://gateway.test";
+  const previousFetch = globalThis.fetch;
+  let sentBody: Record<string, unknown> | null = null;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(options?.method, "PATCH");
+    assert.ok(String(url).endsWith("/api/interviews/iv-99/reschedule"));
+    sentBody = JSON.parse(String(options?.body));
+    return new Response(
+      JSON.stringify({ data: { id: "iv-100", scheduleRevision: 2, status: "SCHEDULED" } }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  };
+  try {
+    const res = await rescheduleInterviewByRecruiter("iv-99", {
+      applicationId: "app-123",
+      roundNumber: 1,
+      scheduledStart: "2027-01-20T09:30:00+07:00",
+      timeZone: "Asia/Ho_Chi_Minh",
+      durationMinutes: 45,
+      mode: "OFFLINE",
+      location: "Room 101",
+      notes: "Please arrive 10m early",
+      requestId: "req-abc",
+      reason: "Recruiter updated time",
+    });
+    assert.equal(res.data.id, "iv-100");
+    const body = sentBody as Record<string, unknown> | null;
+    assert.equal(body?.applicationId, undefined);
+    assert.equal(body?.roundNumber, undefined);
+    assert.equal(body?.scheduledStart, "2027-01-20T09:30:00+07:00");
+    assert.equal(body?.mode, "OFFLINE");
+    assert.equal(body?.location, "Room 101");
+    assert.equal(body?.requestId, "req-abc");
+
+    const invalidJsonErr = new ApiClientError({ code: "INVALID_JSON", status: 400 });
+    assert.equal(interviewScheduleError(invalidJsonErr), "Dữ liệu yêu cầu không hợp lệ. Hãy kiểm tra thông tin và thử lại.");
   } finally {
     globalThis.fetch = previousFetch;
     delete process.env.NEXT_PUBLIC_API_BASE_URL;

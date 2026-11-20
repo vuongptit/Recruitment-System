@@ -1,0 +1,317 @@
+.offerCard {
+  background: #ffffff;
+  border: 1px solid var(--border, #dce6e0);
+  border-radius: 16px;
+  padding: 26px 28px;
+  box-shadow: 0 2px 12px rgba(20, 50, 30, 0.03);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.headerMain {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.iconBox {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--primary-tint, #eaf6ef);
+  color: var(--primary, #087f46);
+  flex-shrink: 0;
+}
+
+.headerInfo h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 750;
+  color: var(--text, #163625);
+  line-height: 1.3;
+}
+
+.jobBadge {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--muted, #52645a);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.jobBadge strong {
+  color: var(--text, #1c3628);
+  font-weight: 600;
+}
+
+/* Response status banners */
+.statusBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  margin-bottom: 22px;
+}
+
+.statusBannerIcon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.bannerAccepted {
+  background: linear-gradient(135deg, #f0fdf4 0%, #f6fcf8 100%);
+  border: 1px solid #bbf7d0;
+  border-left: 4px solid #16a34a;
+}
+.bannerAccepted .statusBannerIcon {
+  background: #dcfce7;
+  color: #16a34a;
+}
+.bannerAccepted strong {
+  color: #14532d;
+  font-size: 15px;
+}
+.bannerAccepted p {
+  color: #166534;
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.bannerDeclined {
+  background: linear-gradient(135deg, #fef2f2 0%, #fff7f7 100%);
+  border: 1px solid #fecdd3;
+  border-left: 4px solid #dc2626;
+}
+.bannerDeclined .statusBannerIcon {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.bannerDeclined strong {
+  color: #7f1d1d;
+  font-size: 15px;
+}
+.bannerDeclined p {
+  color: #991b1b;
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.bannerPending {
+  background: linear-gradient(135deg, #fefce8 0%, #fffdf0 100%);
+  border: 1px solid #fef08a;
+  border-left: 4px solid #ca8a04;
+}
+.bannerPending .statusBannerIcon {
+  background: #fef9c3;
+  color: #ca8a04;
+}
+.bannerPending strong {
+  color: #713f12;
+  font-size: 15px;
+}
+.bannerPending p {
+  color: #854d0e;
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.bannerExpired {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #6b7280;
+}
+.bannerExpired .statusBannerIcon {
+  background: #e5e7eb;
+  color: #4b5563;
+}
+.bannerExpired strong {
+  color: #1f2937;
+  font-size: 15px;
+}
+.bannerExpired p {
+  color: #4b5563;
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* Key metrics grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.metricCard {
+  background: #f8faf9;
+  border: 1px solid #e5ebe7;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.15s ease;
+}
+
+.metricCard:hover {
+  border-color: #c9dbd1;
+}
+
+.metricLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #5c7064;
+  font-weight: 500;
+}
+
+.metricLabel svg {
+  color: var(--primary, #087f46);
+  flex-shrink: 0;
+}
+
+.metricValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: #163625;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.salaryHighlight {
+  color: var(--primary, #087f46);
+  font-size: 18px;
+  font-weight: 750;
+}
+
+/* Note box */
+.noteCard {
+  background: #fbfdfc;
+  border: 1px solid #e0eae4;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.noteHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #3b5346;
+  margin-bottom: 8px;
+}
+
+.noteHeader svg {
+  color: var(--primary, #087f46);
+  flex-shrink: 0;
+}
+
+.noteBody {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #243d30;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Attachment box */
+.attachmentCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #f0f7f3;
+  border: 1px dashed #9dcfb1;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.attachmentInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.attachmentIcon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #ffffff;
+  color: var(--primary, #087f46);
+  border: 1px solid #c8e3d3;
+  flex-shrink: 0;
+}
+
+.attachmentDetails strong {
+  display: block;
+  font-size: 13.5px;
+  color: #173b28;
+}
+
+.attachmentDetails small {
+  font-size: 12px;
+  color: #5c7467;
+}
+
+/* Footer help text */
+.footerNotice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: #5f7569;
+  line-height: 1.5;
+  margin: 0;
+  padding-top: 16px;
+  border-top: 1px solid #eef3f0;
+}
+
+.footerNotice svg {
+  flex-shrink: 0;
+  color: #7b9487;
+}
+
+.actionRow {
+  margin-top: 18px;
+}
+
+@media (max-width: 680px) {
+  .offerCard {
+    padding: 18px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
