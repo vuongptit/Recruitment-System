@@ -861,7 +861,7 @@ export function AdminCompanyDetail({
                   </dt>
                   <dd className="admin-company-description">{description}</dd>
                 </div>
-                {createdAt && (
+                {Boolean(createdAt) && (
                   <div className="admin-fact-row">
                     <dt>
                       <CalendarDays size={16} aria-hidden="true" /> Ngày gửi hồ sơ
@@ -869,7 +869,7 @@ export function AdminCompanyDetail({
                     <dd>{date(createdAt, true)}</dd>
                   </div>
                 )}
-                {updatedAt && (
+                {Boolean(updatedAt) && (
                   <div className="admin-fact-row">
                     <dt>
                       <CalendarDays size={16} aria-hidden="true" /> Cập nhật gần nhất
