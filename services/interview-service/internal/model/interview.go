@@ -280,6 +280,8 @@ type RescheduleRequest struct {
 	Mode            *string    `json:"mode,omitempty"`
 	Location        *string    `json:"location,omitempty"`
 	Notes           *string    `json:"notes,omitempty"`
+	ApplicationID   *uuid.UUID `json:"applicationId,omitempty"`
+	RoundNumber     *int       `json:"roundNumber,omitempty"`
 }
 
 type CancelInterviewRequest struct {

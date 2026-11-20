@@ -234,11 +234,14 @@ export function rescheduleInterviewByRecruiter(
     location?: string | null;
     notes?: string | null;
     reason?: string;
+    applicationId?: string;
+    roundNumber?: number;
   }
 ) {
+  const { applicationId: _a, roundNumber: _r, ...cleanBody } = body;
   return requestApi<Interview>(`/api/interviews/${encodeURIComponent(interviewId)}/reschedule`, {
     method: "PATCH",
-    body,
+    body: cleanBody,
     privateData: true,
     maxRetries: 0,
   });
@@ -342,6 +345,7 @@ export function interviewScheduleError(error: unknown): string {
   if (error instanceof ApiClientError) {
     const messages: Record<string, string> = {
       APPLICATION_AUTHORIZATION_UNAVAILABLE: "Chưa xác minh được hồ sơ ứng tuyển. Hãy thử lại sau hoặc tải lại hồ sơ.",
+      INVALID_JSON: "Dữ liệu yêu cầu không hợp lệ. Hãy kiểm tra thông tin và thử lại.",
       COMPANY_MEMBERSHIP_UNAVAILABLE: "Chưa xác minh được quyền tuyển dụng tại công ty. Hãy thử lại sau.",
       INTERVIEW_CANDIDATE_CONFLICT:
         "Ứng viên đã có lịch trùng giờ. Hãy chọn thời gian khác.",

@@ -77,7 +77,16 @@ export default function ScheduleInterviewPage({ params }: { params: { applicatio
       if (identity.current?.fingerprint !== fingerprint) identity.current = {fingerprint, id: crypto.randomUUID()};
       locked.current = true; setPending(true);
       const response = editing
-        ? await rescheduleInterviewByRecruiter(editing.id, { ...payload, requestId: identity.current.id, reason: "Nhà tuyển dụng cập nhật lịch phỏng vấn" })
+        ? await rescheduleInterviewByRecruiter(editing.id, {
+            scheduledStart,
+            timeZone: "Asia/Ho_Chi_Minh",
+            durationMinutes: duration,
+            mode,
+            location: mode === "OFFLINE" ? location.trim() : null,
+            notes: notes.trim() || null,
+            requestId: identity.current.id,
+            reason: "Nhà tuyển dụng cập nhật lịch phỏng vấn",
+          })
         : await scheduleInterview({ ...payload, requestId: identity.current.id });
       setInterviews(previous => [...previous.map(iv => editing?.id === iv.id ? { ...iv, status: "CANCELLED" } : iv).filter(iv => iv.id !== response.data.id), response.data]);
       setEditing(null); identity.current = null; setNow(Date.now());
