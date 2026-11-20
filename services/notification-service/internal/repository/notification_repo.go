@@ -148,8 +148,8 @@ func (r *NotificationRepository) CountUnreadDetailed(ctx context.Context, userID
 	query := `
 		SELECT 
 			COUNT(*),
-			COUNT(*) FILTER (WHERE type = 'new_message'),
-			COUNT(*) FILTER (WHERE type != 'new_message')
+			COUNT(*) FILTER (WHERE LOWER(type) LIKE '%message%'),
+			COUNT(*) FILTER (WHERE LOWER(type) NOT LIKE '%message%')
 		FROM notifications
 		WHERE user_id = $1 AND is_read = FALSE
 	`
@@ -173,7 +173,7 @@ func (r *NotificationRepository) MarkConversationAsRead(ctx context.Context, con
 	query := `
 		UPDATE notifications
 		SET is_read = TRUE, read_at = CURRENT_TIMESTAMP
-		WHERE user_id = $1 AND type = 'new_message' AND metadata->>'conversation_id' = $2 AND is_read = FALSE
+		WHERE user_id = $1 AND LOWER(type) LIKE '%message%' AND metadata->>'conversation_id' = $2 AND is_read = FALSE
 	`
 	_, err := r.db.ExecContext(ctx, query, userID, conversationID)
 	return err
