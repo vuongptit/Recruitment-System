@@ -20,6 +20,18 @@ import { useRouter } from "next/navigation";
 import { ApplicationNextStep, ApplicationProgress } from "./ApplicationJourney";
 import { ApplicationStageFilter } from "./ApplicationStageFilter";
 import { formatApplicationDate } from "../lib/applicationStateMachine";
+import {
+  User,
+  BriefcaseBusiness,
+  CalendarDays,
+  Sparkles,
+  FileText,
+  Star,
+  MessageSquare,
+  RefreshCw,
+  ChevronDown,
+  Layers,
+} from "lucide-react";
 import styles from "./RecruiterApplicationPipeline.module.css";
 
 const DEFAULT_FILTERS: RecruiterApplicationFilterDraft = {
@@ -337,7 +349,31 @@ export function RecruiterApplicationPipeline({ jobId }: { jobId?: string }) {
           return (
             <article className={`card application-pipeline-card ${styles.application}`} key={application.id}>
               <div className="section-head row-between">
-                <div><h3><Link href={`/recruiter/applications/${application.id}`}>{application.candidateName || "Ứng viên"}</Link></h3><strong>{application.jobTitle}</strong><p className="help">Nộp ngày {formatApplicationDate(application.createdAt)} · GMT+7</p></div>
+                <div className={styles.candidateHeader}>
+                  <div className={styles.candidateAvatar}>
+                    <User size={22} />
+                  </div>
+                  <div className={styles.candidateMeta}>
+                    <div className={styles.candidateHeading}>
+                      <span className={styles.candidateTag}>Ứng viên:</span>
+                      <h3 className={styles.candidateName}>
+                        <Link href={`/recruiter/applications/${application.id}`}>
+                          {application.candidateName && application.candidateName !== "Ứng viên"
+                            ? application.candidateName
+                            : "Ứng viên"}
+                        </Link>
+                      </h3>
+                    </div>
+                    <div className={styles.jobRow}>
+                      <BriefcaseBusiness size={14} className={styles.metaIcon} />
+                      <span>{application.jobTitle}</span>
+                    </div>
+                    <p className={styles.dateRow}>
+                      <CalendarDays size={13} className={styles.metaIcon} />
+                      Nộp ngày {formatApplicationDate(application.createdAt)} · GMT+7
+                    </p>
+                  </div>
+                </div>
                 <StatusBadge tone={application.status === "HIRED" ? "success" : application.status === "REJECTED" || application.status === "WITHDRAWN" ? "danger" : "warning"}>{applicationStatusLabel(application.status)}</StatusBadge>
               </div>
               <ApplicationProgress status={application.status} compact />
@@ -350,27 +386,154 @@ export function RecruiterApplicationPipeline({ jobId }: { jobId?: string }) {
                   <button key={action.status} className="btn btn-primary" type="button" disabled={pendingApplicationId !== null} aria-busy={pending} onClick={() => { void moveStatus(application, action.status); }}>{pending ? "Đang cập nhật…" : action.label}</button>
                 ))}
               </div>
-              <details className={styles.tools}><summary>CV, đánh giá và trao đổi</summary>
-              <div className="stack">
-              <p className="help">Điểm phù hợp AI: {application.matchScore == null ? "Chưa sẵn sàng" : `${application.matchScore}/100`}. Điểm này hỗ trợ đánh giá, không tự quyết định chuyển bước.</p>
-              <RecruiterCvAccess applicationId={application.id} />
-              <RecruiterEvaluation applicationId={application.id} />
-              {matchState ? (
-                <p className="notice notice-warning" role="status">
-                  <strong>AI chưa sẵn sàng.</strong> {matchState.message} {matchState.polling ? "CareerHub sẽ tự thử lại một lần sau 5 giây." : "Bạn có thể thử lại khi dữ liệu đã đồng bộ."}
-                </p>
-              ) : null}
-              <div className="btn-group">
-                <button className="btn" type="button" disabled={pendingApplicationId !== null || matchState?.polling} aria-busy={pending && !matchState} onClick={() => { void refreshMatch(application); }}>
-                  {pending && !matchState ? "Đang tính điểm…" : matchState?.polling ? "Đang chờ AI…" : "Làm mới điểm phù hợp"}
-                </button>
-                {application.candidateId ? (
-                  <button className="btn" type="button" disabled={chattingId !== null || !application.candidateId} aria-busy={chattingId === application.id} onClick={() => startChat(application)}>
-                    {chattingId === application.id ? "Đang tạo..." : "Chat với ứng viên"}
-                  </button>
-                ) : null}
-              </div>
-              </div></details>
+              <details className={styles.tools}>
+                <summary className={styles.toolsSummary}>
+                  <span className={styles.toolsSummaryLeft}>
+                    <Layers size={16} />
+                    <span>CV, đánh giá và trao đổi</span>
+                  </span>
+                  <span className={styles.toolsSummaryRight}>
+                    {application.matchScore != null ? (
+                      <span className={styles.summaryBadge}>
+                        <Sparkles size={12} />
+                        AI: {application.matchScore}/100
+                      </span>
+                    ) : (
+                      <span className={styles.summaryBadgeMuted}>
+                        <Sparkles size={12} />
+                        AI: Chưa tính
+                      </span>
+                    )}
+                    <ChevronDown size={16} className={styles.chevronIcon} />
+                  </span>
+                </summary>
+                <div className={styles.toolsBody}>
+                  <div className={styles.toolsGrid}>
+                    {/* Box 1: Điểm phù hợp AI */}
+                    <div className={styles.toolCard}>
+                      <div>
+                        <div className={styles.toolCardHeader}>
+                          <div className={styles.toolCardTitle}>
+                            <div className={styles.toolIconAi}>
+                              <Sparkles size={16} />
+                            </div>
+                            <span>Độ phù hợp AI</span>
+                          </div>
+                          {application.matchScore != null ? (
+                            <StatusBadge tone="success">{application.matchScore >= 70 ? "Phù hợp cao" : "Tiềm năng"}</StatusBadge>
+                          ) : (
+                            <StatusBadge tone="neutral">Chưa sẵn sàng</StatusBadge>
+                          )}
+                        </div>
+                        {application.matchScore != null ? (
+                          <div className={styles.matchScoreRow}>
+                            <div>
+                              <span className={styles.matchScoreNumber}>{application.matchScore}</span>
+                              <span className={styles.matchScoreUnit}>/100</span>
+                            </div>
+                            <div className={styles.matchProgressTrack}>
+                              <div 
+                                className={styles.matchProgressFill} 
+                                style={{ width: `${Math.min(100, Math.max(0, application.matchScore))}%` }} 
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <p className={styles.toolCardBody} style={{ margin: "8px 0" }}>
+                            Hệ thống AI đối soát kỹ năng và kinh nghiệm của ứng viên với mô tả công việc.
+                          </p>
+                        )}
+                        {matchState ? (
+                          <p className="notice notice-warning" role="status" style={{ marginTop: 8, fontSize: 12 }}>
+                            <strong>AI chưa sẵn sàng.</strong> {matchState.message} {matchState.polling ? "Tự thử lại sau 5s…" : ""}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className={styles.toolCardAction}>
+                        <button 
+                          className="btn" 
+                          type="button" 
+                          disabled={pendingApplicationId !== null || matchState?.polling} 
+                          aria-busy={pending && !matchState} 
+                          onClick={() => { void refreshMatch(application); }}
+                        >
+                          <RefreshCw size={13} style={{ marginRight: 6, display: "inline-block", verticalAlign: "middle" }} />
+                          {pending && !matchState ? "Đang tính…" : matchState?.polling ? "Đang chờ AI…" : "Làm mới điểm AI"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Box 2: Hồ sơ CV */}
+                    <div className={styles.toolCard}>
+                      <div>
+                        <div className={styles.toolCardHeader}>
+                          <div className={styles.toolCardTitle}>
+                            <div className={styles.toolIconCv}>
+                              <FileText size={16} />
+                            </div>
+                            <span>Hồ sơ & CV</span>
+                          </div>
+                        </div>
+                        <p className={styles.toolCardBody} style={{ margin: "8px 0 12px" }}>
+                          Xem bản CV ứng tuyển đính kèm được ứng viên cung cấp khi nộp đơn.
+                        </p>
+                        <RecruiterCvAccess applicationId={application.id} />
+                      </div>
+                    </div>
+
+                    {/* Box 3: Đánh giá nội bộ */}
+                    <div className={styles.toolCard}>
+                      <div>
+                        <div className={styles.toolCardHeader}>
+                          <div className={styles.toolCardTitle}>
+                            <div className={styles.toolIconEval}>
+                              <Star size={16} />
+                            </div>
+                            <span>Đánh giá nội bộ</span>
+                          </div>
+                        </div>
+                        <p className={styles.toolCardBody} style={{ margin: "8px 0 12px" }}>
+                          Ghi nhận nhận xét chuyên môn, kỹ năng và mức độ phù hợp văn hóa.
+                        </p>
+                        <RecruiterEvaluation applicationId={application.id} />
+                      </div>
+                    </div>
+
+                    {/* Box 4: Trao đổi trực tiếp */}
+                    <div className={styles.toolCard}>
+                      <div>
+                        <div className={styles.toolCardHeader}>
+                          <div className={styles.toolCardTitle}>
+                            <div className={styles.toolIconChat}>
+                              <MessageSquare size={16} />
+                            </div>
+                            <span>Kênh trao đổi</span>
+                          </div>
+                        </div>
+                        <p className={styles.toolCardBody} style={{ margin: "8px 0" }}>
+                          Nhắn tin trao đổi trực tiếp với {application.candidateName && application.candidateName !== "Ứng viên" ? application.candidateName : "ứng viên"} để làm rõ hồ sơ hoặc mời phỏng vấn.
+                        </p>
+                      </div>
+                      <div className={styles.toolCardAction}>
+                        {application.candidateId ? (
+                          <button 
+                            className={styles.chatButton} 
+                            type="button" 
+                            disabled={chattingId !== null || !application.candidateId} 
+                            aria-busy={chattingId === application.id} 
+                            onClick={() => startChat(application)}
+                          >
+                            <MessageSquare size={14} />
+                            {chattingId === application.id ? "Đang tạo đoạn chat…" : "Chat với ứng viên"}
+                          </button>
+                        ) : (
+                          <span className="help">Chưa có tài khoản liên kết</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </details>
               {hasRejectAction ? <details className={styles.rejection}><summary>{application.status === "OFFER" ? "Thu hồi thư mời và từ chối hồ sơ" : "Từ chối hồ sơ"}</summary><div className="field">
                 <label className="label" htmlFor={`reject-${application.id}`}>Lý do từ chối (hiển thị trong lịch sử hồ sơ)</label>
                 <textarea id={`reject-${application.id}`} className="textarea resize-none" maxLength={2000} value={rejectionReasons[application.id] ?? ""} aria-describedby={validationErrors[application.id] ? `reject-error-${application.id}` : undefined} onChange={(event) => { setRejectionReasons((current) => ({ ...current, [application.id]: event.target.value })); setValidationErrors((current) => ({ ...current, [application.id]: "" })); }} />

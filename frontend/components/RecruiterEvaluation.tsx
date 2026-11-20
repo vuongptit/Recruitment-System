@@ -6,6 +6,7 @@ import { isEvaluationAlreadyExists, normalizeEvaluationDraft, type EvaluationDra
 import { createApplicationEvaluation, getApplicationEvaluations, type ApplicationEvaluationResult } from "../lib/person2Api";
 import { useCurrentAccount } from "./SessionGate";
 import { ErrorState, LoadingState, StatusBadge } from "./ui";
+import { Star, CheckCircle2 } from "lucide-react";
 
 const EMPTY_DRAFT: EvaluationDraft = { score: "", technical: "", communication: "", culture: "", note: "" };
 const SCORE_LABELS = [["score", "Điểm tổng"], ["technical", "Kỹ thuật"], ["communication", "Giao tiếp"], ["culture", "Phù hợp văn hóa"]] as const;
@@ -61,7 +62,19 @@ export function RecruiterEvaluation({ applicationId }: { applicationId: string }
 
   return (
     <div>
-      <div className="btn-group"><button className="btn" type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? "Đóng đánh giá" : "Xem và đánh giá ứng viên"}</button>{evaluated ? <StatusBadge tone="success">Bạn đã đánh giá</StatusBadge> : null}</div>
+      <div className="btn-group" style={{ alignItems: "center" }}>
+        <button 
+          className="btn" 
+          type="button" 
+          aria-expanded={open} 
+          onClick={() => setOpen((value) => !value)}
+          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+        >
+          <Star size={14} style={{ color: evaluated ? "#f59e0b" : "currentColor" }} />
+          {open ? "Đóng đánh giá" : "Xem và đánh giá ứng viên"}
+        </button>
+        {evaluated ? <StatusBadge tone="success"><CheckCircle2 size={12} style={{ marginRight: 4, display: "inline-block", verticalAlign: "middle" }} />Bạn đã đánh giá</StatusBadge> : null}
+      </div>
       {open ? (
         <section className="stack" aria-label="Đánh giá nội bộ">
           {loading ? <LoadingState label="Đang tải đánh giá" /> : null}

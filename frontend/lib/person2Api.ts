@@ -216,6 +216,7 @@ interface BackendApplicationListItem {
   jobId: string;
   companyId: string;
   candidateId?: string;
+  candidateName?: string;
   jobTitle: string;
   status: CandidateApplication["status"];
   matchScore?: number | null;
@@ -480,7 +481,7 @@ function toApplication(value: BackendApplicationListItem): CandidateApplication 
   return {
     id: value.id,
     candidateId: value.candidateId ?? "",
-    candidateName: "Ứng viên",
+    candidateName: value.candidateName?.trim() || "Ứng viên",
     email: "",
     jobId: value.jobId,
     jobTitle: value.jobTitle,
