@@ -8,7 +8,6 @@ import {
   Building2,
   ShieldCheck,
   Flag,
-  Bell,
   ClipboardList,
   Settings,
   UserCog,
@@ -25,7 +24,6 @@ const links: WorkspaceLink[] = [
   { href: "/admin/jobs", label: "Duyệt tin tuyển dụng", icon: BriefcaseBusiness },
   { href: "/admin/reports", label: "Báo cáo vi phạm", icon: Flag },
   { href: "/admin/audit", label: "Nhật ký hoạt động", icon: ClipboardList },
-  { href: "/admin/notifications", label: "Thông báo", icon: Bell },
   { href: "/admin/settings", label: "Cấu hình hệ thống", icon: Settings },
   { href: "/admin/profile", label: "Thông tin cá nhân", icon: UserCog },
 ];

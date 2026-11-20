@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { LayoutDashboard, BriefcaseBusiness, Files, UsersRound, Building2, MailPlus, MessageSquare, Bell, UserCog } from "lucide-react";
+import { LayoutDashboard, BriefcaseBusiness, Files, UsersRound, Building2, MailPlus, UserCog } from "lucide-react";
 import { useCurrentAccount } from "./SessionGate";
 import { WorkspaceShell, type WorkspaceLink } from "./WorkspaceShell";
 import { requestApi } from "../lib/apiClientCore";
@@ -14,8 +14,6 @@ const links: WorkspaceLink[] = [
   { href: "/recruiter/company", label: "Hồ sơ công ty", icon: Building2 },
   { href: "/recruiter/profile", label: "Thông tin cá nhân", icon: UserCog },
   { href: "/recruiter/invitations/accept", label: "Nhận lời mời", icon: MailPlus },
-  { href: "/recruiter/messages", label: "Tin nhắn", icon: MessageSquare },
-  { href: "/recruiter/notifications", label: "Thông báo", icon: Bell },
 ];
 
 export function RecruiterShell({ children }: { children: ReactNode }) {
