@@ -88,9 +88,9 @@ export default function RecruiterApplicationDetailPage({
   return (
     <main className="stack">
       <PageHeader
-        eyebrow="CHI TIẾT HỒ SƠ"
+        eyebrow={`CHI TIẾT HỒ SƠ${application.candidateName && application.candidateName !== "Ứng viên" ? ` · ${application.candidateName}` : ""}`}
         title={application.jobTitle}
-        description="Xem hồ sơ, quản lý lịch phỏng vấn, đánh giá và liên hệ ứng viên trong cùng một nơi."
+        description={`Xem hồ sơ của ${application.candidateName || "ứng viên"}, quản lý lịch phỏng vấn, đánh giá và liên hệ trong cùng một nơi.`}
         action={
           <div className="btn-group">
             {application.status === "INTERVIEW" && (
@@ -186,7 +186,12 @@ export default function RecruiterApplicationDetailPage({
       )}
 
       <section className="card stack">
-        <h2>Thông tin ứng tuyển</h2>
+        <div className="section-head row-between">
+          <div>
+            <h2>Thông tin ứng tuyển</h2>
+            <p className="help">Ứng viên: <strong>{application.candidateName || "Ứng viên"}</strong></p>
+          </div>
+        </div>
         <p>
           Nộp ngày{" "}
           {new Date(application.createdAt).toLocaleString("vi-VN", {

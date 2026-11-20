@@ -6,10 +6,12 @@ import com.recruitment.application.client.RecruiterCompanyMembership;
 import com.recruitment.application.domain.ApplicationEntity;
 import com.recruitment.application.domain.OfferEntity;
 import com.recruitment.application.repository.OfferRepository;
+import com.recruitment.application.pipeline.CandidateNameResolver;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,22 @@ public class ApplicationTrackingService {
     private final ApplicationTimelineRepository history;
     private final CompanyClient companies;
     private final OfferRepository offers;
+    private final CandidateNameResolver candidateNames;
+
+    @Autowired
+    public ApplicationTrackingService(
+        ApplicationTrackingRepository applications,
+        ApplicationTimelineRepository history,
+        CompanyClient companies,
+        OfferRepository offers,
+        CandidateNameResolver candidateNames
+    ) {
+        this.applications = applications;
+        this.history = history;
+        this.companies = companies;
+        this.offers = offers;
+        this.candidateNames = candidateNames;
+    }
 
     public ApplicationTrackingService(
         ApplicationTrackingRepository applications,
@@ -27,10 +45,7 @@ public class ApplicationTrackingService {
         CompanyClient companies,
         OfferRepository offers
     ) {
-        this.applications = applications;
-        this.history = history;
-        this.companies = companies;
-        this.offers = offers;
+        this(applications, history, companies, offers, null);
     }
 
     @Transactional(readOnly = true)
