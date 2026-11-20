@@ -57,7 +57,9 @@
 .jobCard:hover { border-color: #8fc3a6; box-shadow: 0 4px 16px rgb(30 85 55 / 6%); }
 .jobCardLink { display: flex; align-items: flex-start; gap: 20px; padding: 24px 24px 18px; color: inherit; text-decoration: none; }
 .companyMark { display: grid; flex-shrink: 0; place-items: center; width: 68px; height: 68px; overflow: hidden; border: 1px solid #e1e9e4; border-radius: 12px; background: #f5f9f6; color: #238354; font-size: 23px; font-weight: 750; }
+.companyMark > * { grid-area: 1 / 1; }
 .companyMark img { width: 100%; height: 100%; padding: 6px; object-fit: contain; background: white; }
+.companyMark img[data-loaded="false"] { opacity: 0; }
 .companyMarkLarge { width: 116px; height: 116px; border: 5px solid white; border-radius: 18px; background: #f4f8f5; box-shadow: 0 2px 12px #173e2b12; font-size: 36px; }
 .jobCardContent { flex: 1; min-width: 0; }
 .jobCardHeading { display: flex; justify-content: space-between; gap: 18px; }

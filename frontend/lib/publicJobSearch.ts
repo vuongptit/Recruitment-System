@@ -90,3 +90,39 @@ export function mergePublicJobPage<T extends { id: string }>(
   for (const item of incoming) byId.set(item.id, item);
   return [...byId.values()];
 }
+
+export function readJobSearchQuery(query: URLSearchParams) {
+  const form = { ...emptyPublicJobSearchForm };
+  form.q = (query.get("q") ?? "").slice(0, 200);
+  form.location = (query.get("location") ?? "").slice(0, 255);
+  form.skills = (query.get("skills") ?? "").slice(0, 2000);
+  form.salaryMin = (query.get("salaryMin") ?? "").slice(0, 30);
+  form.salaryMax = (query.get("salaryMax") ?? "").slice(0, 30);
+  form.experienceYears = (query.get("experienceYears") ?? "").slice(0, 3);
+  form.jobType = (query.get("jobType") ?? "") as PublicJobTypeFilter;
+  const sort = query.get("sort");
+  if (sort === "NEWEST" || sort === "SALARY_DESC") form.sort = sort;
+  for (const key of Object.keys(validatePublicJobSearch(form))) {
+    if (key === "salary") { form.salaryMin = ""; form.salaryMax = ""; }
+    else if (key === "jobType" || key === "experienceYears" || key === "skills") form[key] = "";
+  }
+  const requestedLimit = Number(query.get("limit"));
+  const limit = [5, 10, 20, 50].includes(requestedLimit) ? requestedLimit : 10;
+  const mode = query.get("mode") === "CURSOR" ? "CURSOR" as const : "OFFSET" as const;
+  const requestedPage = Number(query.get("page"));
+  const page = mode === "OFFSET" && Number.isInteger(requestedPage) && requestedPage >= 1 && !isOffsetWindowTooDeep(requestedPage, limit) ? requestedPage : 1;
+  return { form, limit, mode, page, searched: query.get("search") === "1" };
+}
+
+export function jobSearchHref(filters: PublicJobSearchFilters, mode: "CURSOR" | "OFFSET", page: number, limit: number, searched: boolean) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || (key === "sort" && value === "RELEVANCE")) continue;
+    query.set(key, Array.isArray(value) ? value.join(",") : String(value));
+  }
+  if (mode === "CURSOR") query.set("mode", mode);
+  if (page > 1 && mode === "OFFSET") query.set("page", String(page));
+  if (limit !== 10) query.set("limit", String(limit));
+  if (searched) query.set("search", "1");
+  return `/candidate/jobs${query.size ? `?${query}` : ""}`;
+}

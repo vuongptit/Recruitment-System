@@ -173,6 +173,7 @@ interface BackendJob {
   status?: Job["status"];
   rejectionReason?: string | null;
   aggregateVersion?: number;
+  publishedAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -471,6 +472,7 @@ function toJob(value: BackendJob, source: JobDataSource = "POSTGRESQL"): Job {
     ownerName: value.companyName || "Nhà tuyển dụng",
     aggregateVersion: value.aggregateVersion ?? 0,
     rejectionReason: value.rejectionReason ?? undefined,
+    publishedAt: value.publishedAt,
     createdAt: value.createdAt ?? value.updatedAt ?? new Date(0).toISOString(),
     updatedAt: value.updatedAt ?? value.createdAt ?? new Date(0).toISOString(),
     createdBy: value.createdBy,

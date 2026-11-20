@@ -15,3 +15,7 @@ export function jobDeadline(value: string): string {
 export function jobExperience(years?: number): string {
   return years === undefined ? "Chưa cập nhật" : years === 0 ? "Không yêu cầu kinh nghiệm" : `Từ ${years} năm kinh nghiệm`;
 }
+
+export function isJobAcceptingApplications(job: Pick<Job, "status" | "deadline">): boolean {
+  return job.status === "PUBLISHED" && job.deadline.slice(0, 10) >= new Date().toISOString().slice(0, 10);
+}

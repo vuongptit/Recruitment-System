@@ -1,22 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCurrentAccount } from "@/components/SessionGate";
 import { EmptyState, ErrorState, LoadingState, StatusBadge } from "@/components/ui";
-import { Building2, ChevronDown, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
-import { JobResultCard } from "@/components/discovery/JobResultCard";
+import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import { LocationPicker } from "@/components/discovery/LocationPicker";
-import styles from "@/components/discovery/Discovery.module.css";
+import discovery from "@/components/discovery/Discovery.module.css";
+import styles from "./JobSearch.module.css";
+import { SearchJobCard, SearchSkeleton, useJobSearchActivity } from "./JobSearchPanels";
 import { jobTypeLabel } from "@/lib/recruitmentLabels";
 import { ApiClientError, toUserMessage } from "../../../lib/apiClient";
 import { cursorRestartView } from "../../../lib/cursorRecovery";
 import {
   emptyPublicJobSearchForm,
   isOffsetWindowTooDeep,
+  jobSearchHref,
   mergePublicJobPage,
   normalizePublicJobSearch,
   publicJobSearchScope,
+  readJobSearchQuery,
   validatePublicJobSearch,
   type PublicJobSearchFilters,
   type PublicJobSearchForm,
@@ -25,8 +29,10 @@ import { canLoadMoreRecommendations, mergeRecommendationPage, recommendationFall
 import {
   type Job,
   type JobRecommendation,
+  type PublicCompanyProfile,
   type RecommendationSource,
   type SearchMode,
+  getPublicCompany,
   getPublicJobs,
   isDemoPerson2Api,
   type FallbackReason,
@@ -65,20 +71,35 @@ function RecommendationCard({
   );
 }
 
-export default function CandidateJobsPage({ searchParams = {} }: { searchParams?: { q?: string; location?: string; search?: string } }) {
+function WatchSearchUrl({ onChange }: { onChange: (query: string) => void }) {
+  const query = useSearchParams().toString();
+  useEffect(() => { onChange(query); }, [query, onChange]);
+  return null;
+}
+
+export default function CandidateJobsPage({ searchParams = {} }: { searchParams?: Record<string, string | string[] | undefined> }) {
   const account = useCurrentAccount();
   const canRecommend = isDemoPerson2Api || account?.role === "CANDIDATE";
+  const activity = useJobSearchActivity(account?.role === "CANDIDATE" ? account.id : isDemoPerson2Api ? "demo-candidate" : undefined, account === null && !isDemoPerson2Api);
+  const routeQuery = new URLSearchParams(Object.fromEntries(
+    Object.entries(searchParams).flatMap(([key, value]) => typeof value === "string" ? [[key, value]] : []),
+  )).toString();
+  const [initial] = useState(() => readJobSearchQuery(new URLSearchParams(routeQuery)));
   const [recommendationFallback, setRecommendationFallback] = useState<FallbackReason | undefined>();
-  const [form, setForm] = useState<PublicJobSearchForm>(() => ({ ...emptyPublicJobSearchForm,
-    q: typeof searchParams.q === "string" ? searchParams.q.slice(0, 200) : "",
-    location: typeof searchParams.location === "string" ? searchParams.location.slice(0, 255) : "" }));
+  const [form, setForm] = useState<PublicJobSearchForm>(initial.form);
   const [filters, setFilters] = useState<PublicJobSearchFilters>(() => normalizePublicJobSearch(form));
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [hasSearched, setHasSearched] = useState(() => Boolean(searchParams.search === "1" || form.q.trim() || form.location.trim()));
-  const [mode, setMode] = useState<SearchMode>("OFFSET");
-  const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [hasSearched, setHasSearched] = useState(() => initial.searched || !!(initial.form.q || initial.form.location));
+  const [mode, setMode] = useState<SearchMode>(initial.mode);
+  const [page, setPage] = useState(initial.page);
+  const [limit, setLimit] = useState(initial.limit);
+  const [wide, setWide] = useState(false);
+  const [companies, setCompanies] = useState<Record<string, PublicCompanyProfile>>({});
+  const companyRequests = useRef(new Map<string, AbortController>());
+  const [searchRevision, setSearchRevision] = useState(0);
+  const filtersDialogRef = useRef<HTMLDialogElement>(null);
+  const lastQuery = useRef(routeQuery);
   const [cursor, setCursor] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -101,8 +122,68 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
   const recommendationRestartedRef = useRef(false);
   const restoreListFocusRef = useRef(false);
   const jobListRef = useRef<HTMLElement>(null);
+  const cardListRef = useRef<HTMLDivElement>(null);
   const recommendationSentinelRef = useRef<HTMLDivElement>(null);
   const scope = useMemo(() => publicJobSearchScope(filters, limit), [filters, limit]);
+
+  useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 980px)");
+    function resize() {
+      setWide(desktop.matches);
+      if (desktop.matches) setFiltersOpen(false);
+    }
+    resize();
+    desktop.addEventListener("change", resize);
+    return () => desktop.removeEventListener("change", resize);
+  }, []);
+
+  const syncSearchUrl = useCallback((query: string) => {
+    if (lastQuery.current === query) return;
+    lastQuery.current = query;
+    setSearchRevision(value => value + 1);
+  }, []);
+
+  useEffect(() => { if (filtersOpen) filtersDialogRef.current?.showModal(); }, [filtersOpen]);
+
+  useEffect(() => {
+    if (!searchRevision) return;
+    const next = readJobSearchQuery(new URLSearchParams(window.location.search));
+    resetTraversal();
+    setForm(next.form);
+    setFormErrors({});
+    setHasSearched(next.searched || !!(next.form.q || next.form.location));
+    setMode(next.mode);
+    setPage(next.page);
+    setLimit(next.limit);
+    setFilters(normalizePublicJobSearch(next.form));
+  }, [searchRevision]);
+
+  const loadCompany = useCallback((companyId: string) => {
+    if (companyRequests.current.has(companyId)) return;
+    const controller = new AbortController();
+    companyRequests.current.set(companyId, controller);
+    getPublicCompany(companyId, controller.signal).then(({ data }) => {
+      if (!controller.signal.aborted && data) setCompanies(current => ({ ...current, [companyId]: data }));
+    }).catch(() => { /* Company data is optional in the job search. */ });
+  }, []);
+
+  useEffect(() => {
+    const requests = companyRequests.current;
+    return () => { requests.forEach(request => request.abort()); requests.clear(); };
+  }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const id = entry.target.getAttribute("data-company-id");
+        if (id) loadCompany(id);
+        observer.unobserve(entry.target);
+      }
+    }, { rootMargin: "120px" });
+    cardListRef.current?.querySelectorAll("[data-company-id]").forEach(card => observer.observe(card));
+    return () => observer.disconnect();
+  }, [jobs, loadCompany]);
 
   useEffect(() => {
     let active = true;
@@ -122,8 +203,12 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
         if (restoreListFocusRef.current) {
           restoreListFocusRef.current = false;
           requestAnimationFrame(() => {
-            jobListRef.current?.focus({ preventScroll: true });
-            jobListRef.current?.scrollIntoView({ block: "start" });
+            const list = jobListRef.current;
+            if (!list) return;
+            list.scrollTo({ top: 0 });
+            list.focus({ preventScroll: true });
+            const bounds = list.getBoundingClientRect();
+            if (bounds.bottom <= 0 || bounds.top >= window.innerHeight) list.scrollIntoView({ block: "start" });
           });
         }
       })
@@ -212,7 +297,6 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
   }, [canLoadMoreRecommendation, nextRecommendationCursor, recommendationLoading]);
 
   function change<K extends keyof PublicJobSearchForm>(field: K, value: PublicJobSearchForm[K]) {
-    if (field === "q" || field === "location") setFiltersOpen(false);
     setForm((current) => ({ ...current, [field]: value }));
     setFormErrors((current) => {
       if (!(field in current) && !(field === "salaryMin" || field === "salaryMax")) return current;
@@ -235,50 +319,66 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
     setTooDeep(false);
   }
 
+  function updateUrl(nextFilters: PublicJobSearchFilters, nextMode = mode, nextPage = 1, nextLimit = limit, searched = hasSearched) {
+    const href = jobSearchHref(nextFilters, nextMode, nextPage, nextLimit, searched);
+    if (href === window.location.pathname + window.location.search) return;
+    window.history.pushState(null, "", href);
+    lastQuery.current = new URLSearchParams(window.location.search).toString();
+  }
+
   function applyFilters(event: React.FormEvent<HTMLFormElement>, advanced = false) {
     event.preventDefault();
-    const nextForm = advanced ? form : { ...emptyPublicJobSearchForm, q: form.q, location: form.location };
+    const nextForm: PublicJobSearchForm = advanced ? form : {
+      ...emptyPublicJobSearchForm, q: form.q, location: form.location, sort: filters.sort,
+      salaryMin: String(filters.salaryMin ?? ""), salaryMax: String(filters.salaryMax ?? ""),
+      jobType: filters.jobType ?? "", skills: filters.skills?.join(", ") ?? "", experienceYears: String(filters.experienceYears ?? ""),
+    };
     const errors = validatePublicJobSearch(nextForm);
     setFormErrors(errors);
     if (Object.keys(errors).length) {
-      if (advanced) setFiltersOpen(true);
       requestAnimationFrame(() => document.getElementById(Object.keys(errors)[0])?.focus());
       return;
     }
     resetTraversal();
     setForm(nextForm);
-    setFilters(normalizePublicJobSearch(nextForm));
+    const nextFilters = normalizePublicJobSearch(nextForm);
+    setFilters(nextFilters);
+    updateUrl(nextFilters, mode, 1, limit, true);
     setHasSearched(true);
     restoreListFocusRef.current = true;
     setReloadKey((value) => value + 1);
-    setFiltersOpen(false);
+    if (advanced) filtersDialogRef.current?.close();
   }
 
   function changeMode(nextMode: SearchMode) {
     if (nextMode === mode) return;
     resetTraversal();
     setMode(nextMode);
+    updateUrl(filters, nextMode);
   }
 
   function changeLimit(nextLimit: number) {
     if (nextLimit === limit) return;
     resetTraversal();
     setLimit(nextLimit);
+    updateUrl(filters, mode, 1, nextLimit);
   }
 
-  function resetFilters() {
-    setHasSearched(false);
-    setFiltersOpen(false);
-    setForm(emptyPublicJobSearchForm);
+  function resetFilters(clearSearch = false) {
+    filtersDialogRef.current?.close();
+    const nextForm = clearSearch ? emptyPublicJobSearchForm : { ...emptyPublicJobSearchForm, q: filters.q ?? "", location: filters.location ?? "" };
+    if (clearSearch) setHasSearched(false);
+    setForm(nextForm);
     setFormErrors({});
     resetTraversal();
-    setFilters(normalizePublicJobSearch(emptyPublicJobSearchForm));
+    const nextFilters = normalizePublicJobSearch(nextForm);
+    setFilters(nextFilters);
+    updateUrl(nextFilters, mode, 1, limit, !clearSearch);
     setReloadKey((value) => value + 1);
   }
 
   function switchToCursor() {
-    resetTraversal();
-    setMode("CURSOR");
+    changeMode("CURSOR");
   }
 
   function restartRecommendations() {
@@ -291,7 +391,6 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
 
   const nextOffsetTooDeep = mode === "OFFSET" && isOffsetWindowTooDeep(page + 1, limit);
   const totalPages = Math.max(1, Math.ceil(total / limit));
-  const basicReady = hasSearched && form.q.normalize("NFKC").trim() === (filters.q ?? "") && form.location.normalize("NFKC").trim() === (filters.location ?? "");
   const activeFilters: { field: Exclude<keyof PublicJobSearchForm, "sort">; label: string }[] = [];
   if (filters.q) activeFilters.push({ field: "q", label: filters.q });
   if (filters.location) activeFilters.push({ field: "location", label: filters.location });
@@ -300,116 +399,151 @@ export default function CandidateJobsPage({ searchParams = {} }: { searchParams?
   if (filters.salaryMax !== undefined) activeFilters.push({ field: "salaryMax", label: `Lương đến ${filters.salaryMax.toLocaleString("vi-VN")}` });
   if (filters.skills?.length) activeFilters.push({ field: "skills", label: filters.skills.join(", ") });
   if (filters.experienceYears !== undefined) activeFilters.push({ field: "experienceYears", label: `Kinh nghiệm tối đa ${filters.experienceYears} năm` });
+  const advancedFilters = activeFilters.filter(item => item.field !== "q" && item.field !== "location");
 
   function removeFilter(field: Exclude<keyof PublicJobSearchForm, "sort">) {
     setForm(current => ({ ...current, [field]: emptyPublicJobSearchForm[field] }));
     setFormErrors({});
-    setFilters(current => { const next = { ...current }; delete next[field]; return next; });
+    const next = { ...filters };
+    delete next[field];
+    setFilters(next);
+    updateUrl(next);
     resetTraversal();
     setReloadKey(value => value + 1);
     restoreListFocusRef.current = true;
   }
 
+  function sortBy(sort: PublicJobSearchForm["sort"]) {
+    if (filters.sort === sort) return;
+    const next = { ...filters, sort };
+    setForm(current => ({ ...current, sort }));
+    setFilters(next);
+    resetTraversal();
+    updateUrl(next);
+  }
+
+  function changePage(next: number) {
+    setPage(next);
+    restoreListFocusRef.current = true;
+    updateUrl(filters, mode, next);
+    const list = jobListRef.current;
+    if (list && list.getBoundingClientRect().top < 72) list.scrollIntoView({ block: "start" });
+  }
+
+  const searchHref = jobSearchHref(filters, mode, page, limit, hasSearched);
+  const detailHref = (jobId: string) => `/candidate/jobs/${jobId}?${new URLSearchParams({ from: searchHref })}`;
+
+  const filterForm = <form className={styles.filterForm} noValidate onSubmit={event => applyFilters(event, true)}>
+    <fieldset className={styles.types}>
+      <legend>Hình thức làm việc</legend>
+      {([["", "Tất cả"], ["FULL_TIME", "Toàn thời gian"], ["PART_TIME", "Bán thời gian"], ["INTERNSHIP", "Thực tập"], ["REMOTE", "Làm việc từ xa"]] as const).map(([value, label]) =>
+        <label key={value}><input type="radio" name="jobType" value={value} checked={form.jobType === value} onChange={() => change("jobType", value)} />{label}</label>)}
+    </fieldset>
+    <fieldset className={styles.types}>
+      <legend>Kinh nghiệm</legend>
+      {([["", "Tất cả"], ["0", "Không yêu cầu"], ["1", "Tối đa 1 năm"], ["3", "Tối đa 3 năm"], ["5", "Tối đa 5 năm"]] as const).map(([value, label]) =>
+        <label key={value}><input type="radio" name="experiencePreset" value={value} checked={form.experienceYears === value} onChange={() => change("experienceYears", value)} />{label}</label>)}
+    </fieldset>
+    <div className={styles.filterGroup}>
+      <label className="label" htmlFor="salary">Khoảng lương</label>
+      <div className={styles.salaryInputs}>
+        <input id="salary" className="input" inputMode="decimal" placeholder="Từ" aria-label="Lương tối thiểu" value={form.salaryMin} onChange={event => change("salaryMin", event.target.value)} aria-invalid={!!formErrors.salary} aria-describedby={formErrors.salary ? "salary-error" : undefined} />
+        <input id="salaryMax" className="input" inputMode="decimal" placeholder="Đến" aria-label="Lương tối đa" value={form.salaryMax} onChange={event => change("salaryMax", event.target.value)} aria-invalid={!!formErrors.salary} aria-describedby={formErrors.salary ? "salary-error" : undefined} />
+      </div>
+      {formErrors.salary ? <span id="salary-error" className="form-error">{formErrors.salary}</span> : null}
+    </div>
+    <details className={styles.displayOptions} open={formErrors.experienceYears || formErrors.skills ? true : undefined}>
+      <summary>Kỹ năng và kinh nghiệm khác<ChevronDown size={15} aria-hidden="true" /></summary>
+      <div className={styles.filterGroup}>
+      <label className="label" htmlFor="experienceYears">Số năm kinh nghiệm tối đa</label>
+      <input id="experienceYears" className="input" placeholder="Không giới hạn" type="number" min="0" max="60" step="1" value={form.experienceYears} onChange={event => change("experienceYears", event.target.value)} aria-invalid={!!formErrors.experienceYears} aria-describedby={formErrors.experienceYears ? "experienceYears-error" : undefined} />
+      {formErrors.experienceYears ? <span id="experienceYears-error" className="form-error">{formErrors.experienceYears}</span> : null}
+      <label className="label" htmlFor="skills">Kỹ năng</label>
+      <input id="skills" className="input" value={form.skills} onChange={event => change("skills", event.target.value)} aria-invalid={!!formErrors.skills} aria-describedby={formErrors.skills ? "skills-error" : "skills-help"} placeholder="Ví dụ: React, Java" />
+      <span id="skills-help" className="help">Phân tách bằng dấu phẩy.</span>
+      {formErrors.skills ? <span id="skills-error" className="form-error">{formErrors.skills}</span> : null}
+      </div>
+    </details>
+    <button className="btn btn-primary" type="submit">Áp dụng bộ lọc</button>
+    <details className={`${styles.displayOptions} job-results-options`}>
+      <summary>Tùy chọn hiển thị<ChevronDown size={15} aria-hidden="true" /></summary>
+      <div className={styles.filterGroup}>
+        <label className="label" htmlFor="candidate-job-mode">Cách xem việc làm</label>
+        <select id="candidate-job-mode" className="select" value={mode} onChange={event => changeMode(event.target.value as SearchMode)}><option value="OFFSET">Phân trang</option><option value="CURSOR">Tải thêm</option></select>
+        <label className="label" htmlFor="candidate-job-limit">Số việc mỗi lượt</label>
+        <select id="candidate-job-limit" className="select" value={limit} onChange={event => changeLimit(Number(event.target.value))}><option value={5}>5</option><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></select>
+      </div>
+    </details>
+  </form>;
+  const filterTitle = <h2 id="job-search-filter-title">Bộ lọc</h2>;
+
   return (
     <main className={styles.page}>
-      <nav className={styles.breadcrumb} aria-label="Đường dẫn"><Link href="/">Trang chủ</Link><span aria-hidden="true">/</span><span>Tìm việc làm</span></nav>
-      <form noValidate onSubmit={applyFilters}>
-        <section className={styles.searchHero}><h1>Tìm việc làm phù hợp với bạn</h1><p>Cơ hội mới bắt đầu từ một công việc phù hợp. Khám phá các vị trí đang tuyển trên CareerHub.</p>
+      <Suspense fallback={null}><WatchSearchUrl onChange={syncSearchUrl} /></Suspense>
+      <form className={styles.searchHeader} noValidate onSubmit={applyFilters} role="search" aria-label="Tìm việc làm">
+        <div className={styles.heading}><h1>Tìm công việc phù hợp với bạn</h1><p>Khám phá cơ hội nghề nghiệp và tiến gần hơn đến mục tiêu của bạn.</p></div>
         <div className={styles.searchBar}>
-          <div className={styles.searchField}><Search size={20} aria-hidden="true" />
+          <div className={styles.keyword}><Search size={20} aria-hidden="true" />
             <label className="sr-only" htmlFor="q">Vị trí hoặc từ khóa</label>
-            <input id="q" type="search" placeholder="Vị trí tuyển dụng, tên công ty" value={form.q} onChange={(event) => change("q", event.target.value)} aria-invalid={!!formErrors.q} aria-describedby={formErrors.q ? "q-error" : undefined} />
-            {formErrors.q ? <span id="q-error" className="form-error">{formErrors.q}</span> : null}
+            <input id="q" type="search" maxLength={200} placeholder="Vị trí, kỹ năng hoặc tên công ty" value={form.q} onChange={event => change("q", event.target.value)} aria-invalid={!!formErrors.q} aria-describedby={formErrors.q ? "q-error" : undefined} />
+            {form.q ? <button className={styles.iconButton} type="button" aria-label="Xóa từ khóa" onClick={() => { change("q", ""); document.getElementById("q")?.focus(); }}><X size={17} aria-hidden="true" /></button> : null}
           </div>
-          <LocationPicker value={form.location} onChange={value => change("location", value)} invalid={!!formErrors.location} describedBy={formErrors.location ? "location-error" : undefined} />
-          <button className="btn btn-primary" type="submit"><Search size={18} aria-hidden="true" />Tìm việc</button>
+          <div className={styles.location}><LocationPicker value={form.location} onChange={value => change("location", value)} invalid={!!formErrors.location} describedBy={formErrors.location ? "location-error" : undefined} /></div>
+          <button className="btn btn-primary" type="submit">Tìm việc</button>
         </div>
-        {formErrors.location ? <span id="location-error" className="form-error">{formErrors.location}</span> : null}
-        <div className={styles.searchHeroFoot}><Building2 size={15} aria-hidden="true" />Chọn địa điểm đến xã/phường hoặc tìm trên toàn quốc.</div></section>
+        {formErrors.q ? <p id="q-error" className="form-error">{formErrors.q}</p> : null}
+        {formErrors.location ? <p id="location-error" className="form-error">{formErrors.location}</p> : null}
       </form>
-      {basicReady ? <div className={styles.advancedToolbar}><p>Thu hẹp kết quả theo mức lương, kinh nghiệm và kỹ năng.</p><button type="button" className={styles.filterToggle} aria-expanded={filtersOpen} aria-controls="job-search-filters" onClick={() => { setFiltersOpen(value => !value); }}><span><SlidersHorizontal size={18} aria-hidden="true" />Bộ lọc nâng cao</span><ChevronDown size={18} aria-hidden="true" /></button></div> : null}
-        <div className={`${styles.resultsLayout} ${!basicReady || !filtersOpen ? styles.resultsLayoutFull : ""}`}>
-        {basicReady && filtersOpen ? <aside id="job-search-filters" className={`${styles.filterPanel} candidate-job-search-advanced`} aria-label="Bộ lọc việc làm">
-          <form noValidate onSubmit={event => applyFilters(event, true)}>
-          <div className={styles.filterHeading}><SlidersHorizontal size={19} aria-hidden="true" /><h2>Bộ lọc nâng cao</h2></div>
-          <div className={styles.filterFields}>
-            <div className="field">
-              <label className="label" htmlFor="jobType">Hình thức làm việc</label>
-              <select id="jobType" className="select" value={form.jobType} onChange={(event) => change("jobType", event.target.value as PublicJobSearchForm["jobType"])}>
-                <option value="">Tất cả</option><option value="FULL_TIME">Toàn thời gian</option><option value="PART_TIME">Bán thời gian</option><option value="REMOTE">Làm việc từ xa</option><option value="INTERNSHIP">Thực tập</option>
-              </select>
-            </div>
-            <div><label className="label" htmlFor="salary">Khoảng lương</label><div className={styles.salaryFields}>
-              <input id="salary" className="input" inputMode="decimal" placeholder="Từ" aria-label="Lương tối thiểu" value={form.salaryMin} onChange={(event) => change("salaryMin", event.target.value)} aria-invalid={!!formErrors.salary} aria-describedby={formErrors.salary ? "salary-error" : undefined} />
-              <input id="salaryMax" className="input" inputMode="decimal" placeholder="Đến" aria-label="Lương tối đa" value={form.salaryMax} onChange={(event) => change("salaryMax", event.target.value)} aria-invalid={!!formErrors.salary} aria-describedby={formErrors.salary ? "salary-error" : undefined} />
+
+      <div className={styles.workspace}>
+        {wide ? <aside className={`${styles.filters} candidate-job-search-advanced`} aria-labelledby="job-search-filter-title">
+          <div className={styles.filterHeader}>{filterTitle}<button className={styles.textButton} type="button" onClick={() => resetFilters()}>Đặt lại</button></div>
+          {filterForm}
+        </aside> : filtersOpen ? (
+          <dialog ref={filtersDialogRef} className={`${styles.dialog} ${styles.filterDrawer} candidate-job-search-advanced`} aria-labelledby="job-search-filter-title" onClose={() => setFiltersOpen(false)}>
+            <header className={styles.dialogHeader}>{filterTitle}<div><button className={styles.textButton} type="button" onClick={() => resetFilters()}>Đặt lại</button><button className={styles.iconButton} type="button" onClick={() => filtersDialogRef.current?.close()} aria-label="Đóng bộ lọc"><X size={20} aria-hidden="true" /></button></div></header>
+            {filterForm}
+          </dialog>
+        ) : null}
+
+        <section ref={jobListRef} className={styles.results} tabIndex={-1} aria-label="Kết quả tìm việc">
+          <div className={styles.toolbar}>
+            <div className={styles.toolbarTop}><h2>{loading && jobs.length === 0 ? "Đang tìm việc làm…" : error ? "Việc làm" : <>{(mode === "OFFSET" ? total : jobs.length).toLocaleString("vi-VN")} việc làm</>}</h2>
+              <div className={styles.sortRow}><label htmlFor="sort" className="sr-only">Sắp xếp theo</label><select id="sort" className="select" value={filters.sort} onChange={event => sortBy(event.target.value as PublicJobSearchForm["sort"])}><option value="RELEVANCE">Phù hợp nhất</option><option value="NEWEST">Mới nhất</option><option value="SALARY_DESC">Lương cao nhất</option></select>
+                {!wide ? <button type="button" className={styles.filterButton} aria-expanded={filtersOpen} aria-haspopup="dialog" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={17} aria-hidden="true" /> Bộ lọc {advancedFilters.length > 0 ? <span>{advancedFilters.length}</span> : null}</button> : null}
               </div>
-              {formErrors.salary ? <span id="salary-error" className="form-error">{formErrors.salary}</span> : null}
             </div>
-            <div className="field">
-              <label className="label" htmlFor="skills">Kỹ năng</label>
-              <input id="skills" className="input" value={form.skills} onChange={(event) => change("skills", event.target.value)} aria-invalid={!!formErrors.skills} aria-describedby={formErrors.skills ? "skills-error" : "skills-help"} placeholder="React, TypeScript" />
-              <span id="skills-help" className="help">Phân tách bằng dấu phẩy.</span>
-              {formErrors.skills ? <span id="skills-error" className="form-error">{formErrors.skills}</span> : null}
-            </div>
-            <div className="field">
-              <label className="label" htmlFor="experienceYears">Kinh nghiệm tối đa phù hợp</label>
-              <input id="experienceYears" className="input" type="number" min="0" max="60" step="1" value={form.experienceYears} onChange={(event) => change("experienceYears", event.target.value)} aria-invalid={!!formErrors.experienceYears} aria-describedby={formErrors.experienceYears ? "experienceYears-error" : undefined} />
-              {formErrors.experienceYears ? <span id="experienceYears-error" className="form-error">{formErrors.experienceYears}</span> : null}
-            </div>
-            <div className="field"><label className="label" htmlFor="sort">Sắp xếp theo</label><select id="sort" className="select" value={form.sort} onChange={event => change("sort", event.target.value as PublicJobSearchForm["sort"])}><option value="RELEVANCE">Liên quan nhất</option><option value="NEWEST">Mới nhất</option><option value="SALARY_DESC">Lương cao nhất</option></select></div>
+            {advancedFilters.length ? <div className={styles.activeFilters} aria-label="Bộ lọc đang áp dụng">{advancedFilters.map(item => <button type="button" key={item.field} onClick={() => removeFilter(item.field)} aria-label={`Bỏ bộ lọc ${item.label}`}>{item.label}<X size={13} aria-hidden="true" /></button>)}</div> : null}
           </div>
-          <details className={`${styles.displayOptions} job-results-options`}>
-            <summary>Tùy chọn hiển thị<ChevronDown size={13} aria-hidden="true" /></summary>
-            <div><div className="field"><label className="label" htmlFor="candidate-job-mode">Cách xem việc làm</label><select id="candidate-job-mode" className="select" value={mode} onChange={event => changeMode(event.target.value as SearchMode)}><option value="OFFSET">Phân trang</option><option value="CURSOR">Tải thêm</option></select></div><div className="field"><label className="label" htmlFor="candidate-job-limit">Số việc mỗi lượt</label><select id="candidate-job-limit" className="select" value={limit} onChange={event => changeLimit(Number(event.target.value))}><option value={5}>5</option><option value={10}>10</option><option value={20}>20</option><option value={50}>50</option></select></div></div>
-          </details>
-          <div className={styles.filterActions}>
-            <button className="btn btn-primary" type="submit">Áp dụng bộ lọc</button>
-            <button className="btn" type="button" onClick={resetFilters}>Xóa tất cả bộ lọc</button>
+          {activity.error ? <p className="notice notice-danger" role="alert">{activity.error} <button className={styles.textButton} type="button" onClick={activity.reload}>Tải lại danh sách đã lưu</button></p> : null}
+          {tooDeep || (hasMore && nextOffsetTooDeep) ? <section className="notice notice-warning" role="status"><p>Đã tới giới hạn phân trang. Bạn có thể tải thêm hoặc thu hẹp bộ lọc.</p><button className="btn" type="button" onClick={switchToCursor}>Tải thêm kết quả</button></section> : null}
+          {searchRestartNotice ? <p className="notice" role="status">{searchRestartNotice}</p> : null}
+          {error ? <ErrorState message={error} onRetry={() => setReloadKey(value => value + 1)} /> : null}
+          {loading && jobs.length === 0 ? <SearchSkeleton /> : null}
+          {!loading && !error && !tooDeep && jobs.length === 0 ? <div className={styles.blank}><EmptyState title="Chưa có việc làm phù hợp" description="Thử dùng từ khóa ngắn hơn, mở rộng địa điểm hoặc điều chỉnh khoảng lương." />{activeFilters.length ? <button className="btn" onClick={() => resetFilters(true)} type="button">Xóa tìm kiếm</button> : null}</div> : null}
+          <div className={styles.resultList} ref={cardListRef}>
+            {jobs.map(job => <SearchJobCard key={job.id} job={job} company={companies[job.companyId]} href={detailHref(job.id)} activity={activity} />)}
           </div>
-          </form>
-        </aside> : null}
-        <section ref={jobListRef} className={styles.results} tabIndex={-1} aria-label="Kết quả tìm việc" aria-busy={loading}>
-          <div className={styles.resultHeader}><div><h2>Danh sách việc làm</h2><p>{loading && jobs.length === 0 ? "Đang tìm kiếm cơ hội phù hợp…" : <><strong>{(mode === "OFFSET" ? total : jobs.length).toLocaleString("vi-VN")}</strong> {mode === "OFFSET" ? "việc làm phù hợp" : "việc làm đã tải"}{filters.q ? ` cho “${filters.q}”` : ""}</>}</p></div></div>
-          {activeFilters.length ? <div className={styles.activeFilters} aria-label="Bộ lọc đang áp dụng">{activeFilters.map(item => <button type="button" key={item.field} onClick={() => removeFilter(item.field)} aria-label={`Bỏ bộ lọc ${item.label}`}>{item.label}<X size={13} aria-hidden="true" /></button>)}</div> : null}
-
-      {tooDeep || (hasMore && nextOffsetTooDeep) ? (
-        <section className="notice notice-warning" role="status">
-          <strong>Đã xem nhiều kết quả theo trang.</strong>
-          <p>Bạn có thể tải thêm kết quả hoặc thu hẹp tìm kiếm để tìm việc phù hợp nhanh hơn.</p>
-          <div className="btn-group"><button className="btn btn-primary" type="button" onClick={switchToCursor}>Tải thêm kết quả</button><button className="btn" type="button" onClick={() => document.getElementById("q")?.focus()}>Sửa tìm kiếm</button></div>
+          {loading && jobs.length > 0 ? <p className="help" role="status">Đang tải thêm kết quả…</p> : null}
+          {(jobs.length > 0 || page > 1) && (mode === "OFFSET" ? <nav className={styles.pagination} aria-label="Phân trang việc làm">
+            <button className={styles.iconButton} type="button" aria-label="Trang trước" disabled={loading || page <= 1} onClick={() => changePage(page - 1)}><ChevronLeft size={20} aria-hidden="true" /></button>
+            <span>Trang {page} / {totalPages}</span>
+            <button className={styles.iconButton} type="button" aria-label="Trang sau" disabled={loading || !hasMore || nextOffsetTooDeep} onClick={() => changePage(page + 1)}><ChevronRight size={20} aria-hidden="true" /></button>
+          </nav> : <button className={`btn ${styles.loadMore}`} type="button" disabled={loading || !hasMore || !nextCursor} onClick={() => setCursor(nextCursor)}>{hasMore ? "Tải thêm việc làm" : "Đã tải hết kết quả"}</button>)}
         </section>
-      ) : null}
-      {searchRestartNotice ? <p className="notice" role="status">{searchRestartNotice}</p> : null}
 
-          {error ? <ErrorState message={error} onRetry={() => setReloadKey((value) => value + 1)} /> : null}
-          {loading && jobs.length === 0 ? <LoadingState label="Đang tìm việc làm phù hợp" /> : null}
-          {!loading && !error && !tooDeep && jobs.length === 0 ? <EmptyState title="Chưa có việc làm phù hợp" description="Thử bỏ bớt kỹ năng, mở rộng địa điểm hoặc điều chỉnh khoảng lương." /> : null}
-          <div className={styles.resultList}>{jobs.map(job => <JobResultCard job={job} key={job.id} />)}</div>
-          {loading && jobs.length > 0 ? <p className="help" role="status">Đang tải lượt tiếp theo…</p> : null}
-          {mode === "OFFSET" ? (
-            <nav className="btn-group pagination-actions" aria-label="Phân trang việc làm">
-              <button className="btn" type="button" disabled={loading || page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Trang trước</button>
-              <span className="badge muted">Trang {page}/{totalPages}</span>
-              <button className="btn" type="button" disabled={loading || !hasMore || nextOffsetTooDeep} onClick={() => setPage((value) => value + 1)}>Trang sau</button>
-            </nav>
-          ) : (
-            <div className="btn-group pagination-actions">
-              <button className="btn btn-secondary" type="button" disabled={loading || !hasMore || !nextCursor} onClick={() => setCursor(nextCursor)}>{hasMore ? "Tải thêm việc làm" : "Đã tải hết kết quả"}</button>
-            </div>
-          )}
-        </section>
-        </div>
-        <section className={styles.recommendations} id="suitable-jobs" tabIndex={-1}>
-          <header><span className={styles.verified}><Sparkles size={16} aria-hidden="true" />Dành riêng cho bạn</span><h2>Gợi ý phù hợp</h2><p>Khám phá các cơ hội theo CV, sở thích nghề nghiệp hoặc tin mới nhất.</p></header>
+      </div>
+        <section className={discovery.recommendations} id="suitable-jobs" tabIndex={-1}>
+          <header><span className={discovery.verified}><Sparkles size={16} aria-hidden="true" />Dành riêng cho bạn</span><h2>Gợi ý phù hợp</h2><p>Khám phá các cơ hội theo CV, sở thích nghề nghiệp hoặc tin mới nhất.</p></header>
           {!canRecommend ? <p className="notice">Đăng nhập bằng tài khoản ứng viên để nhận gợi ý phù hợp với hồ sơ của bạn.</p> : null}
           {canRecommend && !recommendationLoading && !recommendationError && recs.length === 0 ? (() => {
             const fallback = recommendationFallbackView(recommendationFallback);
-            return <div className={styles.recommendationEmpty}><EmptyState title={fallback?.title ?? "Chưa có việc làm phù hợp"} description={fallback?.description ?? "Hãy thử lại khi có tin tuyển dụng mới."} />{fallback?.action === "UPLOAD_CV" ? <Link className="btn btn-secondary" href="/candidate/profile/cvs">{fallback.actionLabel}</Link> : <button className="btn" type="button" onClick={restartRecommendations}>Làm mới gợi ý</button>}</div>;
+            return <div className={discovery.recommendationEmpty}><EmptyState title={fallback?.title ?? "Chưa có việc làm phù hợp"} description={fallback?.description ?? "Hãy thử lại khi có tin tuyển dụng mới."} />{fallback?.action === "UPLOAD_CV" ? <Link className="btn btn-secondary" href="/candidate/profile/cvs">{fallback.actionLabel}</Link> : <button className="btn" type="button" onClick={restartRecommendations}>Làm mới gợi ý</button>}</div>;
           })() : null}
           {recommendationRestartNotice ? <p className="notice" role="status">{recommendationRestartNotice}</p> : null}
           {recommendationError ? <ErrorState message={recommendationError} onRetry={() => setRecommendationReloadKey((value) => value + 1)} /> : null}
           {recommendationLoading && recs.length === 0 ? <LoadingState label="Đang tải gợi ý việc làm" /> : null}
-          <div className={styles.recommendationGrid}>
+          <div className={discovery.recommendationGrid}>
             {recs.map((item) => <RecommendationCard key={item.id} item={item} loading={recommendationLoading} onRetry={restartRecommendations} />)}
           </div>
           {recommendationLoading && recs.length > 0 ? <p className="help" role="status">Đang tải thêm gợi ý…</p> : null}

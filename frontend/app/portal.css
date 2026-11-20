@@ -146,6 +146,33 @@ button, a { touch-action: manipulation; }
 .workspace-discovery.workspace-menu-open .workspace-menu-overlay { display: block; }
 @media (max-width: 980px) { .workspace-discovery .workspace-sidebar { top: 66px; height: calc(100dvh - 66px); } .workspace-discovery .workspace-menu-overlay { top: 66px; height: calc(100dvh - 66px); } }
 
+@media (max-width: 980px) {
+  .workspace-discovery[data-portal="candidate"] { --discovery-header-height: 102px; }
+  .workspace-discovery[data-portal="candidate"] .workspace-header .topbar-inner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: 58px 44px;
+    row-gap: 0;
+    padding-block: 0;
+    min-height: var(--discovery-header-height);
+  }
+  .workspace-discovery[data-portal="candidate"] .workspace-header .top-nav {
+    display: flex;
+    grid-column: 1 / -1;
+    justify-content: center;
+    gap: 0;
+    margin: 0;
+    border-top: 1px solid var(--line);
+    overflow-x: auto;
+  }
+  .workspace-discovery[data-portal="candidate"] .workspace-header .top-nav a { min-height: 43px; }
+  .workspace-discovery[data-portal="candidate"] .workspace-sidebar,
+  .workspace-discovery[data-portal="candidate"] .workspace-menu-overlay {
+    top: var(--discovery-header-height);
+    height: calc(100dvh - var(--discovery-header-height));
+  }
+}
+
 /* Keep the three portals on one control scale with role-scoped color tokens. */
 :where(button, input, select, textarea) { font: inherit; }
 .btn { min-height: var(--control-height); border-radius: var(--radius-control); font-size: 14px; line-height: 1.4; transition: color .16s ease, background-color .16s ease, border-color .16s ease, box-shadow .16s ease; }

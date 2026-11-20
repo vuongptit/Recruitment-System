@@ -39,11 +39,11 @@ function reply(route: Route, data: unknown, status = 200) {
 }
 
 async function authenticate(page: Page) {
+  const user = { id: accountId, role: "CANDIDATE", email: "candidate@example.test" };
+  let signedIn = false;
   await page.route(`${api}/auth-cookie/refresh`, (route) => reply(route, { code: "AUTH_INVALID" }, 401));
-  await page.route(`${api}/auth/me`, (route) => reply(route, { code: "AUTH_INVALID" }, 401));
-  await page.route(`${api}/auth-cookie/login`, (route) => reply(route, {
-    user: { id: accountId, role: "CANDIDATE", email: "candidate@example.test" },
-  }));
+  await page.route(`${api}/auth/me`, route => signedIn ? reply(route, user) : reply(route, { code: "AUTH_INVALID" }, 401));
+  await page.route(`${api}/auth-cookie/login`, route => { signedIn = true; return reply(route, { user }); });
   await page.goto("/login?returnTo=%2Fcandidate%2Fjobs");
   await page.getByLabel("Email", { exact: true }).fill("candidate@example.test");
   await page.getByLabel("Mật khẩu", { exact: true }).fill("fixture-password");
@@ -65,15 +65,23 @@ test("candidate job search keeps primary search clear and advanced filters funct
   await page.route(`${api}/jobs/recommended**`, (route) => reply(route, {
     items: [], source: "LATEST", fallbackReason: null, nextCursor: null,
   }));
+  await page.route(`${api}/jobs/${job.id}`, route => reply(route, job));
+  await page.route(`${api}/applications/bookmarks`, route => reply(route, []));
+  await page.route(`${api}/applications/my`, route => reply(route, []));
 
   await authenticate(page);
   const advanced = page.locator(".candidate-job-search-advanced");
   const displayOptions = page.locator(".job-results-options");
   await expect(page.getByRole("searchbox", { name: "Vị trí hoặc từ khóa" })).toBeVisible();
-  const toggle = page.getByRole("button", { name: "Bộ lọc nâng cao", exact: true });
-  await expect(toggle).toHaveCount(0);
-  await expect(advanced).toHaveCount(0);
-  await expect(displayOptions).toHaveCount(0);
+  const sidebar = page.viewportSize()!.width >= 980;
+  const toggle = page.getByRole("button", { name: /^Bộ lọc/ });
+  if (sidebar) await expect(advanced).toBeVisible();
+  else await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  const mainNav = page.getByRole("navigation", { name: "Điều hướng chính" });
+  const tabs = ["Trang chủ", "Tìm việc làm", "Công ty"];
+  await expect(mainNav).toBeVisible();
+  await expect(mainNav.getByRole("link")).toHaveText(tabs);
+  await expect(page.getByRole("complementary", { name: "Chi tiết công việc" })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("search-basic.png"), fullPage: true, animations: "disabled" });
   await page.locator("#q").fill("Frontend");
   await page.getByRole("button", { name: "Địa điểm làm việc", exact: true }).click();
@@ -87,25 +95,38 @@ test("candidate job search keeps primary search clear and advanced filters funct
   await location.getByRole("button", { name: "Áp dụng địa điểm", exact: true }).click();
   await page.getByRole("button", { name: "Tìm việc", exact: true }).click();
   await expect.poll(() => searches.at(-1)?.searchParams.get("location")).toBe("Phường Ba Đình, Hà Nội");
-  await expect(toggle).toBeVisible();
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await expect(advanced).toHaveCount(0);
-  await toggle.click();
+  await expect(mainNav.getByRole("link")).toHaveText(tabs);
+  if (!sidebar) await toggle.click();
   await expect(advanced).toBeVisible();
   await expect(displayOptions).not.toHaveAttribute("open", "");
-  await page.locator("#jobType").selectOption("REMOTE");
+  await advanced.getByRole("radio", { name: "Làm việc từ xa", exact: true }).check();
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await page.screenshot({ path: info.outputPath("search-advanced.png"), fullPage: true, animations: "disabled" });
   await page.getByRole("button", { name: "Áp dụng bộ lọc", exact: true }).click();
   await expect.poll(() => searches.at(-1)?.searchParams.get("q")).toBe("Frontend");
   await expect.poll(() => searches.at(-1)?.searchParams.get("jobType")).toBe("REMOTE");
-  await expect(page.getByRole("link", { name: "Xem chi tiết", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Kết quả tìm việc", exact: true }).getByRole("link", { name: /Remote Engineer/ })).toBeVisible();
   await expect(page.getByRole("region", { name: "Kết quả tìm việc", exact: true })).toBeFocused();
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
   await page.screenshot({ path: info.outputPath("job-search.png"), fullPage: true, animations: "disabled" });
   await page.getByRole("button", { name: "Bỏ bộ lọc Làm việc từ xa", exact: true }).click();
   await expect.poll(() => searches.at(-1)?.searchParams.has("jobType")).toBe(false);
+  await page.getByLabel("Sắp xếp theo", { exact: true }).selectOption("NEWEST");
+  await expect.poll(() => new URL(page.url()).searchParams.get("sort")).toBe("NEWEST");
+  await page.goBack();
+  await expect(page.getByLabel("Sắp xếp theo", { exact: true })).toHaveValue("RELEVANCE");
+  await page.reload();
+  await expect(page.getByRole("searchbox", { name: "Vị trí hoặc từ khóa" })).toHaveValue("Frontend");
+  await page.getByRole("region", { name: "Kết quả tìm việc" }).getByRole("link", { name: /^Remote Engineer/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/candidate/jobs/${job.id}\\?from=`));
+  await expect(page.getByRole("heading", { name: "Remote Engineer", exact: true })).toBeVisible();
+  await expect(page.locator('#job-application')).toHaveCount(1);
+  await page.getByRole("navigation", { name: "Đường dẫn" }).getByRole("link", { name: "Tìm việc làm" }).click();
+  await expect(page.getByRole("searchbox", { name: "Vị trí hoặc từ khóa" })).toHaveValue("Frontend");
+  await mainNav.getByRole("link", { name: "Tìm việc làm" }).click();
+  await expect(page).toHaveURL(/\/candidate\/jobs$/);
+  await expect(page.getByRole("searchbox", { name: "Vị trí hoặc từ khóa" })).toHaveValue("");
 });
 
 test("homepage passes keyword and selected province/ward into the first search stage", async ({ page }) => {
@@ -123,8 +144,8 @@ test("homepage passes keyword and selected province/ward into the first search s
   await expect.poll(() => new URL(page.url()).searchParams.get("location")).toBe("Phường Ba Đình, Hà Nội");
   expect(new URL(page.url()).searchParams.get("q")).toBe("Frontend");
   expect(new URL(page.url()).searchParams.get("search")).toBe("1");
-  await expect(page.getByRole("button", { name: "Bộ lọc nâng cao", exact: true })).toHaveAttribute("aria-expanded", "false");
-  await expect(page.locator(".candidate-job-search-advanced")).toHaveCount(0);
+  if (page.viewportSize()!.width >= 980) await expect(page.getByRole("heading", { name: "Bộ lọc", exact: true })).toBeVisible();
+  else await expect(page.getByRole("button", { name: /^Bộ lọc/ })).toHaveAttribute("aria-expanded", "false");
 });
 
 test("location picker retries local ward data and changing province clears the previous ward", async ({ page }) => {
@@ -152,4 +173,71 @@ test("location picker retries local ward data and changing province clears the p
   await page.keyboard.press("Escape");
   await expect(selected).toBeVisible();
   await expect(selected).toBeFocused();
+});
+
+test("job details navigate to a separate page and retain search, saved and applied status on return", async ({ page }) => {
+  const second = { ...job, id: "3795c0de-7908-4ab5-9bed-4c4f1cf9c211", title: "Backend Developer", requirements: ["Java"], benefits: ["Đào tạo"], publishedAt: "2026-11-10T07:30:00Z" };
+  const saved: string[] = [];
+  const submitted: unknown[] = [];
+  await page.route(`${api}/notifications**`, route => reply(route, { unread_count: 0 }));
+  await page.route(`${api}/profile/${accountId}`, route => reply(route, { userId: accountId, fullName: "Ứng viên thử nghiệm" }));
+  await page.route(`${api}/jobs/search**`, route => reply(route, { items: [job, second], total: 2, page: 1, limit: 10, hasMore: false, source: "POSTGRESQL" }));
+  await page.route(`${api}/jobs/recommended**`, route => reply(route, { items: [], source: "LATEST" }));
+  await page.route(`${api}/jobs/${job.id}`, route => reply(route, job));
+  await page.route(`${api}/jobs/${second.id}`, route => reply(route, second));
+  await page.route(`${api}/companies/${job.companyId}`, route => reply(route, { id: job.companyId, name: job.companyName, industry: "Công nghệ", media: [], logoUrl: null }));
+  await page.route(`${api}/applications/bookmarks`, route => {
+    if (route.request().method() === "POST") saved.push(route.request().postDataJSON().jobId);
+    return reply(route, route.request().method() === "POST" ? { jobId: second.id } : saved.map(jobId => ({ jobId })));
+  });
+  await page.route(`${api}/applications/my`, route => reply(route, submitted.length ? [{ id: accountId, jobId: second.id, status: "APPLIED", appliedAt: "2026-11-20T00:00:00Z" }] : []));
+  await page.route(`${api}/profile/cvs`, route => reply(route, [{ id: accountId, title: "CV Java", isDefault: true, type: "UPLOAD" }]));
+  await page.route(url => url.pathname === "/api/applications" || url.pathname === "/api/applications/", route => {
+    submitted.push(route.request().postDataJSON());
+    return reply(route, { id: accountId, jobId: second.id, status: "APPLIED", appliedAt: "2026-11-20T00:00:00Z" }, 201);
+  });
+  await authenticate(page);
+  const results = page.getByRole("region", { name: "Kết quả tìm việc" });
+  await page.getByRole("searchbox", { name: "Vị trí hoặc từ khóa" }).fill("Developer");
+  await page.getByRole("button", { name: "Tìm việc", exact: true }).click();
+  await expect(page).toHaveURL(/\/candidate\/jobs\?q=Developer&search=1$/);
+  await expect(page.getByRole("complementary", { name: "Chi tiết công việc" })).toHaveCount(0);
+  const save = results.getByRole("button", { name: /Lưu việc làm: Backend Developer/i });
+  await save.click();
+  await expect(results.getByRole("button", { name: "Bỏ lưu việc làm: Backend Developer" })).toHaveAttribute("aria-pressed", "true");
+  expect(saved).toEqual([second.id]);
+  await results.getByRole("link", { name: /^Backend Developer/ }).click();
+  await expect(page.getByRole("heading", { name: second.title, exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bỏ lưu việc làm", exact: true })).toHaveAttribute("aria-pressed", "true");
+  const apply = page.locator("#job-application");
+  await expect(apply.getByLabel("CV dùng để ứng tuyển")).toHaveValue(accountId);
+  await apply.getByRole("button", { name: "Gửi ứng tuyển" }).click();
+  await expect(apply.getByRole("status")).toContainText("Đã gửi hồ sơ ứng tuyển");
+  await page.getByRole("navigation", { name: "Đường dẫn" }).getByRole("link", { name: "Tìm việc làm" }).click();
+  await expect(page).toHaveURL(/\/candidate\/jobs\?q=Developer&search=1$/);
+  await expect(results.getByRole("link", { name: /Backend Developer.*Đã ứng tuyển/ })).toBeVisible();
+  expect(submitted).toEqual([{ jobId: second.id, cvId: accountId, source: "SEARCH" }]);
+});
+
+test("search shows loading, empty and recoverable error states", async ({ page }) => {
+  await page.route(`${api}/auth/me`, route => reply(route, { code: "AUTH_INVALID" }, 401));
+  await page.route(`${api}/auth-cookie/refresh`, route => reply(route, { code: "AUTH_INVALID" }, 401));
+  let resolveInitial!: () => void;
+  const initial = new Promise<void>(resolve => { resolveInitial = resolve; });
+  let fail = true;
+  await page.route(`${api}/jobs/search**`, async route => {
+    await initial;
+    return fail ? reply(route, { code: "SERVICE_UNAVAILABLE" }, 503) : reply(route, { items: [], total: 0, hasMore: false });
+  });
+  await page.goto("/candidate/jobs?q=KhongTonTai");
+  const results = page.getByRole("region", { name: "Kết quả tìm việc" });
+  await expect(results.getByText("Đang tải danh sách việc làm", { exact: true })).toBeAttached();
+  resolveInitial();
+  await expect(results.getByRole("alert")).toBeVisible();
+  fail = false;
+  await results.getByRole("button", { name: "Thử lại" }).click();
+  await expect(results.getByRole("heading", { name: "Chưa có việc làm phù hợp" })).toBeVisible();
+  await results.getByRole("button", { name: "Xóa tìm kiếm" }).click();
+  await expect(page.getByRole("searchbox", { name: "Vị trí hoặc từ khóa" })).toHaveValue("");
+  await expect(page).toHaveURL(/\/candidate\/jobs$/);
 });

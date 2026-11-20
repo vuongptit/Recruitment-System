@@ -11,7 +11,7 @@ import { EmptyState, ErrorState, LoadingState, StatusBadge } from "@/components/
 import { ArrowRight, ArrowUpRight, Banknote, BriefcaseBusiness, Building2, CalendarDays, Clock3, MapPin, MessageSquare, Send, ShieldCheck, UsersRound } from "lucide-react";
 import { CompanyMark } from "@/components/discovery/CompanyMark";
 import styles from "@/components/discovery/Discovery.module.css";
-import { jobDeadline, jobExperience, jobSalary } from "@/lib/jobPresentation";
+import { isJobAcceptingApplications, jobDeadline, jobExperience, jobSalary } from "@/lib/jobPresentation";
 import { ApiClientError, toUserMessage } from "../../../../lib/apiClient";
 import { getPublicCompany, getPublicJob, getRecommendationsForCandidate, isDemoPerson2Api, type Job, type JobRecommendation, type PublicCompanyProfile } from "../../../../lib/person2Api";
 import { createConversation } from "../../../../lib/chatApi";
@@ -22,7 +22,7 @@ type ApplicationSource = typeof SOURCES[number];
 
 export default function CandidateJobDetailPage({ params, searchParams }: {
   params: { jobId: string };
-  searchParams: { source?: string };
+  searchParams: { source?: string; from?: string };
 }) {
   const router = useRouter();
   const account = useCurrentAccount();
@@ -40,6 +40,8 @@ export default function CandidateJobDetailPage({ params, searchParams }: {
   const source = SOURCES.includes(searchParams.source as ApplicationSource)
     ? searchParams.source as ApplicationSource
     : "SEARCH";
+  const searchHref = typeof searchParams.from === "string" && /^\/candidate\/jobs(?:\?[^#]*)?$/.test(searchParams.from)
+    ? searchParams.from : "/candidate/jobs";
 
   async function handleStartChat() {
     if (!job?.createdBy || chatting || account?.role !== "CANDIDATE") return;
@@ -95,13 +97,13 @@ export default function CandidateJobDetailPage({ params, searchParams }: {
   }, [canRecommend, params.jobId]);
 
   if (loading) return <main><LoadingState label="Đang tải việc làm" /></main>;
-  if (error) return <main><ErrorState message={error} onRetry={() => setReloadKey((value) => value + 1)} /><Link className="btn" href="/candidate/jobs">Quay về danh sách</Link></main>;
-  if (!job) return <main><h1 className="page-title">Không tìm thấy việc làm</h1><Link className="btn" href="/candidate/jobs">Quay về danh sách</Link></main>;
+  if (error) return <main><ErrorState message={error} onRetry={() => setReloadKey((value) => value + 1)} /><Link className="btn" href={searchHref}>Quay về danh sách</Link></main>;
+  if (!job) return <main><h1 className="page-title">Không tìm thấy việc làm</h1><Link className="btn" href={searchHref}>Quay về danh sách</Link></main>;
 
-  const canApply = job.status === "PUBLISHED" && job.deadline.slice(0, 10) >= new Date().toISOString().slice(0, 10);
+  const canApply = isJobAcceptingApplications(job);
   return (
     <main className={`${styles.page} ${styles.jobDetailPage}`}>
-      <nav className={styles.breadcrumb} aria-label="Đường dẫn"><Link href="/">Trang chủ</Link><span aria-hidden="true">/</span><Link href="/candidate/jobs">Tìm việc làm</Link><span aria-hidden="true">/</span><span>{job.title}</span></nav>
+      <nav className={styles.breadcrumb} aria-label="Đường dẫn"><Link href="/">Trang chủ</Link><span aria-hidden="true">/</span><Link href={searchHref}>Tìm việc làm</Link><span aria-hidden="true">/</span><span>{job.title}</span></nav>
       <section className={styles.jobHero}>
         <StatusBadge tone={canApply ? "success" : "warning"}>{!canApply && job.status === "PUBLISHED" ? "Đã hết hạn ứng tuyển" : jobStatusLabel(job.status)}</StatusBadge>
         <h1>{job.title}</h1>
