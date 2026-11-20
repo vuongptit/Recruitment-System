@@ -171,6 +171,7 @@ services:
       - ./services/auth-service/.env
     environment:
       <<: *java-environment
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
     healthcheck: *java-healthcheck
     secrets:
       - source: jwt-private-key
@@ -194,6 +195,7 @@ services:
       - ./services/application-service/.env
     environment:
       <<: *java-environment
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
       PROFILE_INTERNAL_API_KEY: ${PROFILE_INTERNAL_API_KEY_APPLICATION:?PROFILE_INTERNAL_API_KEY_APPLICATION is required}
       INTERNAL_API_KEY_PROFILE: ${APPLICATION_INTERNAL_API_KEY_PROFILE:?APPLICATION_INTERNAL_API_KEY_PROFILE is required}
       INTERNAL_API_KEY_INTERVIEW: ${APPLICATION_INTERNAL_API_KEY_INTERVIEW:?APPLICATION_INTERNAL_API_KEY_INTERVIEW is required}
@@ -269,6 +271,7 @@ services:
       - ./services/admin-service/.env
     environment:
       <<: *java-environment
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?currentSchema=admin
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}

@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class JwtTokenService {
-  public static final Duration ACCESS_TOKEN_LIFETIME = Duration.ofMinutes(15);
+  public static final Duration ACCESS_TOKEN_LIFETIME = Duration.ofDays(7);
 
   private static final JOSEObjectType ACCESS_TOKEN_TYPE = JOSEObjectType.JWT;
 

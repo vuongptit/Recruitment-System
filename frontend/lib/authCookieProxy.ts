@@ -67,8 +67,8 @@ export async function proxyAuthCookie(req: Request, action: Action): Promise<Nex
         }
         // Only the account crosses the browser boundary; credentials stay HttpOnly.
         response = json({ data: { user: data.user }, meta: null }, 200);
-        response.cookies.set("careerhub_token", data.accessToken, cookieOptions(req, "/", data.accessTokenExpiresInSeconds || 900));
-        response.cookies.set("careerhub_refresh", data.refreshToken, cookieOptions(req, refreshPath, data.refreshTokenExpiresInSeconds || 604800));
+        response.cookies.set("careerhub_token", data.accessToken, cookieOptions(req, "/", data.accessTokenExpiresInSeconds || 604800));
+        response.cookies.set("careerhub_refresh", data.refreshToken, cookieOptions(req, refreshPath, data.refreshTokenExpiresInSeconds || 2592000));
       }
     }
   } catch {
