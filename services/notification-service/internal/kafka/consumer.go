@@ -292,10 +292,15 @@ func (c *Consumer) handleMessageCreated(ctx context.Context, event model.KafkaEv
 		c.sseHub.LinkGroup(memberUUIDs)
 	}
 
-	metadataJSON, _ := json.Marshal(map[string]string{
+	senderName, _ := data["sender_name"].(string)
+	metadataMap := map[string]string{
 		"conversation_id": convIDStr,
 		"sender_id":       senderIDStr,
-	})
+	}
+	if senderName != "" {
+		metadataMap["sender_name"] = senderName
+	}
+	metadataJSON, _ := json.Marshal(metadataMap)
 
 	for _, m := range rawMembers {
 		mStr, ok := m.(string)
@@ -313,11 +318,16 @@ func (c *Consumer) handleMessageCreated(ctx context.Context, event model.KafkaEv
 			bodyPreview = string(runes[:97]) + "..."
 		}
 
+		title := "Tin nhắn mới"
+		if senderName != "" {
+			title = fmt.Sprintf("Tin nhắn mới từ %s", senderName)
+		}
+
 		notif := &model.Notification{
 			ID:        uuid.New(),
 			UserID:    recipientID,
 			Type:      model.TypeNewMessage,
-			Title:     "Tin nhắn mới",
+			Title:     title,
 			Body:      bodyPreview,
 			Metadata:  metadataJSON,
 			IsRead:    false,
