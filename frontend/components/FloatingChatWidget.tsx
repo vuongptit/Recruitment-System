@@ -204,7 +204,7 @@ export function FloatingChatWidget() {
                 <h3 className={styles.headerTitle}>CareerHub AI</h3>
                 <p className={styles.headerSubtitle}>
                   <Sparkles size={12} aria-hidden="true" />
-                  Google Gemini 1.5
+                  Google Gemini Flash
                 </p>
               </div>
             </div>
