@@ -142,6 +142,36 @@ test("avatar optimizes a large PNG before signing and saving, and shows invalid 
   await expect(input).toBeEnabled();
 });
 
+test("CV library filters and sorts real rows and preserves private preview links", async ({ page }) => {
+  await base(page);
+  const shared = { aggregateVersion: 1, revisionNumber: 1, createdAt: "2026-08-01T00:00:00Z" };
+  await page.route(api + "/profile/cvs", route => reply(route, [
+    { ...shared, id: cvId, title: "Backend Developer", type: "UPLOAD", isDefault: true, updatedAt: "2026-11-19T00:00:00Z" },
+    { ...shared, id: fileId, title: "Java Engineer", type: "ONLINE", isDefault: false, updatedAt: "2026-11-20T00:00:00Z" },
+  ]));
+  await login(page, "CANDIDATE", "/candidate/profile/cvs");
+  const library = page.getByRole("region", { name: "Danh sách CV" });
+  await expect(library.getByRole("heading")).toHaveText(["Java Engineer", "Backend Developer"]);
+  await page.getByRole("combobox", { name: "Sắp xếp CV" }).selectOption("name");
+  await expect(library.getByRole("heading")).toHaveText(["Backend Developer", "Java Engineer"]);
+  const types = page.getByRole("navigation", { name: "Loại CV" });
+  await types.getByRole("button", { name: "CV tải lên", exact: true }).click();
+  await expect(library.getByRole("heading")).toHaveText(["Backend Developer"]);
+  await expect(library.getByRole("link", { name: "Xem CV" })).toHaveAttribute("href", `/api/cv-preview/candidate/${cvId}`);
+  await expect(library.getByRole("link", { name: "Xem CV" })).toHaveAttribute("target", "_blank");
+  await page.getByRole("searchbox", { name: "Tìm kiếm CV" }).fill("không khớp");
+  await expect(page.getByText("Không tìm thấy CV phù hợp")).toBeVisible();
+  await page.getByRole("button", { name: "Xóa bộ lọc" }).click();
+  await page.getByRole("button", { name: "Dạng danh sách" }).click();
+  await expect(page.getByRole("button", { name: "Dạng danh sách" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Dạng lưới" }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.evaluate(() => { if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); window.scrollTo(0, 0); });
+  await page.screenshot({ path: test.info().outputPath("cv-library.png"), fullPage: true });
+  await page.evaluate(() => { window.location.hash = "upload-cv"; });
+  await expect(page.getByLabel("Tên CV", { exact: true })).toBeVisible();
+});
+
 test("CV retries resume confirmation and saving without sending the same PDF again", async ({ page }) => {
   await base(page);
   let signatures = 0, uploads = 0, confirms = 0, saves = 0;
@@ -168,6 +198,7 @@ test("CV retries resume confirmation and saving without sending the same PDF aga
     return confirms === 1 ? reply(route, { code: "SERVICE_UNAVAILABLE" }, 503) : reply(route, { fileId });
   });
   await login(page, "CANDIDATE", "/candidate/profile/cvs");
+  await page.getByRole("button", { name: "Tải CV lên", exact: true }).click();
   await page.getByLabel("Tên CV", { exact: true }).fill(cv.title);
   await expect(page.getByText("Chưa chọn tệp", { exact: true })).toBeVisible();
   const picker = page.waitForEvent("filechooser");
@@ -176,7 +207,7 @@ test("CV retries resume confirmation and saving without sending the same PDF aga
   await expect(page.locator(".file-picker-name")).toHaveText("cv.pdf");
   const submit = page.getByRole("button", { name: "Tải lên và lưu CV", exact: true });
   await submit.click();
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.locator("#upload-cv").getByRole("alert")).toBeVisible();
   expect([signatures, uploads, confirms, saves]).toEqual([1, 1, 1, 0]);
   await submit.click();
   await expect.poll(() => saves).toBe(1);
@@ -515,6 +546,7 @@ test("CV upload explains a missing storage preset, keeps the form and saves only
     return reply(route, { id: fileId, status: "ACTIVE" });
   });
   await login(page, "CANDIDATE", "/candidate/profile/cvs");
+  await page.getByRole("button", { name: "Tải CV lên", exact: true }).click();
   await page.getByLabel("Tên CV").fill("CV thử nghiệm");
   await page.getByLabel("Tệp PDF, tối đa 5 MB").setInputFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\nTest CV") });
   await page.getByRole("button", { name: "Tải lên và lưu CV", exact: true }).click();
@@ -565,7 +597,8 @@ test("CV delete carries version and explains deferred deletion", async ({
     return reply(route, { deletionMode: "PENDING" }, 202);
   });
   await login(page, "CANDIDATE", "/candidate/profile/cvs");
-  await page.getByRole("button", { name: "Xóa CV", exact: true }).click();
+  await page.getByRole("button", { name: "Thao tác với CV cũ", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Xóa CV", exact: true }).click();
   await page
     .getByRole("alertdialog")
     .getByRole("button", { name: "Xóa CV", exact: true })
@@ -726,7 +759,7 @@ test("candidate navigation is shared across profile and CV routes without duplic
   await openWorkspaceMenu(page);
   await expect(navigation.getByRole("link", { name: "Hồ sơ cá nhân", exact: true })).toHaveAttribute("aria-current", "page");
   await navigation.getByRole("link", { name: "Quản lý CV", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "CV của tôi" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quản lý CV", exact: true })).toBeVisible();
   await openWorkspaceMenu(page);
   await expect(page.locator(".candidate-workspace")).toHaveCount(1);
   await expect(navigation.getByRole("link", { name: "Quản lý CV", exact: true })).toHaveAttribute("aria-current", "page");
@@ -820,7 +853,7 @@ test("candidate registration preserves the interrupted CV library destination af
   await page.getByLabel("Mã xác minh").fill("123456");
   await page.getByRole("button", { name: "Xác nhận", exact: true }).click();
   await expect(page).toHaveURL(/\/candidate\/profile\/cvs$/);
-  await expect(page.getByRole("heading", { name: "CV của tôi", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quản lý CV", exact: true })).toBeVisible();
 });
 
 test("candidate settings links to working security and notification workflows", async ({ page }) => {

@@ -140,7 +140,7 @@ for (const role of ["CANDIDATE", "RECRUITER", "ADMIN"] as const) {
 
 for (const [name, destination, heading] of [
   ["candidate-profile", "/candidate/profile", "Hồ sơ cá nhân"],
-  ["candidate-cvs", "/candidate/profile/cvs", "CV của tôi"],
+  ["candidate-cvs", "/candidate/profile/cvs", "Quản lý CV"],
 ] as const) {
   test(`${name} uses the shared content and form geometry`, async ({ page }, testInfo) => {
     await fixtureSession(page, "CANDIDATE", destination);

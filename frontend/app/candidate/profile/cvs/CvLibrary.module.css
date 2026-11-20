@@ -1,0 +1,95 @@
+.page {
+  --cv-accent: #087747;
+  --cv-muted: #51665e;
+  --cv-line: #dbe7e0;
+  display: grid;
+  gap: 17px;
+  min-width: 0;
+}
+.page > :global(.page-header) { margin-block-end: 2px; }
+.metrics, .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
+.metric, .card, .uploadPanel { border: 1px solid var(--cv-line); border-radius: 14px; background: var(--surface-1, #fff); min-width: 0; }
+.metric { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 16px 18px; }
+.metric div { display: grid; gap: 5px; min-width: 0; }
+.metric div > span { font-size: 13px; color: var(--cv-muted); }
+.metric strong { font-size: 27px; line-height: 1.15; }
+.metricIcon { width: 42px; height: 42px; flex: none; border-radius: 11px; display: grid; place-items: center; background: #e6f4ec; color: var(--cv-accent); }
+.metric[data-tone="upload"] .metricIcon { background: #eaf1f9; color: #285b83; }
+.metric[data-tone="online"] .metricIcon { background: #e3f3f0; color: #146559; }
+.uploadPanel { scroll-margin-top: 90px; }
+.uploadPanel:not([open]) { display: none; }
+.uploadPanel summary { min-height: 44px; padding: 10px 16px; color: var(--cv-accent); cursor: pointer; font-size: 14px; font-weight: 650; }
+.uploadPanel form { padding: 0 16px 16px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 5px 17px; border-bottom: 1px solid var(--cv-line); }
+.tabs button, .viewToggle button, .menuTrigger { border: 0; font: inherit; cursor: pointer; color: #3d574b; background: transparent; }
+.tabs button { min-height: 44px; padding: 6px 8px; border-bottom: 2px solid transparent; font-size: 14px; }
+.tabs button[aria-pressed="true"] { color: var(--cv-accent); border-color: var(--cv-accent); font-weight: 700; }
+.page button:focus-visible, .menuItem:focus-visible { outline: 2px solid #0c8656; outline-offset: 2px; }
+.toolbar, .viewControls { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 10px; }
+.viewControls { flex-wrap: nowrap; }
+.viewControls :global(.select) { width: auto; min-width: 0; }
+.search { position: relative; width: min(100%, 335px); }
+.search svg { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); color: var(--cv-muted); pointer-events: none; }
+.search :global(.input) { padding-inline-start: 37px; }
+.viewToggle { display: flex; flex: none; overflow: hidden; border: 1px solid var(--cv-line); border-radius: 9px; background: #fff; }
+.viewToggle button { display: grid; place-items: center; width: 40px; height: 42px; }
+.viewToggle button[aria-pressed="true"] { background: #e6f4ec; color: var(--cv-accent); }
+.viewToggle button:focus-visible { outline-offset: -3px; }
+.grid { align-items: stretch; }
+.list { display: grid; gap: 12px; }
+.card { display: flex; flex-direction: column; overflow: hidden; }
+.cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 185px;
+  padding: 18px;
+  background: #eff4f7;
+  border-bottom: 1px solid var(--cv-line);
+}
+.card[data-type="ONLINE"] .cover { background: #edf5f2; }
+.paper { width: 105px; height: 139px; display: grid; align-content: start; gap: 8px; padding: 14px 11px 12px 23px; color: #345a78; background: #fff; border: 1px solid #d7e3ed; box-shadow: 0 4px 14px rgb(28 62 53 / .10); position: relative; }
+.paper span { width: 12px; background: #345a78; position: absolute; inset: 0 auto 0 0; }
+.paper i { height: 3px; border-radius: 10px; background: #dce6ec; }
+.paper i:nth-last-child(2) { width: 75%; }
+.card[data-type="ONLINE"] .paper { color: #187263; }
+.card[data-type="ONLINE"] .paper span { background: #187263; }
+.defaultBadge { position: absolute; z-index: 1; left: 12px; top: 12px; background: #e3f6e9; color: #075438; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 650; }
+.cardBody { display: flex; flex-direction: column; flex: 1; padding: 14px; min-width: 0; }
+.cardHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; }
+.cardHeader > div { min-width: 0; }
+.cardHeader h2 { margin: 0 0 4px; font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
+.muted, .date { color: var(--cv-muted); font-size: 13px; margin: 0; }
+.date { margin-top: 3px; font-size: 12px; }
+.menuTrigger { min-width: 38px; min-height: 38px; flex: none; display: grid; place-items: center; border-radius: 8px; }
+.menuTrigger:hover, .menuTrigger[data-state="open"] { background: #edf5f0; }
+.menuTrigger:disabled { opacity: .55; cursor: wait; }
+.menu { z-index: 80; min-width: 160px; padding: 5px; border: 1px solid #dbe7e0; border-radius: 10px; background: #fff; color: #1d3028; box-shadow: 0 10px 28px rgb(28 62 53 / .15); }
+.menuItem { padding: 8px 10px; border-radius: 5px; display: block; font-size: 14px; outline: none; cursor: pointer; color: inherit; text-decoration: none; }
+.menuItem[data-highlighted] { background: #edf5f0; }
+.menuSeparator { height: 1px; background: #dbe7e0; margin: 4px; }
+.danger { color: #9e2727; }
+.cardActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; border-top: 1px solid var(--cv-line); padding-top: 10px; margin-top: auto; }
+.cardHeader { padding-bottom: 12px; }
+.cardActions :global(.btn) { padding: 7px 5px; gap: 4px; font-size: 13px; min-height: 40px; }
+.list .card { flex-direction: row; }
+.list .cover { width: 150px; min-height: 145px; border-bottom: 0; border-right: 1px solid var(--cv-line); }
+.list .paper { transform: scale(.78); }
+.list .cardActions { grid-template-columns: repeat(2, minmax(0, 150px)); }
+@media (max-width: 1100px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .metrics { gap: 7px; }
+  .metric { padding: 10px; align-items: flex-start; flex-direction: column-reverse; }
+  .metricIcon { width: 34px; height: 34px; }
+  .metricIcon svg { width: 17px; height: 17px; }
+  .metric div > span { font-size: 12px; }
+  .metric strong { font-size: 23px; }
+  .toolbar .search { width: 100%; }
+  .toolbar .viewControls { width: 100%; }
+  .viewControls :global(.select) { flex: 1; }
+  .list .cover { width: 96px; padding: 5px; overflow: hidden; }
+  .list .paper { width: 75px; transform: scale(.78); }
+  .list .defaultBadge { left: 5px; top: 5px; font-size: 10px; }
+  .list .cardActions { grid-template-columns: minmax(0, 1fr); }
+}

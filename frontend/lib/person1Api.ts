@@ -190,6 +190,7 @@ export interface CandidateCv {
   isDefault: boolean;
   aggregateVersion: number;
   createdAt: string;
+  updatedAt?: string;
   templateId?: string;
   contentJson?: BuilderContent;
   revisionNumber: number;
