@@ -325,6 +325,7 @@ export function normalizeError(code: string): string {
     EVALUATION_ALREADY_EXISTS: "Bạn đã đánh giá hồ sơ này.",
     INVALID_APPLICATION_TRANSITION: "Trạng thái hồ sơ đã thay đổi hoặc thao tác này không còn hợp lệ. Hãy tải lại quy trình tuyển dụng.",
     REAPPLICATION_COOLDOWN: "Bạn đang trong thời gian chờ trước khi có thể ứng tuyển lại.",
+    ACTIVE_APPLICATION_EXISTS: "Bạn đã ứng tuyển vị trí này.",
     JOB_STATE_CHANGED: "Trạng thái tin tuyển dụng vừa thay đổi. Hãy tải lại và so sánh trước khi tiếp tục.",
     JOB_ACCESS_DENIED: "Bạn không có quyền thao tác với tin tuyển dụng này. Danh sách sẽ được đồng bộ lại.",
     JOB_SEARCH_PAGE_TOO_DEEP: "Kết quả quá sâu. Hãy lọc hẹp hơn hoặc chuyển sang tải thêm.",
