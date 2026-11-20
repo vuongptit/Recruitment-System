@@ -36,6 +36,7 @@ public class ApplicationPipelineService {
     private final OfferRepository offers;
     private final CompanyClient companies;
     private final ObjectMapper objectMapper;
+    private final CandidateNameResolver candidateNames;
     private final Clock clock;
     private final String topic;
 
@@ -47,6 +48,7 @@ public class ApplicationPipelineService {
         OfferRepository offers,
         CompanyClient companies,
         ObjectMapper objectMapper,
+        CandidateNameResolver candidateNames,
         @Value("${application-events.topic}") String topic
     ) {
         this(
@@ -56,6 +58,7 @@ public class ApplicationPipelineService {
             offers,
             companies,
             objectMapper,
+            candidateNames,
             Clock.systemUTC(),
             topic
         );
@@ -71,12 +74,37 @@ public class ApplicationPipelineService {
         Clock clock,
         String topic
     ) {
+        this(
+            applications,
+            history,
+            outbox,
+            offers,
+            companies,
+            objectMapper,
+            null,
+            clock,
+            topic
+        );
+    }
+
+    ApplicationPipelineService(
+        ApplicationPipelineRepository applications,
+        ApplicationHistoryWriter history,
+        ApplicationEventOutboxRepository outbox,
+        OfferRepository offers,
+        CompanyClient companies,
+        ObjectMapper objectMapper,
+        CandidateNameResolver candidateNames,
+        Clock clock,
+        String topic
+    ) {
         this.applications = applications;
         this.history = history;
         this.outbox = outbox;
         this.offers = offers;
         this.companies = companies;
         this.objectMapper = objectMapper;
+        this.candidateNames = candidateNames;
         this.clock = clock;
         this.topic = topic;
     }
@@ -116,10 +144,16 @@ public class ApplicationPipelineService {
                 OfferRepository.OfferReference::getApplicationId,
                 OfferRepository.OfferReference::getId
             ));
+        Map<UUID, String> names = (candidateNames == null || result.isEmpty()) ? Map.of()
+            : candidateNames.resolveNames(
+                result.getContent().stream().map(ApplicationEntity::getCandidateId).distinct().toList()
+            );
         return new RecruiterApplicationPageResponse(
             result.getContent().stream()
                 .map(application -> RecruiterApplicationItemResponse.from(
-                    application, offerIds.get(application.getId())
+                    application,
+                    offerIds.get(application.getId()),
+                    names.getOrDefault(application.getCandidateId(), "Ứng viên")
                 ))
                 .toList(),
             result.getNumber(),

@@ -24,19 +24,29 @@ public record ApplicationDetailResponse(
     Instant updatedAt,
     long version,
     List<TimelineEntryResponse> timeline,
-    UUID offerId
+    UUID offerId,
+    String candidateName
 ) {
     static ApplicationDetailResponse from(
         ApplicationEntity application,
         List<TimelineEntryResponse> timeline
     ) {
-        return from(application, timeline, null);
+        return from(application, timeline, null, null);
     }
 
     static ApplicationDetailResponse from(
         ApplicationEntity application,
         List<TimelineEntryResponse> timeline,
         UUID offerId
+    ) {
+        return from(application, timeline, offerId, null);
+    }
+
+    static ApplicationDetailResponse from(
+        ApplicationEntity application,
+        List<TimelineEntryResponse> timeline,
+        UUID offerId,
+        String candidateName
     ) {
         return new ApplicationDetailResponse(
             application.getId(),
@@ -54,7 +64,8 @@ public record ApplicationDetailResponse(
             application.getUpdatedAt(),
             application.getVersion(),
             timeline,
-            offerId
+            offerId,
+            candidateName
         );
     }
 }

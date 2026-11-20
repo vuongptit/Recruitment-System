@@ -19,16 +19,23 @@ public record RecruiterApplicationItemResponse(
     Instant appliedAt,
     Instant updatedAt,
     long version,
-    UUID offerId
+    UUID offerId,
+    String candidateName
 ) {
     static RecruiterApplicationItemResponse from(
         ApplicationEntity application
     ) {
-        return from(application, null);
+        return from(application, null, null);
     }
 
     static RecruiterApplicationItemResponse from(
         ApplicationEntity application, UUID offerId
+    ) {
+        return from(application, offerId, null);
+    }
+
+    static RecruiterApplicationItemResponse from(
+        ApplicationEntity application, UUID offerId, String candidateName
     ) {
         return new RecruiterApplicationItemResponse(
             application.getId(),
@@ -42,7 +49,8 @@ public record RecruiterApplicationItemResponse(
             application.getAppliedAt(),
             application.getUpdatedAt(),
             application.getVersion(),
-            offerId
+            offerId,
+            candidateName
         );
     }
 }
